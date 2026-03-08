@@ -1,0 +1,15 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="#09090B"/>
+  <!-- The main 'L' shape representing a secure conduit -->
+  <path d="M160 160 V312 C160 334.091 177.909 352 200 352 H328" stroke="url(#leluGradient)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- AI Agent Node -->
+  <circle cx="328" cy="160" r="28" fill="#38BDF8"/>
+  <!-- Authorization link (dashed connection) -->
+  <path d="M328 204 V352" stroke="#38BDF8" stroke-width="16" stroke-dasharray="24 24" stroke-linecap="round"/>
+  <defs>
+    <linearGradient id="leluGradient" x1="160" y1="160" x2="328" y2="352" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#818CF8"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+  </defs>
+</svg>

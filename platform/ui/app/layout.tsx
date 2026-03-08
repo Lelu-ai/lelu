@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   description: "Confidence-Aware Auth audit trail",
   applicationName: "Lelu Engine",
   icons: {
-    icon: "/lelu-mark.svg",
-    shortcut: "/lelu-mark.svg",
-    apple: "/lelu-mark.svg",
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+    apple: "/logo.svg",
   },
 };
 
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-white/60 dark:bg-black/60 backdrop-blur-xl border-b border-zinc-200 dark:border-white/[0.08] transition-colors duration-300">
             <a href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight hover:opacity-80 transition-opacity text-black dark:text-white">
-              <img src="/lelu-mark.svg" alt="Lelu logo" className="w-6 h-6 rounded-md" />
+              <img src="/logo.svg" alt="Lelu logo" className="w-8 h-8 rounded-md" />
               Lelu Engine
             </a>
             <div className="flex items-center gap-4 sm:gap-6 text-sm font-medium text-zinc-600 dark:text-zinc-400">
@@ -46,7 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <footer className="border-t border-zinc-200 dark:border-white/[0.08] py-12 mt-20 transition-colors duration-300">
             <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
               <div className="flex items-center gap-2 font-bold text-lg tracking-tight text-zinc-800 dark:text-zinc-300">
-                <img src="/lelu-mark.svg" alt="Lelu logo" className="w-5 h-5 rounded" />
+                <img src="/logo.svg" alt="Lelu logo" className="w-6 h-6 rounded" />
                 Lelu Engine
               </div>
               <div className="flex gap-6 text-sm text-zinc-500">

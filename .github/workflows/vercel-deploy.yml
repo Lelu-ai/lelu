@@ -37,6 +37,22 @@ jobs:
           test -n "$VERCEL_ORG_ID" || (echo "Missing secret: VERCEL_ORG_ID" && exit 1)
           test -n "$VERCEL_PROJECT_ID" || (echo "Missing secret: VERCEL_PROJECT_ID" && exit 1)
 
+      - name: Validate Vercel project access
+        shell: sh
+        run: |
+          code=$(curl -sS -o /tmp/vercel-project.json -w "%{http_code}" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID")
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Vercel project lookup failed (HTTP $code). Verify that VERCEL_TOKEN belongs to the same account/team as VERCEL_ORG_ID and that VERCEL_PROJECT_ID is correct."
+            echo "::error::Current IDs: VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
+            echo "::group::Vercel API response"
+            cat /tmp/vercel-project.json || true
+            echo "::endgroup::"
+            exit 1
+          fi
+
       - name: Install dependencies
         working-directory: platform/ui
         run: npm ci

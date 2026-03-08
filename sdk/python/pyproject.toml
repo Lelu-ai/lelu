@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lelu-agent-auth-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python SDK for Lelu — the confidence-aware authorization engine for autonomous AI agents"
 readme = "README.md"
 license = { text = "MIT" }

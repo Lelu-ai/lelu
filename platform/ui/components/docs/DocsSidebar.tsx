@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type NavItem = { 
   href: string; 
@@ -162,23 +163,24 @@ export function DocsSidebar() {
   };
 
   return (
-    <aside className="hidden md:block w-64 shrink-0 border-r border-zinc-200 dark:border-white/[0.08]">
-      <div ref={scrollRef} className="docs-sidebar-scroll sticky top-[73px] h-[calc(100vh-73px)] overflow-y-auto overscroll-contain py-6 pr-3">
-        <nav className="space-y-1">
+    <aside className="hidden md:block w-64 lg:w-72 shrink-0 border-r border-zinc-200 dark:border-white/[0.05] bg-zinc-50/30 dark:bg-[#09090B]">
+      <div ref={scrollRef} className="docs-sidebar-scroll sticky top-[73px] h-[calc(100vh-73px)] overflow-y-auto overscroll-contain py-8 pl-4 pr-3 lg:pl-8 lg:pr-4 no-scrollbar">
+        <nav className="space-y-4">
           {sections.map((section) => {
             const isOpen = openSections[section.title];
-            const hasActiveItem = section.items.some((item) => pathname === item.href);
             
             return (
-              <div key={section.title}>
+              <div key={section.title} className="flex flex-col">
                 <button
                   onClick={() => toggleSection(section.title)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors group"
+                  className="group flex items-center justify-between py-1 text-[13px] font-semibold tracking-wide text-zinc-900 dark:text-zinc-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer w-full text-left"
                 >
-                  <span className="text-zinc-500 dark:text-zinc-500 group-hover:text-zinc-700 dark:group-hover:text-zinc-300 transition-colors">
-                    {section.icon}
+                  <span className="flex items-center gap-2">
+                    <span className="text-zinc-400 group-hover:text-indigo-500 transition-colors">
+                      {section.icon}
+                    </span>
+                    {section.title}
                   </span>
-                  <span className="flex-1 text-left">{section.title}</span>
                   <svg
                     width="14"
                     height="14"
@@ -188,34 +190,48 @@ export function DocsSidebar() {
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={`text-zinc-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    className={`text-zinc-400 transition-transform duration-200 ${isOpen ? "rotate-90" : "rotate-0"}`}
                   >
                     <path d="M9 18l6-6-6-6"/>
                   </svg>
                 </button>
                 
-                {isOpen && (
-                  <ul className="mt-1 ml-6 space-y-0.5 text-sm border-l border-zinc-200 dark:border-zinc-800 pl-3">
-                    {section.items.map((item) => {
-                      const active = pathname === item.href;
-                      return (
-                        <li key={item.href}>
-                          <a
-                            href={item.href}
-                            className={[
-                              "docs-sidebar-link block px-2 py-1.5 rounded-md transition-colors",
-                              active
-                                ? "is-active text-blue-600 dark:text-blue-400 font-medium"
-                                : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5",
-                            ].join(" ")}
-                          >
-                            {item.label}
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.ul 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                      className="flex flex-col ml-[11px] pl-3 border-l border-zinc-200 dark:border-zinc-800/80 space-y-1 mt-1.5 overflow-hidden"
+                    >
+                      {section.items.map((item) => {
+                        const active = pathname === item.href;
+                        return (
+                          <li key={item.href}>
+                            <a
+                              href={item.href}
+                              className={[
+                                "docs-sidebar-link relative flex items-center py-1.5 px-3 rounded-md text-[13px] font-medium transition-all duration-200",
+                                active
+                                  ? "is-active text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10"
+                                  : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800/50",
+                              ].join(" ")}
+                            >
+                              {active && (
+                                <motion.div 
+                                  layoutId="active-indicator"
+                                  className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-500 rounded-r-full -ml-[13px]" 
+                                />
+                              )}
+                              {item.label}
+                            </a>
+                          </li>
+                        );
+                      })}
+                    </motion.ul>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}

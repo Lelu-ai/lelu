@@ -529,3 +529,76 @@ td a:hover { text-decoration: underline; }
     transition: none;
   }
 }
+/* Next-Gen Docs Typography & Prose Styles */
+.prose {
+  --tw-prose-body: #3f3f46;
+  --tw-prose-headings: #09090b;
+  --tw-prose-links: #4f46e5;
+  --tw-prose-bold: #18181b;
+  --tw-prose-counters: #71717a;
+  --tw-prose-bullets: #d4d4d8;
+  --tw-prose-hr: #e4e4e7;
+  --tw-prose-quotes: #18181b;
+  --tw-prose-code: #18181b;
+  --tw-prose-pre-code: #e4e4e7;
+  --tw-prose-pre-bg: #09090b;
+  --tw-prose-th-borders: #d4d4d8;
+  --tw-prose-td-borders: #e4e4e7;
+}
+
+.dark .prose {
+  --tw-prose-body: #a1a1aa;
+  --tw-prose-headings: #f4f4f5;
+  --tw-prose-links: #818cf8;
+  --tw-prose-bold: #f4f4f5;
+  --tw-prose-counters: #a1a1aa;
+  --tw-prose-bullets: #3f3f46;
+  --tw-prose-hr: #27272a;
+  --tw-prose-quotes: #f4f4f5;
+  --tw-prose-code: #f4f4f5;
+  --tw-prose-pre-code: #e4e4e7;
+  --tw-prose-pre-bg: #09090b;
+  --tw-prose-th-borders: #3f3f46;
+  --tw-prose-td-borders: #27272a;
+}
+
+.prose pre {
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: #09090b !important;
+}
+
+.prose code {
+  font-weight: 500;
+  font-size: 0.875em;
+}
+
+.prose :not(pre) > code {
+  color: #6366f1;
+  background-color: rgba(99, 102, 241, 0.1);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.375rem;
+}
+
+.dark .prose :not(pre) > code {
+  color: #818cf8;
+  background-color: rgba(129, 140, 248, 0.15);
+}
+
+.prose h1, .prose h2, .prose h3 {
+  letter-spacing: -0.025em;
+}
+
+.prose a {
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 0.2s;
+}
+
+.prose a:hover {
+  text-decoration-color: currentColor;
+}
+

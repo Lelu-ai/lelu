@@ -20,7 +20,7 @@ export default function DocsConceptGoSDK() {
               <span className="text-xs text-zinc-500 font-mono">terminal</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-{`go get github.com/Abenezer0923/Lelu/sdk/go`}
+{`go get github.com/lelu-auth/lelu/sdk/go`}
             </pre>
           </div>
         </section>
@@ -38,7 +38,7 @@ import (
   "context"
   "fmt"
 
-  lelu "github.com/Abenezer0923/Lelu/sdk/go"
+  lelu "github.com/lelu-auth/lelu/sdk/go"
 )
 
 func main() {

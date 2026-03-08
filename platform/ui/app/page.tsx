@@ -28,7 +28,7 @@ export default function Home() {
               </code>
               <span>or</span>
               <code className="px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono">
-                go get github.com/Abenezer0923/Lelu/sdk/go
+                go get github.com/lelu-auth/lelu/sdk/go
               </code>
             </div>
 
@@ -40,7 +40,7 @@ export default function Home() {
                 GET STARTED
               </a>
               <a 
-                href="https://github.com/Abenezer0923/Lelu" 
+                href="https://github.com/lelu-auth/lelu" 
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all border border-zinc-200 dark:border-zinc-800"
@@ -79,7 +79,7 @@ export default function Home() {
               <div className="p-6 font-mono text-sm overflow-x-auto">
                 <pre className="text-zinc-300">
                   <code>
-<span className="text-purple-400">import</span> {"{"} <span className="text-blue-300">LeluClient</span> {"}"} <span className="text-purple-400">from</span> <span className="text-orange-300">"lelu"</span>;
+<span className="text-purple-400">import</span> {"{"} <span className="text-blue-300">LeluClient</span> {"}"} <span className="text-purple-400">from</span> <span className="text-orange-300">"@lelu-auth/lelu"</span>;
 
 <span className="text-purple-400">const</span> <span className="text-blue-300">decision</span> = <span className="text-purple-400">await</span> <span className="text-yellow-300">client</span>.<span className="text-blue-300">agentAuthorize</span>({"{"}
   <span className="text-blue-300">actor</span>: <span className="text-orange-300">"invoice_bot"</span>,

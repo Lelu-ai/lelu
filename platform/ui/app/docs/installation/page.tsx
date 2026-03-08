@@ -14,9 +14,9 @@ export default function DocsInstallation() {
 
   const packageCommands: Record<typeof packageTab, string> = {
     npm: "npm install @lelu-auth/lelu",
-    pnpm: "pnpm add lelu",
-    yarn: "yarn add lelu",
-    bun: "bun add lelu",
+    pnpm: "pnpm add @lelu-auth/lelu",
+    yarn: "yarn add @lelu-auth/lelu",
+    bun: "bun add @lelu-auth/lelu",
   };
 
   return (

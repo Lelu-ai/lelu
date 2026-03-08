@@ -111,7 +111,7 @@ if decision.allowed:
               <span className="text-xs text-zinc-500 font-mono">Installation</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-{`go get github.com/Abenezer0923/Lelu/sdk/go`}
+{`go get github.com/lelu-auth/lelu/sdk/go`}
             </pre>
           </div>
 
@@ -126,7 +126,7 @@ import (
   "context"
   "fmt"
 
-  lelu "github.com/Abenezer0923/Lelu/sdk/go"
+  lelu "github.com/lelu-auth/lelu/sdk/go"
 )
 
 func main() {

@@ -12,6 +12,22 @@ Lelu provides confidence-aware access control, human-in-the-loop approvals, and 
 npm install @lelu-auth/lelu
 ```
 
+## Start Dashboard (Localhost)
+
+After installing the package, start the local dashboard stack with one command:
+
+```bash
+npx @lelu-auth/lelu dashboard
+```
+
+Then open:
+
+```text
+http://localhost:3002/audit
+```
+
+This command clones/updates the Lelu stack in `~/.lelu-stack` and runs `docker compose up -d --build`.
+
 Or run the public Lelu engine image:
 
 ```bash
@@ -42,7 +58,7 @@ import { createClient } from "@lelu-auth/lelu";
 
 // Initialize the client
 const lelu = createClient({ 
-  baseUrl: "http://localhost:8082" 
+  baseUrl: "http://localhost:8083" 
 });
 
 // Authorize an agent action

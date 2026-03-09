@@ -32,16 +32,20 @@ function formatAgo(ts: string): string {
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: { actor?: string; action?: string; decision?: string };
+  searchParams: Promise<{ actor?: string; action?: string; decision?: string }>;
 }) {
-  const events = await listAuditEvents({
-    actor: searchParams.actor,
-    action: searchParams.action,
-    decision: searchParams.decision,
-    limit: 100,
-  });
-  const shadow = await getShadowSummary(60);
-  const compliance = await getComplianceExport("all");
+  const params = await searchParams;
+
+  const [events, shadow, compliance] = await Promise.all([
+    listAuditEvents({
+      actor: params.actor,
+      action: params.action,
+      decision: params.decision,
+      limit: 100,
+    }).catch(() => []),
+    getShadowSummary(60).catch(() => null),
+    getComplianceExport("all").catch(() => null),
+  ]);
   const sparklinePoints = shadow ? buildSparklinePoints(shadow) : "0,24 240,24";
   const knownControls = 6;
   const coverageCount = compliance?.controls?.length ?? 0;
@@ -249,7 +253,7 @@ export default async function AuditPage({
           </div>
           <input
             name="actor"
-            defaultValue={searchParams.actor}
+            defaultValue={params.actor}
             placeholder="Filter by actor..."
             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-sm text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
           />
@@ -263,14 +267,14 @@ export default async function AuditPage({
           </div>
           <input
             name="action"
-            defaultValue={searchParams.action}
+            defaultValue={params.action}
             placeholder="Filter by action..."
             className="w-full pl-10 pr-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-sm text-zinc-900 dark:text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
           />
         </div>
         <select
           name="decision"
-          defaultValue={searchParams.decision ?? ""}
+          defaultValue={params.decision ?? ""}
           className="flex-1 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md text-sm text-zinc-900 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all appearance-none"
         >
           <option value="">All decisions</option>

@@ -6,13 +6,7 @@
 
 ## Quick Start (Docker)
 
-Run all Lelu services with one command:
-
-```bash
-docker compose up -d --build
-```
-
-Or use the public engine image directly from Docker Hub:
+use the public engine image directly from Docker Hub:
 
 ```bash
 docker pull abenezer0923/lelu-engine:latest

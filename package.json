@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@lelu-auth/lelu": "^0.1.9"
+  }
+}

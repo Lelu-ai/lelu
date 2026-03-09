@@ -12,6 +12,13 @@ Run all Lelu services with one command:
 docker compose up -d --build
 ```
 
+Or use the public engine image directly from Docker Hub:
+
+```bash
+docker pull abenezer0923/lelu-engine:latest
+docker run --rm -p 8083:8080 abenezer0923/lelu-engine:latest
+```
+
 Key local endpoints:
 
 - Engine: `http://localhost:8083/healthz`

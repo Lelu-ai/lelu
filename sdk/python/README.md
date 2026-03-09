@@ -8,6 +8,13 @@ Python client for [Lelu](https://github.com/lelu-auth/lelu) — the confidence-a
 pip install lelu-agent-auth-sdk
 ```
 
+Or run the public Lelu engine image:
+
+```bash
+docker pull abenezer0923/lelu-engine:latest
+docker run --rm -p 8083:8080 abenezer0923/lelu-engine:latest
+```
+
 ## Quick start
 
 ```python

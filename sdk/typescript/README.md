@@ -12,6 +12,13 @@ Lelu provides confidence-aware access control, human-in-the-loop approvals, and 
 npm install @lelu-auth/lelu
 ```
 
+Or run the public Lelu engine image:
+
+```bash
+docker pull abenezer0923/lelu-engine:latest
+docker run --rm -p 8083:8080 abenezer0923/lelu-engine:latest
+```
+
 ## Docker Support
 
 Lelu works in Dockerized apps.

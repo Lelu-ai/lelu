@@ -8,6 +8,13 @@ Go client for [Lelu](https://github.com/lelu-auth/lelu) — confidence-aware aut
 go get github.com/lelu-auth/lelu/sdk/go
 ```
 
+Or run the public Lelu engine image:
+
+```bash
+docker pull abenezer0923/lelu-engine:latest
+docker run --rm -p 8083:8080 abenezer0923/lelu-engine:latest
+```
+
 ## Quick Start
 
 ```go

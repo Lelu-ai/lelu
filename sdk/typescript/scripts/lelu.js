@@ -29,30 +29,53 @@ function showAuditLog() {
   run("node", [auditScript]);
 }
 
+function showPolicies() {
+  const policiesScript = path.join(__dirname, "policies.js");
+  const args = process.argv.slice(3); // Pass remaining args to policies script
+  run("node", [policiesScript, ...args]);
+}
+
 function printHelp() {
   console.log(`
 Lelu CLI
 
 Usage:
-  lelu audit-log       View recent audit events from the platform
-  lelu help            Show this help
+  lelu audit-log         View recent audit events from the platform
+  lelu policies          Manage authorization policies
+  lelu help              Show this help
+
+Commands:
+  audit-log              View audit trail and authorization events
+  policies list          List all policies
+  policies get <name>    Get a specific policy
+  policies set <name> <file>  Create or update a policy from file
+  policies delete <name> Delete a policy
 
 Environment Variables:
-  LELU_PLATFORM_URL   Platform API URL (default: http://localhost:3001)
-  LELU_AUDIT_LIMIT    Number of events to fetch (default: 20)
+  LELU_PLATFORM_URL       Platform API URL (default: http://localhost:9091)
+  LELU_PLATFORM_API_KEY   Platform API key (default: platform-dev-key)
+  LELU_TENANT_ID          Tenant ID (default: default)
+  LELU_AUDIT_LIMIT        Number of events to fetch (default: 20)
 
 Examples:
-  lelu audit-log                                    # View recent audit events
-  LELU_AUDIT_LIMIT=50 lelu audit-log               # View 50 recent events
-  LELU_PLATFORM_URL=https://api.example.com lelu audit-log  # Use custom platform URL
+  lelu audit-log                              # View recent audit events
+  lelu policies list                          # List all policies
+  lelu policies get auth                      # View the "auth" policy
+  lelu policies set auth ./auth.rego          # Create/update policy from file
+  LELU_TENANT_ID=prod lelu policies list      # Use different tenant
 `);
 }
 
 function main() {
-  const command = process.argv[2] || "audit-log";
+  const command = process.argv[2] || "help";
 
   if (command === "audit-log") {
     showAuditLog();
+    return;
+  }
+
+  if (command === "policies") {
+    showPolicies();
     return;
   }
 

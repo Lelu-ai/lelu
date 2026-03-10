@@ -158,6 +158,64 @@ class ListAuditEventsResult(BaseModel):
     next_cursor: int
 
 
+# ─── Policies ─────────────────────────────────────────────────────────────────
+
+
+class Policy(BaseModel):
+    """A policy stored in the platform."""
+
+    id: str
+    tenant_id: str
+    name: str
+    content: str
+    version: str
+    hmac_sha256: str
+    created_at: str
+    updated_at: str
+
+
+class ListPoliciesRequest(BaseModel):
+    """Request for listing policies."""
+
+    tenant_id: str | None = Field(default=None, description="Tenant ID")
+
+
+class ListPoliciesResult(BaseModel):
+    """Result of listing policies."""
+
+    policies: list[Policy]
+    count: int
+
+
+class GetPolicyRequest(BaseModel):
+    """Request for getting a specific policy."""
+
+    name: str = Field(..., min_length=1, description="Policy name")
+    tenant_id: str | None = Field(default=None, description="Tenant ID")
+
+
+class UpsertPolicyRequest(BaseModel):
+    """Request for creating or updating a policy."""
+
+    name: str = Field(..., min_length=1, description="Policy name")
+    content: str = Field(..., min_length=1, description="Policy content (Rego code)")
+    version: str = Field(default="1.0", description="Policy version")
+    tenant_id: str | None = Field(default=None, description="Tenant ID")
+
+
+class DeletePolicyRequest(BaseModel):
+    """Request for deleting a policy."""
+
+    name: str = Field(..., min_length=1, description="Policy name")
+    tenant_id: str | None = Field(default=None, description="Tenant ID")
+
+
+class DeletePolicyResult(BaseModel):
+    """Result of deleting a policy."""
+
+    deleted: bool
+
+
 # ─── Errors ───────────────────────────────────────────────────────────────────
 
 

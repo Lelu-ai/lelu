@@ -99,8 +99,36 @@ export default function DocsQuickStart() {
 
         {/* Step 4 */}
         <div className="relative">
+          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
           <div className="relative flex gap-6">
             <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">4</div>
+            <div className="flex-1 pb-8">
+              <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-3">View audit logs</h2>
+              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+                Use the built-in CLI to view audit logs and manage policies directly from your terminal.
+              </p>
+              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
+                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 font-mono">terminal</span>
+                </div>
+                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
+                  <pre><code>{`# Install and view audit logs
+npm install -g @lelu-auth/lelu
+npx @lelu-auth/lelu audit-log
+
+# Manage policies
+npx @lelu-auth/lelu policies list
+npx @lelu-auth/lelu policies get auth`}</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 5 */}
+        <div className="relative">
+          <div className="relative flex gap-6">
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">5</div>
             <div className="flex-1">
               <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-3">Use the SDK</h2>
               <p className="text-zinc-600 dark:text-zinc-400 mb-4">

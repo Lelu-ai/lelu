@@ -17,6 +17,13 @@ import {
   type AuditEvent,
   type ListAuditEventsRequest,
   type ListAuditEventsResult,
+  type Policy,
+  type ListPoliciesRequest,
+  type ListPoliciesResult,
+  type GetPolicyRequest,
+  type UpsertPolicyRequest,
+  type DeletePolicyRequest,
+  type DeletePolicyResult,
 } from "./types.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
@@ -236,7 +243,7 @@ export class LeluClient {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
-      const url = `${this.baseUrl}/v1/audit${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `${this.baseUrl}/api/v1/audit${params.toString() ? `?${params.toString()}` : ""}`;
       const res = await fetch(url, {
         method: "GET",
         headers,
@@ -252,12 +259,112 @@ export class LeluClient {
       }>(res);
 
       return {
-        events: data.events,
+        events: data.events || [],
         count: data.count,
         limit: data.limit,
         cursor: data.cursor,
         nextCursor: data.next_cursor,
       };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // ─── Policy Management ────────────────────────────────────────────────────────
+
+  async listPolicies(req: ListPoliciesRequest = {}): Promise<ListPoliciesResult> {
+    const headers = this.headers();
+    if (req.tenantId) {
+      headers["X-Tenant-ID"] = req.tenantId;
+    }
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/policies`, {
+        method: "GET",
+        headers,
+        signal: ctrl.signal,
+      });
+      
+      const data = await this.parseResponse<{
+        policies: Policy[];
+        count: number;
+      }>(res);
+
+      return {
+        policies: data.policies || [],
+        count: data.count,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async getPolicy(req: GetPolicyRequest): Promise<Policy> {
+    const headers = this.headers();
+    if (req.tenantId) {
+      headers["X-Tenant-ID"] = req.tenantId;
+    }
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
+        method: "GET",
+        headers,
+        signal: ctrl.signal,
+      });
+      
+      return await this.parseResponse<Policy>(res);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async upsertPolicy(req: UpsertPolicyRequest): Promise<Policy> {
+    const headers = this.headers();
+    if (req.tenantId) {
+      headers["X-Tenant-ID"] = req.tenantId;
+    }
+
+    const body = {
+      content: req.content,
+      version: req.version || "1.0"
+    };
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      
+      return await this.parseResponse<Policy>(res);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async deletePolicy(req: DeletePolicyRequest): Promise<DeletePolicyResult> {
+    const headers = this.headers();
+    if (req.tenantId) {
+      headers["X-Tenant-ID"] = req.tenantId;
+    }
+
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
+        method: "DELETE",
+        headers,
+        signal: ctrl.signal,
+      });
+      
+      return await this.parseResponse<DeletePolicyResult>(res);
     } finally {
       clearTimeout(timer);
     }

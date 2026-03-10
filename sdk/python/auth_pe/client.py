@@ -21,6 +21,13 @@ from .models import (
     AuditEvent,
     ListAuditEventsRequest,
     ListAuditEventsResult,
+    Policy,
+    ListPoliciesRequest,
+    ListPoliciesResult,
+    GetPolicyRequest,
+    UpsertPolicyRequest,
+    DeletePolicyRequest,
+    DeletePolicyResult,
 )
 
 
@@ -217,7 +224,7 @@ class LeluClient:
         if req.tenant_id:
             headers["X-Tenant-ID"] = req.tenant_id
 
-        resp = await self._client.get("/v1/audit", params=params, headers=headers)
+        resp = await self._client.get("/api/v1/audit", params=params, headers=headers)
         await self._raise_for_status(resp)
         data = resp.json()
 
@@ -228,6 +235,67 @@ class LeluClient:
             cursor=data["cursor"],
             next_cursor=data["next_cursor"],
         )
+
+    # ── Policy Management ─────────────────────────────────────────────────────
+
+    async def list_policies(self, req: ListPoliciesRequest | None = None) -> ListPoliciesResult:
+        """List all policies from the platform API."""
+        if req is None:
+            req = ListPoliciesRequest()
+
+        headers = {}
+        if req.tenant_id:
+            headers["X-Tenant-ID"] = req.tenant_id
+
+        resp = await self._client.get("/api/v1/policies", headers=headers)
+        await self._raise_for_status(resp)
+        data = resp.json()
+
+        return ListPoliciesResult(
+            policies=[Policy(**policy) for policy in data["policies"]],
+            count=data["count"],
+        )
+
+    async def get_policy(self, req: GetPolicyRequest) -> Policy:
+        """Get a specific policy by name."""
+        headers = {}
+        if req.tenant_id:
+            headers["X-Tenant-ID"] = req.tenant_id
+
+        resp = await self._client.get(f"/api/v1/policies/{req.name}", headers=headers)
+        await self._raise_for_status(resp)
+        data = resp.json()
+
+        return Policy(**data)
+
+    async def upsert_policy(self, req: UpsertPolicyRequest) -> Policy:
+        """Create or update a policy."""
+        headers = {}
+        if req.tenant_id:
+            headers["X-Tenant-ID"] = req.tenant_id
+
+        payload = {
+            "content": req.content,
+            "version": req.version,
+        }
+
+        resp = await self._client.put(f"/api/v1/policies/{req.name}", json=payload, headers=headers)
+        await self._raise_for_status(resp)
+        data = resp.json()
+
+        return Policy(**data)
+
+    async def delete_policy(self, req: DeletePolicyRequest) -> DeletePolicyResult:
+        """Delete a policy by name."""
+        headers = {}
+        if req.tenant_id:
+            headers["X-Tenant-ID"] = req.tenant_id
+
+        resp = await self._client.delete(f"/api/v1/policies/{req.name}", headers=headers)
+        await self._raise_for_status(resp)
+        data = resp.json()
+
+        return DeletePolicyResult(**data)
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 

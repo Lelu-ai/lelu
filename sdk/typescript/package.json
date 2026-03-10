@@ -1,6 +1,6 @@
 {
   "name": "@lelu-auth/lelu",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer",
   "homepage": "https://ui-seven-amber.vercel.app/",

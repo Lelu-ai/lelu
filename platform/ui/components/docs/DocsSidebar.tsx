@@ -46,6 +46,7 @@ const sections: NavSection[] = [
       { href: "/docs/concepts/api", label: "API" },
       { href: "/docs/concepts/client", label: "Client SDK" },
       { href: "/docs/concepts/cli", label: "CLI & MCP" },
+      { href: "/docs/cli-commands", label: "CLI Commands" },
       { href: "/docs/concepts/skills", label: "Skills" },
     ],
   },

@@ -45,7 +45,7 @@ export default function DocsConceptCli() {
         </div>
         <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 tracking-tight">CLI &amp; MCP</h1>
         <p className="text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          The Lelu CLI provides tools for local development, policy testing, and running the Model Context Protocol (MCP) server for seamless integration with AI assistants like Cursor and Claude.
+          The Lelu CLI provides tools for local development, policy management, audit log viewing, and running the Model Context Protocol (MCP) server for seamless integration with AI assistants like Cursor and Claude.
         </p>
       </div>
 
@@ -53,16 +53,163 @@ export default function DocsConceptCli() {
         <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Installation</h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            The CLI is distributed as an npm package. You can run it directly using <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">npx</code> or install it globally.
+            The CLI is available in all three SDK packages. You can run it directly using <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">npx</code> or install it globally.
           </p>
           
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button className="px-3 py-1 text-xs rounded bg-zinc-800 text-white font-medium">TypeScript</button>
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">Python</button>
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">Go</button>
+                </div>
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-              {`npm install -g @lelu/cli`}
+              {`# Install globally
+npm install -g @lelu-auth/lelu
+
+# Or run directly
+npx @lelu-auth/lelu help`}
             </pre>
+          </div>
+
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">TypeScript</button>
+                  <button className="px-3 py-1 text-xs rounded bg-zinc-800 text-white font-medium">Python</button>
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">Go</button>
+                </div>
+              </div>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300">
+              {`# Install via pip
+pip install lelu-agent-auth-sdk
+
+# Run CLI
+lelu help`}
+            </pre>
+          </div>
+
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <div className="flex items-center gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">TypeScript</button>
+                  <button className="px-3 py-1 text-xs rounded text-zinc-400">Python</button>
+                  <button className="px-3 py-1 text-xs rounded bg-zinc-800 text-white font-medium">Go</button>
+                </div>
+              </div>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300">
+              {`# Install Go module
+go get github.com/lelu-auth/lelu/sdk/go
+
+# Build and run CLI
+cd sdk/go/cmd/lelu
+go build -o lelu
+./lelu help`}
+            </pre>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">CLI Commands</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+            The Lelu CLI provides commands for viewing audit logs and managing authorization policies directly from your terminal.
+          </p>
+
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-3">Audit Log</h3>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            View recent authorization events and audit trail data from the platform service.
+          </p>
+
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
+              {`# View recent audit events
+lelu audit-log
+
+# Customize number of events
+LELU_AUDIT_LIMIT=50 lelu audit-log
+
+# Use custom platform URL
+LELU_PLATFORM_URL=https://your-platform.com lelu audit-log`}
+            </pre>
+          </div>
+
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-3">Policy Management</h3>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            Create, update, view, and delete authorization policies stored in the platform.
+          </p>
+
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
+              {`# List all policies
+lelu policies list
+
+# View a specific policy
+lelu policies get auth
+
+# Create or update a policy from file
+lelu policies set auth ./auth.rego
+
+# Delete a policy
+lelu policies delete old-policy
+
+# Use different tenant
+LELU_TENANT_ID=prod lelu policies list`}
+            </pre>
+          </div>
+
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-3">Environment Variables</h3>
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-white/10 mb-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5">
+                  <th className="text-left px-4 py-3 font-semibold text-zinc-900 dark:text-white">Variable</th>
+                  <th className="text-left px-4 py-3 font-semibold text-zinc-900 dark:text-white">Default</th>
+                  <th className="text-left px-4 py-3 font-semibold text-zinc-900 dark:text-white">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
+                {[
+                  ["LELU_PLATFORM_URL", "http://localhost:9091", "Platform API URL"],
+                  ["LELU_PLATFORM_API_KEY", "platform-dev-key", "Platform API key"],
+                  ["LELU_TENANT_ID", "default", "Tenant ID for multi-tenant setups"],
+                  ["LELU_AUDIT_LIMIT", "20", "Number of audit events to fetch"],
+                ].map(([variable, defaultVal, desc]) => (
+                  <tr key={variable}>
+                    <td className="px-4 py-3 font-mono text-blue-600 dark:text-blue-400 whitespace-nowrap">{variable}</td>
+                    <td className="px-4 py-3 font-mono text-zinc-500 dark:text-zinc-400 text-xs">{defaultVal}</td>
+                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4M12 8h.01"/>
+              </svg>
+              <div>
+                <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Platform Service Required</h4>
+                <p className="text-sm text-blue-700 dark:text-blue-400">
+                  The CLI commands require the Lelu platform service to be running. If the service is not available, the CLI will provide helpful Docker setup instructions.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

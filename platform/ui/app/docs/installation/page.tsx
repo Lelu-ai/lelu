@@ -7,7 +7,7 @@ export default function DocsInstallation() {
 
   const steps = [
     { num: 1, title: "Install the Package" },
-    { num: 2, title: "Start the Dashboard" },
+    { num: 2, title: "CLI Commands" },
     { num: 3, title: "Set Environment Variables" },
     { num: 4, title: "Configure Lelu Client" },
     { num: 5, title: "That's it!" },
@@ -127,10 +127,10 @@ export default function DocsInstallation() {
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
               2
             </span>
-            View Audit Logs
+            CLI Commands
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            After installing, you can view audit logs directly in your terminal using the built-in CLI:
+            After installing, you can use the built-in CLI commands to view audit logs and manage policies directly from your terminal:
           </p>
           
           {/* TypeScript/Node.js */}
@@ -141,7 +141,13 @@ export default function DocsInstallation() {
                 <span className="text-xs text-zinc-500 font-mono">terminal</span>
               </div>
               <pre className="p-4 font-mono text-sm text-blue-300">
-                npx @lelu-auth/lelu audit-log
+                {`# View audit logs
+npx @lelu-auth/lelu audit-log
+
+# Manage policies
+npx @lelu-auth/lelu policies list
+npx @lelu-auth/lelu policies get auth
+npx @lelu-auth/lelu policies set auth ./auth.rego`}
               </pre>
             </div>
           </div>
@@ -156,9 +162,9 @@ export default function DocsInstallation() {
               <pre className="p-4 font-mono text-sm text-blue-300">
                 {`# After installing: pip install lelu-agent-auth-sdk
 lelu audit-log
-
-# Or using Docker:
-docker run --rm lelu-python-cli audit-log`}
+lelu policies list
+lelu policies get auth
+lelu policies set auth ./auth.rego`}
               </pre>
             </div>
           </div>
@@ -171,10 +177,11 @@ docker run --rm lelu-python-cli audit-log`}
                 <span className="text-xs text-zinc-500 font-mono">terminal</span>
               </div>
               <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# Build and run with Docker:
-cd sdk/go
-docker build -t lelu-go-cli .
-docker run --rm lelu-go-cli audit-log`}
+                {`# Build and run CLI
+cd sdk/go/cmd/lelu
+go build -o lelu
+./lelu audit-log
+./lelu policies list`}
               </pre>
             </div>
           </div>
@@ -195,20 +202,20 @@ docker run --rm lelu-go-cli audit-log`}
             </svg>
             <div className="text-sm text-blue-800 dark:text-blue-300">
               <p className="mb-2">
-                <strong>Note:</strong> The audit-log command requires the Lelu platform service to be running (not just the engine).
+                <strong>Note:</strong> CLI commands require the Lelu platform service to be running (not just the engine).
               </p>
               <p className="text-xs">
-                Set <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">LELU_PLATFORM_URL</code> to point to your platform instance (default: http://localhost:3001).
+                Set <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">LELU_PLATFORM_URL</code> to point to your platform instance (default: http://localhost:9091).
               </p>
             </div>
           </div>
         </section>
 
-        {/* Step 2 */}
-        <section id="step-2">
+        {/* Step 3 */}
+        <section id="step-3">
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3">
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              2
+              3
             </span>
             Set Environment Variables
           </h2>
@@ -294,11 +301,11 @@ docker run --rm lelu-go-cli audit-log`}
           </div>
         </section>
 
-        {/* Step 3 */}
-        <section id="step-3">
+        {/* Step 4 */}
+        <section id="step-4">
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3">
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              3
+              4
             </span>
             Configure Lelu Client
           </h2>
@@ -378,7 +385,7 @@ elif decision.allowed:
           </div>
         </section>
 
-        {/* Step 4 */}
+        {/* Step 5 */}
         <section id="step-4">
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3">
             <span className="flex items-center justify-center w-7 h-7 rounded-full bg-green-600 text-white text-sm font-bold">

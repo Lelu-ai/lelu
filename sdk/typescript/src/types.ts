@@ -162,6 +162,60 @@ export interface ClientConfig {
 
 // ─── Error type ───────────────────────────────────────────────────────────────
 
+// ─── Policy types ─────────────────────────────────────────────────────────────
+
+export interface Policy {
+  id: string;
+  tenantId: string;
+  name: string;
+  content: string;
+  version: string;
+  hmacSha256: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListPoliciesRequest {
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface ListPoliciesResult {
+  policies: Policy[];
+  count: number;
+}
+
+export interface GetPolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface UpsertPolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Policy content (Rego code) */
+  content: string;
+  /** Policy version (defaults to "1.0") */
+  version?: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface DeletePolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface DeletePolicyResult {
+  deleted: boolean;
+}
+
+// ─── Error type ───────────────────────────────────────────────────────────────
+
 export class AuthEngineError extends Error {
   constructor(
     message: string,
@@ -171,4 +225,55 @@ export class AuthEngineError extends Error {
     super(message);
     this.name = "AuthEngineError";
   }
+}
+// ─── Policy types ─────────────────────────────────────────────────────────────
+
+export interface Policy {
+  id: string;
+  tenantId: string;
+  name: string;
+  content: string;
+  version: string;
+  hmacSha256: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListPoliciesRequest {
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface ListPoliciesResult {
+  policies: Policy[];
+  count: number;
+}
+
+export interface GetPolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface UpsertPolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Policy content (Rego code) */
+  content: string;
+  /** Policy version (defaults to "1.0") */
+  version?: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface DeletePolicyRequest {
+  /** Policy name */
+  name: string;
+  /** Tenant ID (defaults to "default") */
+  tenantId?: string;
+}
+
+export interface DeletePolicyResult {
+  deleted: boolean;
 }

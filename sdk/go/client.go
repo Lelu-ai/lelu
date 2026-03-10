@@ -147,6 +147,54 @@ type ListAuditEventsResult struct {
 	NextCursor int64        `json:"next_cursor"`
 }
 
+// Policy represents a policy stored in the platform.
+type Policy struct {
+	ID         string `json:"id"`
+	TenantID   string `json:"tenant_id"`
+	Name       string `json:"name"`
+	Content    string `json:"content"`
+	Version    string `json:"version"`
+	HMACSha256 string `json:"hmac_sha256"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+}
+
+// ListPoliciesRequest configures policy listing.
+type ListPoliciesRequest struct {
+	TenantID string `json:"tenant_id,omitempty"` // Tenant ID
+}
+
+// ListPoliciesResult contains the policies response.
+type ListPoliciesResult struct {
+	Policies []Policy `json:"policies"`
+	Count    int      `json:"count"`
+}
+
+// GetPolicyRequest configures getting a specific policy.
+type GetPolicyRequest struct {
+	Name     string `json:"name"`                // Policy name
+	TenantID string `json:"tenant_id,omitempty"` // Tenant ID
+}
+
+// UpsertPolicyRequest configures creating or updating a policy.
+type UpsertPolicyRequest struct {
+	Name     string `json:"name"`                // Policy name
+	Content  string `json:"content"`             // Policy content (Rego code)
+	Version  string `json:"version,omitempty"`   // Policy version (defaults to "1.0")
+	TenantID string `json:"tenant_id,omitempty"` // Tenant ID
+}
+
+// DeletePolicyRequest configures deleting a policy.
+type DeletePolicyRequest struct {
+	Name     string `json:"name"`                // Policy name
+	TenantID string `json:"tenant_id,omitempty"` // Tenant ID
+}
+
+// DeletePolicyResult contains the policy deletion response.
+type DeletePolicyResult struct {
+	Deleted bool `json:"deleted"`
+}
+
 type mintTokenWire struct {
 	Token     string `json:"token"`
 	TokenID   string `json:"token_id"`
@@ -366,7 +414,7 @@ func (c *Client) ListAuditEvents(ctx context.Context, req *ListAuditEventsReques
 	}
 
 	// Build URL
-	path := "/v1/audit"
+	path := "/api/v1/audit"
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -468,4 +516,224 @@ func (c *Client) doJSON(ctx context.Context, method, path string, in any, out an
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+// ── Policy Management ─────────────────────────────────────────────────────────
+
+// ListPolicies lists all policies from the platform API.
+func (c *Client) ListPolicies(ctx context.Context, req *ListPoliciesRequest) (*ListPoliciesResult, error) {
+	if req == nil {
+		req = &ListPoliciesRequest{}
+	}
+
+	// Build request
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/policies", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	if req.TenantID != "" {
+		hreq.Header.Set("X-Tenant-ID", req.TenantID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(hreq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(respBytes))
+		var eb errorBody
+		if len(respBytes) > 0 && json.Unmarshal(respBytes, &eb) == nil && eb.Error != "" {
+			msg = eb.Error
+		}
+		if msg == "" {
+			msg = "request failed"
+		}
+		return nil, &EngineError{Message: msg, Status: resp.StatusCode, Body: string(respBytes)}
+	}
+
+	var result ListPoliciesResult
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// GetPolicy gets a specific policy by name.
+func (c *Client) GetPolicy(ctx context.Context, req *GetPolicyRequest) (*Policy, error) {
+	if req == nil || req.Name == "" {
+		return nil, errors.New("policy name is required")
+	}
+
+	// Build request
+	path := fmt.Sprintf("/api/v1/policies/%s", url.PathEscape(req.Name))
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	if req.TenantID != "" {
+		hreq.Header.Set("X-Tenant-ID", req.TenantID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(hreq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(respBytes))
+		var eb errorBody
+		if len(respBytes) > 0 && json.Unmarshal(respBytes, &eb) == nil && eb.Error != "" {
+			msg = eb.Error
+		}
+		if msg == "" {
+			msg = "request failed"
+		}
+		return nil, &EngineError{Message: msg, Status: resp.StatusCode, Body: string(respBytes)}
+	}
+
+	var result Policy
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// UpsertPolicy creates or updates a policy.
+func (c *Client) UpsertPolicy(ctx context.Context, req *UpsertPolicyRequest) (*Policy, error) {
+	if req == nil || req.Name == "" || req.Content == "" {
+		return nil, errors.New("policy name and content are required")
+	}
+
+	version := req.Version
+	if version == "" {
+		version = "1.0"
+	}
+
+	payload := map[string]string{
+		"content": req.Content,
+		"version": version,
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	// Build request
+	path := fmt.Sprintf("/api/v1/policies/%s", url.PathEscape(req.Name))
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL+path, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	if req.TenantID != "" {
+		hreq.Header.Set("X-Tenant-ID", req.TenantID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(hreq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(respBytes))
+		var eb errorBody
+		if len(respBytes) > 0 && json.Unmarshal(respBytes, &eb) == nil && eb.Error != "" {
+			msg = eb.Error
+		}
+		if msg == "" {
+			msg = "request failed"
+		}
+		return nil, &EngineError{Message: msg, Status: resp.StatusCode, Body: string(respBytes)}
+	}
+
+	var result Policy
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// DeletePolicy deletes a policy by name.
+func (c *Client) DeletePolicy(ctx context.Context, req *DeletePolicyRequest) (*DeletePolicyResult, error) {
+	if req == nil || req.Name == "" {
+		return nil, errors.New("policy name is required")
+	}
+
+	// Build request
+	path := fmt.Sprintf("/api/v1/policies/%s", url.PathEscape(req.Name))
+	hreq, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	hreq.Header.Set("Content-Type", "application/json")
+	if c.apiKey != "" {
+		hreq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+	if req.TenantID != "" {
+		hreq.Header.Set("X-Tenant-ID", req.TenantID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(hreq)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(respBytes))
+		var eb errorBody
+		if len(respBytes) > 0 && json.Unmarshal(respBytes, &eb) == nil && eb.Error != "" {
+			msg = eb.Error
+		}
+		if msg == "" {
+			msg = "request failed"
+		}
+		return nil, &EngineError{Message: msg, Status: resp.StatusCode, Body: string(respBytes)}
+	}
+
+	var result DeletePolicyResult
+	if err := json.Unmarshal(respBytes, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
 }

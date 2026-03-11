@@ -18,6 +18,8 @@ Out of the box, Lelu provides:
 - Runtime risk evaluation
 - Short-lived (JIT) scoped tokens
 - Audit trail and incident hooks
+- SQLite local storage (works offline)
+- PostgreSQL for production deployments
 
 ## Why Lelu
 

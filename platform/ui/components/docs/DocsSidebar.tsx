@@ -105,7 +105,7 @@ const sections: NavSection[] = [
       </svg>
     ),
     items: [
-      { href: "/docs/databases", label: "Overview" },
+      { href: "/docs/database", label: "Configuration" },
       { href: "/docs/databases/postgresql", label: "PostgreSQL" },
       { href: "/docs/databases/redis", label: "Redis" },
     ],

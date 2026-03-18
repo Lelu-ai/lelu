@@ -24,6 +24,17 @@ import {
   type UpsertPolicyRequest,
   type DeletePolicyRequest,
   type DeletePolicyResult,
+  // Phase 2: Behavioral Analytics Types
+  type AgentReputation,
+  type AnomalyResult,
+  type BaselineHealth,
+  type DriftAnalysis,
+  type Alert,
+  type ReputationListResponse,
+  type AnomaliesResponse,
+  type BaselineResponse,
+  type AlertsResponse,
+  type AcknowledgeAlertRequest,
 } from "./types.js";
 import { agentTracer, type DecisionMetrics, type LatencyMetrics } from "./observability/tracer.js";
 
@@ -492,6 +503,82 @@ export class LeluClient {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // ─── Phase 2: Behavioral Analytics ─────────────────────────────────────────
+
+  /**
+   * Gets reputation information for a specific agent.
+   */
+  async getAgentReputation(agentId: string): Promise<AgentReputation> {
+    return await this.get<AgentReputation>(`/v1/analytics/reputation/${encodeURIComponent(agentId)}`);
+  }
+
+  /**
+   * Lists agent reputations sorted by performance.
+   */
+  async listAgentReputations(options: {
+    sort: 'top' | 'problematic';
+    limit?: number;
+    threshold?: number;
+  }): Promise<ReputationListResponse> {
+    const params = new URLSearchParams();
+    params.set('sort', options.sort);
+    if (options.limit) params.set('limit', options.limit.toString());
+    if (options.threshold) params.set('threshold', options.threshold.toString());
+    
+    return await this.get<ReputationListResponse>(`/v1/analytics/reputation?${params.toString()}`);
+  }
+
+  /**
+   * Gets recent anomalies for a specific agent.
+   */
+  async getAgentAnomalies(agentId: string, since?: Date): Promise<AnomaliesResponse> {
+    const params = new URLSearchParams();
+    if (since) params.set('since', since.toISOString());
+    
+    const path = `/v1/analytics/anomalies/${encodeURIComponent(agentId)}${params.toString() ? `?${params.toString()}` : ''}`;
+    return await this.get<AnomaliesResponse>(path);
+  }
+
+  /**
+   * Gets behavioral baseline information for a specific agent.
+   */
+  async getAgentBaseline(agentId: string): Promise<BaselineResponse> {
+    return await this.get<BaselineResponse>(`/v1/analytics/baseline/${encodeURIComponent(agentId)}`);
+  }
+
+  /**
+   * Triggers a baseline refresh for a specific agent.
+   */
+  async refreshAgentBaseline(agentId: string): Promise<{ agent_id: string; status: string }> {
+    return await this.post<{ agent_id: string; status: string }>(`/v1/analytics/baseline/${encodeURIComponent(agentId)}/refresh`, {});
+  }
+
+  /**
+   * Gets active alerts, optionally filtered by agent.
+   */
+  async getAlerts(agentId?: string): Promise<AlertsResponse> {
+    const params = new URLSearchParams();
+    if (agentId) params.set('agent_id', agentId);
+    
+    const path = `/v1/analytics/alerts${params.toString() ? `?${params.toString()}` : ''}`;
+    return await this.get<AlertsResponse>(path);
+  }
+
+  /**
+   * Acknowledges an alert.
+   */
+  async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ alert_id: string; status: string }> {
+    const body: AcknowledgeAlertRequest = { acknowledged_by: acknowledgedBy };
+    return await this.post<{ alert_id: string; status: string }>(`/v1/analytics/alerts/${encodeURIComponent(alertId)}/acknowledge`, body);
+  }
+
+  /**
+   * Resolves an alert.
+   */
+  async resolveAlert(alertId: string): Promise<{ alert_id: string; status: string }> {
+    return await this.post<{ alert_id: string; status: string }>(`/v1/analytics/alerts/${encodeURIComponent(alertId)}/resolve`, {});
   }
 
   // ── HTTP helpers ───────────────────────────────────────────────────────────

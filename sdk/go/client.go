@@ -198,6 +198,120 @@ type DeletePolicyResult struct {
 	Deleted bool `json:"deleted"`
 }
 
+// ─── Phase 2: Behavioral Analytics Types ─────────────────────────────────────
+
+// AgentReputation represents an agent's reputation metrics
+type AgentReputation struct {
+	AgentID          string    `json:"agent_id"`
+	ReputationScore  float64   `json:"reputation_score"`   // 0-1 trust score
+	DecisionCount    int64     `json:"decision_count"`     // Total decisions made
+	AccuracyRate     float64   `json:"accuracy_rate"`      // % correct decisions
+	CalibrationScore float64   `json:"calibration_score"`  // Confidence vs accuracy alignment
+	LastUpdated      string    `json:"last_updated"`       // ISO timestamp
+	ConfidenceSum    float64   `json:"confidence_sum"`     // Sum of all confidence scores
+	CorrectDecisions int64     `json:"correct_decisions"`  // Number of correct decisions
+	HighConfErrors   int64     `json:"high_conf_errors"`   // High confidence but wrong
+	LowConfCorrect   int64     `json:"low_conf_correct"`   // Low confidence but correct
+}
+
+// AnomalyResult represents an anomaly detection result
+type AnomalyResult struct {
+	AgentID      string             `json:"agent_id"`
+	Timestamp    string             `json:"timestamp"`       // ISO timestamp
+	AnomalyScore float64            `json:"anomaly_score"`   // 0-1, higher = more anomalous
+	IsAnomaly    bool               `json:"is_anomaly"`
+	Severity     string             `json:"severity"`        // none, low, medium, high, severe
+	Features     map[string]float64 `json:"features"`        // Feature values that contributed
+	Explanation  string             `json:"explanation"`     // Human-readable explanation
+	Action       string             `json:"action"`
+	Confidence   float64            `json:"confidence"`
+	Latency      float64            `json:"latency"`         // milliseconds
+	Outcome      string             `json:"outcome"`
+}
+
+// BaselineHealth represents behavioral baseline health information
+type BaselineHealth struct {
+	AgentID             string   `json:"agent_id"`
+	OverallHealth       float64  `json:"overall_health"`       // 0-1 health score
+	SampleCount         int64    `json:"sample_count"`
+	Age                 float64  `json:"age"`                  // milliseconds
+	LastUpdated         string   `json:"last_updated"`         // ISO timestamp
+	ConfidenceVariance  float64  `json:"confidence_variance"`
+	LatencyVariance     float64  `json:"latency_variance"`
+	ActionDiversity     int64    `json:"action_diversity"`
+	TemporalCoverage    float64  `json:"temporal_coverage"`    // How well it covers different times
+	ConfidenceDrift     float64  `json:"confidence_drift"`
+	LatencyDrift        float64  `json:"latency_drift"`
+	PatternDrift        float64  `json:"pattern_drift"`
+	NeedsRefresh        bool     `json:"needs_refresh"`
+	RecommendedActions  []string `json:"recommended_actions"`
+}
+
+// DriftAnalysis represents behavioral drift analysis
+type DriftAnalysis struct {
+	AgentID         string   `json:"agent_id"`
+	DetectedAt      string   `json:"detected_at"`      // ISO timestamp
+	DriftScore      float64  `json:"drift_score"`      // 0-1, higher = more drift
+	DriftType       string   `json:"drift_type"`       // none, confidence, latency, pattern, combined
+	Severity        string   `json:"severity"`         // none, low, medium, high, critical
+	BaselineAge     float64  `json:"baseline_age"`     // milliseconds
+	RecentSamples   int64    `json:"recent_samples"`
+	Explanation     string   `json:"explanation"`
+	Recommendations []string `json:"recommendations"`
+}
+
+// Alert represents alert information
+type Alert struct {
+	ID          string                 `json:"id"`
+	RuleID      string                 `json:"rule_id"`
+	AgentID     string                 `json:"agent_id"`
+	Timestamp   string                 `json:"timestamp"`    // ISO timestamp
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Severity    string                 `json:"severity"`     // low, medium, high, critical
+	Priority    int                    `json:"priority"`     // 1-5, higher = more urgent
+	TriggerData map[string]interface{} `json:"trigger_data"`
+	Context     map[string]interface{} `json:"context"`
+	Status      string                 `json:"status"`       // active, acknowledged, resolved
+	AckedBy     *string                `json:"acked_by,omitempty"`
+	AckedAt     *string                `json:"acked_at,omitempty"`     // ISO timestamp
+	ResolvedAt  *string                `json:"resolved_at,omitempty"`  // ISO timestamp
+	GroupID     *string                `json:"group_id,omitempty"`
+	GroupCount  int                    `json:"group_count"`
+	Tags        map[string]string      `json:"tags"`
+	Channels    []string               `json:"channels"`
+}
+
+// API Response types for Phase 2
+type ReputationListResponse struct {
+	Agents    []AgentReputation `json:"agents"`
+	Total     int               `json:"total"`
+	Sort      string            `json:"sort"`      // top or problematic
+	Threshold *float64          `json:"threshold,omitempty"`
+}
+
+type AnomaliesResponse struct {
+	AgentID   string          `json:"agent_id"`
+	Anomalies []AnomalyResult `json:"anomalies"`
+	Total     int             `json:"total"`
+	Since     string          `json:"since"`     // ISO timestamp
+}
+
+type BaselineResponse struct {
+	AgentID string         `json:"agent_id"`
+	Health  BaselineHealth `json:"health"`
+	Drift   DriftAnalysis  `json:"drift"`
+}
+
+type AlertsResponse struct {
+	Alerts []Alert `json:"alerts"`
+	Total  int     `json:"total"`
+}
+
+type AcknowledgeAlertRequest struct {
+	AcknowledgedBy string `json:"acknowledged_by"`
+}
+
 type mintTokenWire struct {
 	Token     string `json:"token"`
 	TokenID   string `json:"token_id"`
@@ -835,4 +949,138 @@ func (c *Client) DeletePolicy(ctx context.Context, req *DeletePolicyRequest) (*D
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
+}
+
+// ─── Phase 2: Behavioral Analytics Methods ──────────────────────────────────
+
+// GetAgentReputation retrieves reputation information for a specific agent.
+func (c *Client) GetAgentReputation(ctx context.Context, agentID string) (*AgentReputation, error) {
+	if strings.TrimSpace(agentID) == "" {
+		return nil, errors.New("agentID is required")
+	}
+
+	path := fmt.Sprintf("/v1/analytics/reputation/%s", url.PathEscape(agentID))
+	var result AgentReputation
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListAgentReputations retrieves reputation information for all agents.
+func (c *Client) ListAgentReputations(ctx context.Context, sort string, threshold *float64) (*ReputationListResponse, error) {
+	params := url.Values{}
+	if sort != "" {
+		params.Set("sort", sort)
+	}
+	if threshold != nil {
+		params.Set("threshold", fmt.Sprintf("%.3f", *threshold))
+	}
+
+	path := "/v1/analytics/reputation"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var result ReputationListResponse
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetAgentAnomalies retrieves recent anomalies for a specific agent.
+func (c *Client) GetAgentAnomalies(ctx context.Context, agentID string, since *string) (*AnomaliesResponse, error) {
+	if strings.TrimSpace(agentID) == "" {
+		return nil, errors.New("agentID is required")
+	}
+
+	params := url.Values{}
+	if since != nil {
+		params.Set("since", *since)
+	}
+
+	path := fmt.Sprintf("/v1/analytics/anomalies/%s", url.PathEscape(agentID))
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var result AnomaliesResponse
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetAgentBaseline retrieves behavioral baseline information for a specific agent.
+func (c *Client) GetAgentBaseline(ctx context.Context, agentID string) (*BaselineResponse, error) {
+	if strings.TrimSpace(agentID) == "" {
+		return nil, errors.New("agentID is required")
+	}
+
+	path := fmt.Sprintf("/v1/analytics/baseline/%s", url.PathEscape(agentID))
+	var result BaselineResponse
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RefreshAgentBaseline triggers a refresh of the behavioral baseline for a specific agent.
+func (c *Client) RefreshAgentBaseline(ctx context.Context, agentID string) error {
+	if strings.TrimSpace(agentID) == "" {
+		return errors.New("agentID is required")
+	}
+
+	path := fmt.Sprintf("/v1/analytics/baseline/%s/refresh", url.PathEscape(agentID))
+	return c.doJSON(ctx, http.MethodPost, path, nil, nil)
+}
+
+// GetAlerts retrieves active alerts.
+func (c *Client) GetAlerts(ctx context.Context, agentID *string, severity *string, status *string) (*AlertsResponse, error) {
+	params := url.Values{}
+	if agentID != nil {
+		params.Set("agent_id", *agentID)
+	}
+	if severity != nil {
+		params.Set("severity", *severity)
+	}
+	if status != nil {
+		params.Set("status", *status)
+	}
+
+	path := "/v1/analytics/alerts"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var result AlertsResponse
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// AcknowledgeAlert acknowledges a specific alert.
+func (c *Client) AcknowledgeAlert(ctx context.Context, alertID string, acknowledgedBy string) error {
+	if strings.TrimSpace(alertID) == "" {
+		return errors.New("alertID is required")
+	}
+	if strings.TrimSpace(acknowledgedBy) == "" {
+		return errors.New("acknowledgedBy is required")
+	}
+
+	path := fmt.Sprintf("/v1/analytics/alerts/%s/acknowledge", url.PathEscape(alertID))
+	req := AcknowledgeAlertRequest{AcknowledgedBy: acknowledgedBy}
+	return c.doJSON(ctx, http.MethodPost, path, req, nil)
+}
+
+// ResolveAlert resolves a specific alert.
+func (c *Client) ResolveAlert(ctx context.Context, alertID string) error {
+	if strings.TrimSpace(alertID) == "" {
+		return errors.New("alertID is required")
+	}
+
+	path := fmt.Sprintf("/v1/analytics/alerts/%s/resolve", url.PathEscape(alertID))
+	return c.doJSON(ctx, http.MethodPost, path, nil, nil)
 }

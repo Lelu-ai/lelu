@@ -29,6 +29,17 @@ from .models import (
     UpsertPolicyRequest,
     DeletePolicyRequest,
     DeletePolicyResult,
+    # Phase 2: Behavioral Analytics Types
+    AgentReputation,
+    AnomalyResult,
+    BaselineHealth,
+    DriftAnalysis,
+    Alert,
+    ReputationListResponse,
+    AnomaliesResponse,
+    BaselineResponse,
+    AlertsResponse,
+    AcknowledgeAlertRequest,
 )
 from .observability import (
     agent_tracer,
@@ -423,6 +434,76 @@ class LeluClient:
         data = resp.json()
 
         return DeletePolicyResult(**data)
+
+    # ─── Phase 2: Behavioral Analytics ───────────────────────────────────────
+
+    async def get_agent_reputation(self, agent_id: str) -> AgentReputation:
+        """Get reputation information for a specific agent."""
+        resp = await self._client.get(f"/v1/analytics/reputation/{agent_id}")
+        await self._raise_for_status(resp)
+        return AgentReputation(**resp.json())
+
+    async def list_agent_reputations(
+        self, 
+        sort: str, 
+        limit: int | None = None, 
+        threshold: float | None = None
+    ) -> ReputationListResponse:
+        """List agent reputations sorted by performance."""
+        params = {"sort": sort}
+        if limit:
+            params["limit"] = str(limit)
+        if threshold:
+            params["threshold"] = str(threshold)
+        
+        resp = await self._client.get("/v1/analytics/reputation", params=params)
+        await self._raise_for_status(resp)
+        return ReputationListResponse(**resp.json())
+
+    async def get_agent_anomalies(self, agent_id: str, since: datetime | None = None) -> AnomaliesResponse:
+        """Get recent anomalies for a specific agent."""
+        params = {}
+        if since:
+            params["since"] = since.isoformat()
+        
+        resp = await self._client.get(f"/v1/analytics/anomalies/{agent_id}", params=params)
+        await self._raise_for_status(resp)
+        return AnomaliesResponse(**resp.json())
+
+    async def get_agent_baseline(self, agent_id: str) -> BaselineResponse:
+        """Get behavioral baseline information for a specific agent."""
+        resp = await self._client.get(f"/v1/analytics/baseline/{agent_id}")
+        await self._raise_for_status(resp)
+        return BaselineResponse(**resp.json())
+
+    async def refresh_agent_baseline(self, agent_id: str) -> dict[str, str]:
+        """Trigger a baseline refresh for a specific agent."""
+        resp = await self._client.post(f"/v1/analytics/baseline/{agent_id}/refresh", json={})
+        await self._raise_for_status(resp)
+        return resp.json()
+
+    async def get_alerts(self, agent_id: str | None = None) -> AlertsResponse:
+        """Get active alerts, optionally filtered by agent."""
+        params = {}
+        if agent_id:
+            params["agent_id"] = agent_id
+        
+        resp = await self._client.get("/v1/analytics/alerts", params=params)
+        await self._raise_for_status(resp)
+        return AlertsResponse(**resp.json())
+
+    async def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> dict[str, str]:
+        """Acknowledge an alert."""
+        payload = {"acknowledged_by": acknowledged_by}
+        resp = await self._client.post(f"/v1/analytics/alerts/{alert_id}/acknowledge", json=payload)
+        await self._raise_for_status(resp)
+        return resp.json()
+
+    async def resolve_alert(self, alert_id: str) -> dict[str, str]:
+        """Resolve an alert."""
+        resp = await self._client.post(f"/v1/analytics/alerts/{alert_id}/resolve", json={})
+        await self._raise_for_status(resp)
+        return resp.json()
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 

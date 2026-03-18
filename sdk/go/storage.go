@@ -147,14 +147,14 @@ type ListAuditEventsParams struct {
 }
 
 // ListAuditEventsResult holds the result of listing audit events.
-type ListAuditEventsResult struct {
+type LocalAuditEventsResult struct {
 	Events     []map[string]interface{}
 	Count      int
 	NextCursor int64
 }
 
 // ListAuditEvents lists audit events from local storage.
-func (s *LocalStorage) ListAuditEvents(params ListAuditEventsParams) (*ListAuditEventsResult, error) {
+func (s *LocalStorage) ListAuditEvents(params ListAuditEventsParams) (*LocalAuditEventsResult, error) {
 	if params.TenantID == "" {
 		params.TenantID = "default"
 	}
@@ -258,7 +258,7 @@ func (s *LocalStorage) ListAuditEvents(params ListAuditEventsParams) (*ListAudit
 		return nil, err
 	}
 
-	return &ListAuditEventsResult{
+	return &LocalAuditEventsResult{
 		Events:     events,
 		Count:      count,
 		NextCursor: nextCursor,
@@ -282,7 +282,7 @@ func (s *LocalStorage) ListPolicies(tenantID string) ([]Policy, error) {
 	var policies []Policy
 	for rows.Next() {
 		var p Policy
-		err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Content, &p.Version, &p.HmacSha256, &p.CreatedAt, &p.UpdatedAt)
+		err := rows.Scan(&p.ID, &p.TenantID, &p.Name, &p.Content, &p.Version, &p.HMACSha256, &p.CreatedAt, &p.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +302,7 @@ func (s *LocalStorage) GetPolicy(name, tenantID string) (*Policy, error) {
 	err := s.db.QueryRow(
 		"SELECT * FROM policies WHERE tenant_id = ? AND name = ?",
 		tenantID, name,
-	).Scan(&p.ID, &p.TenantID, &p.Name, &p.Content, &p.Version, &p.HmacSha256, &p.CreatedAt, &p.UpdatedAt)
+	).Scan(&p.ID, &p.TenantID, &p.Name, &p.Content, &p.Version, &p.HMACSha256, &p.CreatedAt, &p.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

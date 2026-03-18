@@ -1,7 +1,7 @@
 {
   "name": "@lelu-auth/lelu",
-  "version": "0.2.0",
-  "description": "TypeScript SDK for Lelu — framework-agnostic authorization engine for AI agents with confidence-aware controls and Docker deployment",
+  "version": "0.4.0",
+  "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer",
   "homepage": "https://ui-seven-amber.vercel.app/",
   "bugs": {
@@ -56,12 +56,7 @@
     "langchain",
     "permissions",
     "jwt",
-    "confidence-aware",
-    "docker",
-    "policy-engine",
-    "human-in-the-loop",
-    "risk-evaluation",
-    "audit-trail"
+    "confidence-aware"
   ],
   "license": "MIT",
   "dependencies": {

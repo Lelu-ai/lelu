@@ -277,3 +277,111 @@ export interface DeletePolicyRequest {
 export interface DeletePolicyResult {
   deleted: boolean;
 }
+// ─── Phase 2: Behavioral Analytics Types ─────────────────────────────────────
+
+export interface AgentReputation {
+  agent_id: string;
+  reputation_score: number;        // 0-1 trust score
+  decision_count: number;          // Total decisions made
+  accuracy_rate: number;           // % correct decisions
+  calibration_score: number;       // Confidence vs accuracy alignment
+  last_updated: string;            // ISO timestamp
+  confidence_sum: number;          // Sum of all confidence scores
+  correct_decisions: number;       // Number of correct decisions
+  high_conf_errors: number;        // High confidence but wrong
+  low_conf_correct: number;        // Low confidence but correct
+}
+
+export interface AnomalyResult {
+  agent_id: string;
+  timestamp: string;               // ISO timestamp
+  anomaly_score: number;           // 0-1, higher = more anomalous
+  is_anomaly: boolean;
+  severity: 'none' | 'low' | 'medium' | 'high' | 'severe';
+  features: Record<string, number>; // Feature values that contributed
+  explanation: string;             // Human-readable explanation
+  action: string;
+  confidence: number;
+  latency: number;                 // milliseconds
+  outcome: string;
+}
+
+export interface BaselineHealth {
+  agent_id: string;
+  overall_health: number;          // 0-1 health score
+  sample_count: number;
+  age: number;                     // milliseconds
+  last_updated: string;            // ISO timestamp
+  confidence_variance: number;
+  latency_variance: number;
+  action_diversity: number;
+  temporal_coverage: number;       // How well it covers different times
+  confidence_drift: number;
+  latency_drift: number;
+  pattern_drift: number;
+  needs_refresh: boolean;
+  recommended_actions: string[];
+}
+
+export interface DriftAnalysis {
+  agent_id: string;
+  detected_at: string;             // ISO timestamp
+  drift_score: number;             // 0-1, higher = more drift
+  drift_type: 'none' | 'confidence' | 'latency' | 'pattern' | 'combined';
+  severity: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  baseline_age: number;            // milliseconds
+  recent_samples: number;
+  explanation: string;
+  recommendations: string[];
+}
+
+export interface Alert {
+  id: string;
+  rule_id: string;
+  agent_id: string;
+  timestamp: string;               // ISO timestamp
+  title: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  priority: number;                // 1-5, higher = more urgent
+  trigger_data: Record<string, any>;
+  context: Record<string, any>;
+  status: 'active' | 'acknowledged' | 'resolved';
+  acked_by?: string;
+  acked_at?: string;               // ISO timestamp
+  resolved_at?: string;            // ISO timestamp
+  group_id?: string;
+  group_count: number;
+  tags: Record<string, string>;
+  channels: string[];
+}
+
+// API Response types for Phase 2
+export interface ReputationListResponse {
+  agents: AgentReputation[];
+  total: number;
+  sort: 'top' | 'problematic';
+  threshold?: number;
+}
+
+export interface AnomaliesResponse {
+  agent_id: string;
+  anomalies: AnomalyResult[];
+  total: number;
+  since: string;                   // ISO timestamp
+}
+
+export interface BaselineResponse {
+  agent_id: string;
+  health: BaselineHealth;
+  drift: DriftAnalysis;
+}
+
+export interface AlertsResponse {
+  alerts: Alert[];
+  total: number;
+}
+
+export interface AcknowledgeAlertRequest {
+  acknowledged_by: string;
+}

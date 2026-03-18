@@ -229,3 +229,132 @@ class AuthEngineError(Exception):
 
     def __repr__(self) -> str:
         return f"AuthEngineError(message={str(self)!r}, status={self.status})"
+
+# ─── Phase 2: Behavioral Analytics ───────────────────────────────────────────
+
+
+class AgentReputation(BaseModel):
+    """Agent reputation information."""
+
+    agent_id: str
+    reputation_score: float = Field(..., ge=0.0, le=1.0, description="0-1 trust score")
+    decision_count: int = Field(..., ge=0, description="Total decisions made")
+    accuracy_rate: float = Field(..., ge=0.0, le=1.0, description="% correct decisions")
+    calibration_score: float = Field(..., ge=0.0, le=1.0, description="Confidence vs accuracy alignment")
+    last_updated: str = Field(..., description="ISO timestamp")
+    confidence_sum: float = Field(..., description="Sum of all confidence scores")
+    correct_decisions: int = Field(..., ge=0, description="Number of correct decisions")
+    high_conf_errors: int = Field(..., ge=0, description="High confidence but wrong")
+    low_conf_correct: int = Field(..., ge=0, description="Low confidence but correct")
+
+
+class AnomalyResult(BaseModel):
+    """Anomaly detection result."""
+
+    agent_id: str
+    timestamp: str = Field(..., description="ISO timestamp")
+    anomaly_score: float = Field(..., ge=0.0, le=1.0, description="0-1, higher = more anomalous")
+    is_anomaly: bool
+    severity: str = Field(..., description="none, low, medium, high, severe")
+    features: dict[str, float] = Field(..., description="Feature values that contributed")
+    explanation: str = Field(..., description="Human-readable explanation")
+    action: str
+    confidence: float
+    latency: float = Field(..., description="milliseconds")
+    outcome: str
+
+
+class BaselineHealth(BaseModel):
+    """Behavioral baseline health information."""
+
+    agent_id: str
+    overall_health: float = Field(..., ge=0.0, le=1.0, description="0-1 health score")
+    sample_count: int = Field(..., ge=0)
+    age: float = Field(..., description="milliseconds")
+    last_updated: str = Field(..., description="ISO timestamp")
+    confidence_variance: float
+    latency_variance: float
+    action_diversity: int = Field(..., ge=0)
+    temporal_coverage: float = Field(..., ge=0.0, le=1.0, description="How well it covers different times")
+    confidence_drift: float
+    latency_drift: float
+    pattern_drift: float
+    needs_refresh: bool
+    recommended_actions: list[str]
+
+
+class DriftAnalysis(BaseModel):
+    """Behavioral drift analysis."""
+
+    agent_id: str
+    detected_at: str = Field(..., description="ISO timestamp")
+    drift_score: float = Field(..., ge=0.0, le=1.0, description="0-1, higher = more drift")
+    drift_type: str = Field(..., description="none, confidence, latency, pattern, combined")
+    severity: str = Field(..., description="none, low, medium, high, critical")
+    baseline_age: float = Field(..., description="milliseconds")
+    recent_samples: int = Field(..., ge=0)
+    explanation: str
+    recommendations: list[str]
+
+
+class Alert(BaseModel):
+    """Alert information."""
+
+    id: str
+    rule_id: str
+    agent_id: str
+    timestamp: str = Field(..., description="ISO timestamp")
+    title: str
+    description: str
+    severity: str = Field(..., description="low, medium, high, critical")
+    priority: int = Field(..., ge=1, le=5, description="1-5, higher = more urgent")
+    trigger_data: dict[str, Any]
+    context: dict[str, Any]
+    status: str = Field(..., description="active, acknowledged, resolved")
+    acked_by: str | None = None
+    acked_at: str | None = Field(default=None, description="ISO timestamp")
+    resolved_at: str | None = Field(default=None, description="ISO timestamp")
+    group_id: str | None = None
+    group_count: int = Field(default=1)
+    tags: dict[str, str]
+    channels: list[str]
+
+
+# API Response types for Phase 2
+class ReputationListResponse(BaseModel):
+    """Response for listing agent reputations."""
+
+    agents: list[AgentReputation]
+    total: int
+    sort: str = Field(..., description="top or problematic")
+    threshold: float | None = None
+
+
+class AnomaliesResponse(BaseModel):
+    """Response for getting agent anomalies."""
+
+    agent_id: str
+    anomalies: list[AnomalyResult]
+    total: int
+    since: str = Field(..., description="ISO timestamp")
+
+
+class BaselineResponse(BaseModel):
+    """Response for getting agent baseline information."""
+
+    agent_id: str
+    health: BaselineHealth
+    drift: DriftAnalysis
+
+
+class AlertsResponse(BaseModel):
+    """Response for getting alerts."""
+
+    alerts: list[Alert]
+    total: int
+
+
+class AcknowledgeAlertRequest(BaseModel):
+    """Request for acknowledging an alert."""
+
+    acknowledged_by: str = Field(..., min_length=1)

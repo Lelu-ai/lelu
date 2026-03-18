@@ -55,10 +55,10 @@ export const DECISION_TYPES = {
 export interface AgentSpanOptions {
   agentId: string;
   agentType?: string;
-  action?: string;
-  confidence?: number;
-  actingFor?: string;
-  scope?: string;
+  action?: string | undefined;
+  confidence?: number | undefined;
+  actingFor?: string | undefined;
+  scope?: string | undefined;
 }
 
 export interface DecisionMetrics {

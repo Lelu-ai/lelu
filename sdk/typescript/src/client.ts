@@ -106,8 +106,8 @@ export class LeluClient {
         agentId: validated.actor,
         action: validated.action,
         confidence: validated.context.confidence,
-        actingFor: validated.context.actingFor,
-        scope: validated.context.scope,
+        ...(validated.context.actingFor && { actingFor: validated.context.actingFor }),
+        ...(validated.context.scope && { scope: validated.context.scope }),
       },
       async (span) => {
         const startTime = Date.now();
@@ -234,8 +234,8 @@ export class LeluClient {
       {
         agentId: validated.delegator,
         action: 'delegate',
-        confidence: validated.confidence,
-        actingFor: validated.actingFor,
+        ...(validated.confidence !== undefined && { confidence: validated.confidence }),
+        ...(validated.actingFor && { actingFor: validated.actingFor }),
       },
       async (span) => {
         const startTime = Date.now();

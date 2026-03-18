@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -28,6 +29,12 @@ from .models import (
     UpsertPolicyRequest,
     DeletePolicyRequest,
     DeletePolicyResult,
+)
+from .observability import (
+    agent_tracer,
+    DecisionMetrics,
+    LatencyMetrics,
+    AgentTypes,
 )
 
 
@@ -106,24 +113,71 @@ class LeluClient:
 
         The confidence score in ``req.context`` is passed through the
         Confidence-Aware Auth gate ★ before policy evaluation.
+        
+        Enhanced with Phase 1 observability features.
         """
-        payload = {
-            "actor": req.actor,
-            "action": req.action,
-            "resource": req.resource,
-            "confidence": req.context.confidence,
-            "acting_for": req.context.acting_for,
-            "scope": req.context.scope,
-        }
-        data = await self._post("/v1/agent/authorize", payload)
-        return AgentAuthDecision(
-            allowed=data["allowed"],
-            reason=data["reason"],
-            trace_id=data["trace_id"],
-            downgraded_scope=data.get("downgraded_scope"),
-            requires_human_review=data.get("requires_human_review", False),
-            confidence_used=data.get("confidence_used", 0.0),
-        )
+        # Start enhanced tracing span
+        with agent_tracer.agent_span(
+            "ai.agent.authorize",
+            req.actor,
+            agent_type=AgentTypes.AUTONOMOUS,
+            **{
+                "ai.request.intent": req.action,
+                "ai.request.confidence": req.context.confidence,
+                "ai.request.acting_for": req.context.acting_for or "",
+                "ai.request.scope": req.context.scope or "",
+            }
+        ) as span:
+            start_time = time.time()
+            
+            payload = {
+                "actor": req.actor,
+                "action": req.action,
+                "resource": req.resource,
+                "confidence": req.context.confidence,
+                "acting_for": req.context.acting_for,
+                "scope": req.context.scope,
+            }
+            
+            try:
+                data = await self._post("/v1/agent/authorize", payload)
+                
+                total_latency_ms = (time.time() - start_time) * 1000
+                
+                # Record decision metrics
+                decision_metrics = DecisionMetrics(
+                    allowed=data["allowed"],
+                    requires_human_review=data.get("requires_human_review", False),
+                    confidence=data.get("confidence_used", 0.0),
+                    risk_score=data.get("risk_score", 0.0),
+                    outcome="review" if data.get("requires_human_review") else ("allowed" if data["allowed"] else "denied")
+                )
+                
+                latency_metrics = LatencyMetrics(total_ms=total_latency_ms)
+                
+                agent_tracer.record_decision(span, decision_metrics)
+                agent_tracer.record_latency(span, latency_metrics)
+                
+                # Add trace ID and engine decision to span
+                if hasattr(span, 'set_attributes'):
+                    span.set_attributes({
+                        "lelu.trace_id": data["trace_id"],
+                        "lelu.engine_decision": data["allowed"],
+                        "lelu.downgraded_scope": data.get("downgraded_scope", ""),
+                    })
+                
+                return AgentAuthDecision(
+                    allowed=data["allowed"],
+                    reason=data["reason"],
+                    trace_id=data["trace_id"],
+                    downgraded_scope=data.get("downgraded_scope"),
+                    requires_human_review=data.get("requires_human_review", False),
+                    confidence_used=data.get("confidence_used", 0.0),
+                )
+            
+            except Exception as e:
+                # Error is already recorded by the context manager
+                raise
 
     # ── JIT token minting ─────────────────────────────────────────────────────
 
@@ -160,27 +214,93 @@ class LeluClient:
 
         Confidence-Aware: the delegator's confidence score is checked against
         ``require_confidence_above`` in the policy before delegation is granted.
+        
+        Enhanced with Phase 1 observability features.
         """
-        payload = {
-            "delegator": req.delegator,
-            "delegatee": req.delegatee,
-            "scoped_to": req.scoped_to,
-            "ttl_seconds": req.ttl_seconds or 60,
-            "confidence": req.confidence,
-            "acting_for": req.acting_for or "",
-            "tenant_id": req.tenant_id or "",
-        }
-        data = await self._post("/v1/agent/delegate", payload)
-        from datetime import datetime, timezone
-        return DelegateScopeResult(
-            token=data["token"],
-            token_id=data["token_id"],
-            expires_at=datetime.fromtimestamp(data["expires_at"], tz=timezone.utc),
-            delegator=data["delegator"],
-            delegatee=data["delegatee"],
-            granted_scopes=data["granted_scopes"],
-            trace_id=data["trace_id"],
-        )
+        # Start enhanced delegation tracing span
+        with agent_tracer.agent_span(
+            "ai.agent.delegate",
+            req.delegator,
+            **{
+                "ai.parent.agent": req.delegator,
+                "ai.child.agent": req.delegatee,
+                "ai.delegation.chain": f"{req.delegator}→{req.delegatee}",
+                "ai.delegation.scoped_to": ",".join(req.scoped_to) if req.scoped_to else "",
+                "ai.delegation.ttl_seconds": req.ttl_seconds or 60,
+                "ai.request.confidence": req.confidence or 1.0,
+                "ai.request.acting_for": req.acting_for or "",
+            }
+        ) as span:
+            start_time = time.time()
+            
+            payload = {
+                "delegator": req.delegator,
+                "delegatee": req.delegatee,
+                "scoped_to": req.scoped_to,
+                "ttl_seconds": req.ttl_seconds or 60,
+                "confidence": req.confidence,
+                "acting_for": req.acting_for or "",
+                "tenant_id": req.tenant_id or "",
+            }
+            
+            try:
+                data = await self._post("/v1/agent/delegate", payload)
+                
+                total_latency_ms = (time.time() - start_time) * 1000
+                
+                # Record successful delegation metrics
+                decision_metrics = DecisionMetrics(
+                    allowed=True,
+                    requires_human_review=False,
+                    confidence=req.confidence or 1.0,
+                    risk_score=0.0,
+                    outcome="delegation_allowed"
+                )
+                
+                latency_metrics = LatencyMetrics(total_ms=total_latency_ms)
+                
+                agent_tracer.record_decision(span, decision_metrics)
+                agent_tracer.record_latency(span, latency_metrics)
+                
+                # Add delegation result attributes
+                if hasattr(span, 'set_attributes'):
+                    span.set_attributes({
+                        "lelu.trace_id": data["trace_id"],
+                        "lelu.token_id": data["token_id"],
+                        "lelu.granted_scopes": ",".join(data["granted_scopes"]),
+                        "lelu.delegation_success": True,
+                    })
+                
+                from datetime import datetime, timezone
+                return DelegateScopeResult(
+                    token=data["token"],
+                    token_id=data["token_id"],
+                    expires_at=datetime.fromtimestamp(data["expires_at"], tz=timezone.utc),
+                    delegator=data["delegator"],
+                    delegatee=data["delegatee"],
+                    granted_scopes=data["granted_scopes"],
+                    trace_id=data["trace_id"],
+                )
+            
+            except Exception as e:
+                # Record delegation failure
+                decision_metrics = DecisionMetrics(
+                    allowed=False,
+                    requires_human_review=False,
+                    confidence=req.confidence or 1.0,
+                    risk_score=1.0,
+                    outcome="delegation_denied"
+                )
+                
+                agent_tracer.record_decision(span, decision_metrics)
+                
+                if hasattr(span, 'set_attributes'):
+                    span.set_attributes({
+                        "lelu.delegation_success": False,
+                        "lelu.delegation_error": str(e),
+                    })
+                
+                raise
 
     # ── Health check ──────────────────────────────────────────────────────────
 

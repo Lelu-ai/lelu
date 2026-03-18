@@ -28,6 +28,7 @@ import (
 	"github.com/lelu/engine/internal/fallback"
 	"github.com/lelu/engine/internal/incident"
 	"github.com/lelu/engine/internal/injection"
+	"github.com/lelu/engine/internal/observability"
 	"github.com/lelu/engine/internal/queue"
 	"github.com/lelu/engine/internal/ratelimit"
 	"github.com/lelu/engine/internal/telemetry"
@@ -68,22 +69,24 @@ var (
 
 // Handler wires all engine sub-services into HTTP endpoints.
 type Handler struct {
-	eval      *evaluator.Evaluator
-	tokenSvc  *tokens.Service
-	confGate  *confidence.Gate
-	riskModel *riskModel
-	actorStat *actorStats
-	audit     *audit.Writer
-	queue     *queue.Queue
-	apiKey    string
-	confCfg   ConfidenceConfig
-	mode      EnforcementMode
-	shadow    *shadowStats
-	incident  *incident.Notifier
-	anomaly   *anomalyTracker
-	rateLimit *ratelimit.Limiter
-	fallback  *fallback.Strategy
-	tracer    trace.Tracer
+	eval         *evaluator.Evaluator
+	tokenSvc     *tokens.Service
+	confGate     *confidence.Gate
+	riskModel    *riskModel
+	actorStat    *actorStats
+	audit        *audit.Writer
+	queue        *queue.Queue
+	apiKey       string
+	confCfg      ConfidenceConfig
+	mode         EnforcementMode
+	shadow       *shadowStats
+	incident     *incident.Notifier
+	anomaly      *anomalyTracker
+	rateLimit    *ratelimit.Limiter
+	fallback     *fallback.Strategy
+	tracer       trace.Tracer
+	agentTracer  *observability.AgentTracer
+	correlationMgr *observability.CorrelationManager
 }
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
@@ -224,23 +227,30 @@ func New(
 	if tp != nil {
 		tracer = tp.Tracer()
 	}
+	
+	// Initialize enhanced observability components
+	agentTracer := observability.NewAgentTracer("lelu-engine")
+	correlationMgr := observability.NewCorrelationManager()
+	
 	return &Handler{
-		eval:      eval,
-		tokenSvc:  tokenSvc,
-		confGate:  confGate,
-		riskModel: newRiskModel(NewRiskConfigFromEnv()),
-		actorStat: newActorStats(),
-		audit:     auditWriter,
-		queue:     q,
-		apiKey:    apiKey,
-		confCfg:   confCfg.withDefaults(),
-		mode:      mode,
-		shadow:    newShadowStats(),
-		incident:  incidentNotifier,
-		anomaly:   newAnomalyTracker(5, 60*time.Second),
-		rateLimit: rl,
-		fallback:  fb,
-		tracer:    tracer,
+		eval:           eval,
+		tokenSvc:       tokenSvc,
+		confGate:       confGate,
+		riskModel:      newRiskModel(NewRiskConfigFromEnv()),
+		actorStat:      newActorStats(),
+		audit:          auditWriter,
+		queue:          q,
+		apiKey:         apiKey,
+		confCfg:        confCfg.withDefaults(),
+		mode:           mode,
+		shadow:         newShadowStats(),
+		incident:       incidentNotifier,
+		anomaly:        newAnomalyTracker(5, 60*time.Second),
+		rateLimit:      rl,
+		fallback:       fb,
+		tracer:         tracer,
+		agentTracer:    agentTracer,
+		correlationMgr: correlationMgr,
 	}
 }
 
@@ -380,27 +390,39 @@ type agentAuthorizeResponse struct {
 func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	// Start OpenTelemetry span
-	var span trace.Span
-	ctx := r.Context()
-	if h.tracer != nil {
-		ctx, span = h.tracer.Start(ctx, "agent.authorize")
-		defer span.End()
-	}
-
 	var req agentAuthorizeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// Add span attributes
-	if span != nil {
-		span.SetAttributes(
-			attribute.String("actor", req.Actor),
-			attribute.String("action", req.Action),
-			attribute.String("tenant_id", req.TenantID),
-		)
+	// Start enhanced OpenTelemetry span with AI agent semantic conventions
+	var span trace.Span
+	ctx := r.Context()
+	if h.agentTracer != nil {
+		ctx, span = h.agentTracer.StartAuthorizationSpan(ctx, req.Actor, req.Action, getConfidenceFromRequest(req))
+		defer span.End()
+		
+		// Add additional context attributes
+		if span != nil {
+			span.SetAttributes(
+				attribute.String("tenant_id", req.TenantID),
+				attribute.String(observability.AttrRequestActingFor, req.ActingFor),
+				attribute.String(observability.AttrRequestScope, req.Scope),
+			)
+		}
+	} else if h.tracer != nil {
+		// Fallback to basic tracing
+		ctx, span = h.tracer.Start(ctx, "agent.authorize")
+		defer span.End()
+		
+		if span != nil {
+			span.SetAttributes(
+				attribute.String("actor", req.Actor),
+				attribute.String("action", req.Action),
+				attribute.String("tenant_id", req.TenantID),
+			)
+		}
 	}
 
 	if h.rateLimit != nil && !h.rateLimit.AllowAuth(req.TenantID) {
@@ -414,6 +436,10 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		reason := fmt.Sprintf("prompt injection detected in %s: %q", hit.Source, hit.Pattern)
 		h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, false, reason, 0, ms(start))
 		injectionAttemptsTotal.Inc()
+		
+		// Record enhanced metrics
+		observability.RecordAgentRequest(req.Actor, observability.AgentTypeAutonomous, req.Action, "injection_denied")
+		
 		h.notifyIncident(r.Context(), incident.Event{
 			Type:     "security.injection_attempt",
 			Severity: "critical",
@@ -425,6 +451,11 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 			Decision: "denied",
 			Resource: req.Resource,
 		}, false, false)
+		
+		if h.agentTracer != nil && span != nil {
+			h.agentTracer.RecordDecision(span, false, false, 0, 1.0, "injection_denied")
+		}
+		
 		writeJSON(w, http.StatusOK, agentAuthorizeResponse{
 			Allowed: false,
 			Reason:  reason,
@@ -439,9 +470,19 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record confidence score metrics
+	observability.RecordConfidenceScore(req.Actor, req.Action, confidenceScore)
+
 	if missingSignal {
 		traceID := audit.NewTraceID()
 		resp := h.decisionForMissingSignal(r.Context(), req, traceID, start)
+		
+		// Record enhanced metrics
+		observability.RecordAgentRequest(req.Actor, observability.AgentTypeAutonomous, req.Action, "missing_signal")
+		if resp.RequiresHumanReview {
+			observability.RecordHumanReview(req.Actor, "missing_confidence_signal")
+		}
+		
 		h.notifyIncident(r.Context(), incident.Event{
 			Type:                eventTypeFrom(resp.Allowed, resp.RequiresHumanReview),
 			Severity:            severityFrom(resp.Allowed, resp.RequiresHumanReview),
@@ -456,19 +497,27 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 			ConfidenceUsed:      resp.ConfidenceUsed,
 			Resource:            req.Resource,
 		}, resp.Allowed, resp.RequiresHumanReview)
+		
+		if h.agentTracer != nil && span != nil {
+			h.agentTracer.RecordDecision(span, resp.Allowed, resp.RequiresHumanReview, resp.ConfidenceUsed, 0, "missing_signal")
+		}
+		
 		resp = h.applyShadowMode(resp)
 		writeJSON(w, http.StatusOK, resp)
 		return
 	}
 
-	// 1. Confidence gate.
+	// 1. Confidence gate with timing
+	confStart := time.Now()
 	confDec, err := h.confGate.Evaluate(r.Context(), confidenceScore, nil)
+	confLatency := ms(confStart)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
 		return
 	}
 
-	// 2. Policy evaluator.
+	// 2. Policy evaluator with timing
+	policyStart := time.Now()
 	evalDec, err := h.eval.EvaluateAgent(ctx, evaluator.AgentAuthRequest{
 		TenantID:   req.TenantID,
 		Actor:      req.Actor,
@@ -478,16 +527,27 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		ActingFor:  req.ActingFor,
 		Scope:      req.Scope,
 	})
+	policyLatency := ms(policyStart)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// 3. Risk model (action criticality × (1-confidence) × reliability × anomaly).
+	// Record policy evaluation in span
+	if h.agentTracer != nil && span != nil {
+		h.agentTracer.RecordPolicyEvaluation(span, "default_policy", "1.0", fmt.Sprintf("%t", evalDec.Allowed), policyLatency)
+	}
+
+	// 3. Risk model with timing
+	riskStart := time.Now()
 	reliability := h.actorStat.reliability(req.Actor)
 	anomalyCount := h.anomaly.currentCount(req.Actor)
 	anomalyFactor := 1.0 + minFloat(float64(anomalyCount)/10.0, 0.5)
 	riskDec := h.riskModel.evaluate(req.Action, confidenceScore, reliability, anomalyFactor)
+	riskLatency := ms(riskStart)
+
+	// Record risk score metrics
+	observability.RecordRiskScore(req.Actor, req.Action, riskDec.Score)
 
 	finalOutcome := outcomeAllow
 	finalReason := evalDec.Reason
@@ -534,24 +594,44 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 
 	h.actorStat.record(req.Actor, finalOutcome)
 
-	// Record evaluation latency in span
-	if span != nil {
+	// Record enhanced metrics and latency
+	totalLatency := ms(start)
+	outcome := "denied"
+	if allowed {
+		outcome = "allowed"
+	} else if requiresReview {
+		outcome = "review"
+	}
+	
+	observability.RecordAgentRequest(req.Actor, observability.AgentTypeAutonomous, req.Action, outcome)
+	observability.RecordDecisionLatency(req.Actor, "total", totalLatency/1000.0)
+	observability.RecordDecisionLatency(req.Actor, "confidence_gate", confLatency/1000.0)
+	observability.RecordDecisionLatency(req.Actor, "policy_eval", policyLatency/1000.0)
+	observability.RecordDecisionLatency(req.Actor, "risk_eval", riskLatency/1000.0)
+
+	// Record comprehensive span attributes
+	if h.agentTracer != nil && span != nil {
+		h.agentTracer.RecordDecision(span, allowed, requiresReview, confidenceScore, riskDec.Score, outcome)
+		h.agentTracer.RecordLatency(span, totalLatency, confLatency, policyLatency, riskLatency)
+	} else if span != nil {
+		// Fallback span attributes
 		span.SetAttributes(
 			attribute.Float64("confidence_score", confidenceScore),
 			attribute.Bool("allowed", allowed),
 			attribute.Bool("requires_review", requiresReview),
 			attribute.Float64("risk_score", riskDec.Score),
-			attribute.Float64("latency_ms", ms(start)),
+			attribute.Float64("latency_ms", totalLatency),
 		)
 	}
 
 	traceID := audit.NewTraceID()
-	h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, allowed, finalReason, confidenceScore, ms(start))
+	h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, allowed, finalReason, confidenceScore, totalLatency)
 
 	authDecisionsTotal.WithLabelValues("agent", fmt.Sprintf("%t", allowed)).Inc()
 
 	// Phase 2 — enqueue for human review when flagged.
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
+		observability.RecordHumanReview(req.Actor, finalReason)
 		_, _ = h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor)
 	}
 
@@ -587,6 +667,7 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	if !resp.Allowed && !resp.RequiresHumanReview {
 		if spike := h.anomaly.record(req.Actor); spike {
 			anomalyAlertsTotal.WithLabelValues(req.Actor).Inc()
+			observability.UpdateAgentAnomalyScore(req.Actor, 1.0) // High anomaly score during spike
 			h.notifyIncident(r.Context(), incident.Event{
 				Type:     "security.anomaly_spike",
 				Severity: "high",
@@ -599,6 +680,9 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 				Resource: req.Resource,
 			}, false, false)
 		}
+	} else {
+		// Normal behavior, lower anomaly score
+		observability.UpdateAgentAnomalyScore(req.Actor, 0.1)
 	}
 
 	writeJSON(w, http.StatusOK, h.applyShadowMode(resp))
@@ -639,6 +723,29 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Start enhanced delegation span with correlation tracking
+	var span trace.Span
+	ctx := r.Context()
+	if h.agentTracer != nil {
+		ctx, span = h.agentTracer.StartDelegationSpan(ctx, req.Delegator, req.Delegatee)
+		defer span.End()
+		
+		// Start delegation chain tracking
+		chainID := h.correlationMgr.StartDelegationChain(ctx, req.Delegator, req.Delegatee)
+		if span != nil {
+			span.SetAttributes(
+				attribute.String("ai.correlation.chain_id", chainID),
+				attribute.String("tenant_id", req.TenantID),
+				attribute.Float64("confidence", req.Confidence),
+				attribute.String(observability.AttrRequestActingFor, req.ActingFor),
+			)
+		}
+	} else if h.tracer != nil {
+		// Fallback to basic tracing
+		ctx, span = h.tracer.Start(ctx, "agent.delegate")
+		defer span.End()
+	}
+
 	// Validate delegation rules via evaluator.
 	dec, err := h.eval.CheckDelegation(r.Context(), req.Delegator, req.Delegatee, req.ScopedTo, req.Confidence)
 	if err != nil {
@@ -650,6 +757,14 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 		h.audit.LogDecision(r.Context(), req.TenantID, req.Delegator,
 			"agent:delegate", map[string]string{"delegatee": req.Delegatee},
 			false, dec.Reason, req.Confidence, ms(start))
+		
+		// Record delegation metrics
+		observability.RecordDelegation(req.Delegator, req.Delegatee, "denied")
+		
+		if h.agentTracer != nil && span != nil {
+			h.agentTracer.RecordDecision(span, false, false, req.Confidence, 0, "delegation_denied")
+		}
+		
 		writeJSON(w, http.StatusForbidden, map[string]any{
 			"allowed":  false,
 			"reason":   dec.Reason,
@@ -685,6 +800,18 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 	h.audit.LogDecision(r.Context(), req.TenantID, req.Delegator,
 		"agent:delegate", map[string]string{"delegatee": req.Delegatee, "scope": scope},
 		true, dec.Reason, req.Confidence, ms(start))
+
+	// Record successful delegation metrics
+	observability.RecordDelegation(req.Delegator, req.Delegatee, "allowed")
+	
+	if h.agentTracer != nil && span != nil {
+		h.agentTracer.RecordDecision(span, true, false, req.Confidence, 0, "delegation_allowed")
+		span.SetAttributes(
+			attribute.StringSlice("granted_scopes", dec.GrantedScopes),
+			attribute.String("token_id", minted.TokenID),
+			attribute.Int64("ttl_seconds", int64(ttl.Seconds())),
+		)
+	}
 
 	writeJSON(w, http.StatusOK, agentDelegateResponse{
 		Token:         minted.Token,
@@ -1125,6 +1252,9 @@ func (h *Handler) handleMintToken(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+
+
+		
 	}
 
 	if h.rateLimit != nil && !h.rateLimit.AllowMint(req.TenantID) {
@@ -1404,4 +1534,17 @@ func decisionString(allowed, requiresReview bool) string {
 		return "allowed"
 	}
 	return "denied"
+}
+
+// getConfidenceFromRequest extracts confidence score from request for tracing
+func getConfidenceFromRequest(req agentAuthorizeRequest) float64 {
+	if req.Confidence != nil {
+		return *req.Confidence
+	}
+	if req.Signal != nil {
+		if score, err := confidence.ExtractScore(req.Signal); err == nil {
+			return score
+		}
+	}
+	return 0.0
 }

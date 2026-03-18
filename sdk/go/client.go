@@ -11,6 +11,9 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // ClientConfig configures the Lelu client.
@@ -243,6 +246,7 @@ func (c *Client) Authorize(ctx context.Context, req AuthRequest) (*AuthDecision,
 }
 
 // AgentAuthorize checks whether an agent is authorized for an action.
+// Enhanced with Phase 1 observability features.
 func (c *Client) AgentAuthorize(ctx context.Context, req AgentAuthRequest) (*AgentAuthDecision, error) {
 	if strings.TrimSpace(req.Actor) == "" {
 		return nil, errors.New("actor is required")
@@ -254,11 +258,45 @@ func (c *Client) AgentAuthorize(ctx context.Context, req AgentAuthRequest) (*Age
 		return nil, errors.New("confidence must be between 0 and 1")
 	}
 
-	var out AgentAuthDecision
-	if err := c.postJSON(ctx, "/v1/agent/authorize", req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+	// Start enhanced tracing span
+	tracer := GetAgentTracer()
+	return c.withAgentSpan(ctx, tracer, "ai.agent.authorize", req.Actor, func(ctx context.Context, span trace.Span) (*AgentAuthDecision, error) {
+		start := time.Now()
+		
+		// Add request context attributes
+		span.SetAttributes(
+			attribute.String(AttrRequestIntent, req.Action),
+			attribute.Float64(AttrRequestConfidence, req.Confidence),
+			attribute.String(AttrRequestActingFor, req.ActingFor),
+			attribute.String(AttrRequestScope, req.Scope),
+		)
+		
+		var out AgentAuthDecision
+		if err := c.postJSON(ctx, "/v1/agent/authorize", req, &out); err != nil {
+			return nil, err
+		}
+		
+		// Record decision metrics
+		totalLatency := float64(time.Since(start).Microseconds()) / 1000
+		outcome := "denied"
+		if out.RequiresHumanReview {
+			outcome = "review"
+		} else if out.Allowed {
+			outcome = "allowed"
+		}
+		
+		tracer.RecordDecision(span, out.Allowed, out.RequiresHumanReview, out.ConfidenceUsed, 0.0, outcome)
+		tracer.RecordLatency(span, totalLatency, 0, 0, 0)
+		
+		// Add trace ID and engine decision to span
+		span.SetAttributes(
+			attribute.String("lelu.trace_id", out.TraceID),
+			attribute.Bool("lelu.engine_decision", out.Allowed),
+			attribute.String("lelu.downgraded_scope", out.DowngradedScope),
+		)
+		
+		return &out, nil
+	})
 }
 
 // MintToken mints a scoped JIT token for agents.
@@ -334,6 +372,7 @@ type delegateScopeWire struct {
 // DelegateScope delegates a constrained sub-scope from one agent to another.
 // The delegator's confidence score is checked against the policy's
 // require_confidence_above before delegation is granted.
+// Enhanced with Phase 1 observability features.
 func (c *Client) DelegateScope(ctx context.Context, req DelegateScopeRequest) (*DelegateScopeResult, error) {
 	if strings.TrimSpace(req.Delegator) == "" {
 		return nil, errors.New("delegator is required")
@@ -348,20 +387,52 @@ func (c *Client) DelegateScope(ctx context.Context, req DelegateScopeRequest) (*
 		req.TTLSeconds = 60
 	}
 
-	var wire delegateScopeWire
-	if err := c.postJSON(ctx, "/v1/agent/delegate", req, &wire); err != nil {
-		return nil, err
-	}
-
-	return &DelegateScopeResult{
-		Token:         wire.Token,
-		TokenID:       wire.TokenID,
-		ExpiresAt:     time.Unix(wire.ExpiresAt, 0).UTC(),
-		Delegator:     wire.Delegator,
-		Delegatee:     wire.Delegatee,
-		GrantedScopes: wire.GrantedScopes,
-		TraceID:       wire.TraceID,
-	}, nil
+	// Start enhanced delegation tracing span
+	tracer := GetAgentTracer()
+	return c.withDelegationSpan(ctx, tracer, "ai.agent.delegate", req.Delegator, func(ctx context.Context, span trace.Span) (*DelegateScopeResult, error) {
+		start := time.Now()
+		
+		// Add delegation-specific attributes
+		tracer.InjectCorrelationContext(span, fmt.Sprintf("%s→%s", req.Delegator, req.Delegatee))
+		span.SetAttributes(
+			attribute.String(AttrParentAgent, req.Delegator),
+			attribute.String(AttrChildAgent, req.Delegatee),
+			attribute.StringSlice("ai.delegation.scoped_to", req.ScopedTo),
+			attribute.Int64("ai.delegation.ttl_seconds", req.TTLSeconds),
+			attribute.Float64(AttrRequestConfidence, req.Confidence),
+			attribute.String(AttrRequestActingFor, req.ActingFor),
+		)
+		
+		var wire delegateScopeWire
+		if err := c.postJSON(ctx, "/v1/agent/delegate", req, &wire); err != nil {
+			// Record delegation failure
+			tracer.RecordDecision(span, false, false, req.Confidence, 1.0, "delegation_denied")
+			return nil, err
+		}
+		
+		// Record successful delegation metrics
+		totalLatency := float64(time.Since(start).Microseconds()) / 1000
+		tracer.RecordDecision(span, true, false, req.Confidence, 0.0, "delegation_allowed")
+		tracer.RecordLatency(span, totalLatency, 0, 0, 0)
+		
+		// Add delegation result attributes
+		span.SetAttributes(
+			attribute.String("lelu.trace_id", wire.TraceID),
+			attribute.String("lelu.token_id", wire.TokenID),
+			attribute.StringSlice("lelu.granted_scopes", wire.GrantedScopes),
+			attribute.Bool("lelu.delegation_success", true),
+		)
+		
+		return &DelegateScopeResult{
+			Token:         wire.Token,
+			TokenID:       wire.TokenID,
+			ExpiresAt:     time.Unix(wire.ExpiresAt, 0).UTC(),
+			Delegator:     wire.Delegator,
+			Delegatee:     wire.Delegatee,
+			GrantedScopes: wire.GrantedScopes,
+			TraceID:       wire.TraceID,
+		}, nil
+	})
 }
 
 // IsHealthy returns true when the engine health endpoint reports status=ok.
@@ -461,6 +532,34 @@ func (c *Client) ListAuditEvents(ctx context.Context, req *ListAuditEventsReques
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 	return &result, nil
+}
+
+// withAgentSpan executes a function within an agent span context
+func (c *Client) withAgentSpan(ctx context.Context, tracer *AgentTracer, operationName string, agentID string, fn func(context.Context, trace.Span) (*AgentAuthDecision, error)) (*AgentAuthDecision, error) {
+	ctx, span := tracer.StartAgentSpan(ctx, operationName, agentID)
+	defer span.End()
+	
+	result, err := fn(ctx, span)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+	
+	return result, nil
+}
+
+// withDelegationSpan executes a function within a delegation span context
+func (c *Client) withDelegationSpan(ctx context.Context, tracer *AgentTracer, operationName string, agentID string, fn func(context.Context, trace.Span) (*DelegateScopeResult, error)) (*DelegateScopeResult, error) {
+	ctx, span := tracer.StartAgentSpan(ctx, operationName, agentID)
+	defer span.End()
+	
+	result, err := fn(ctx, span)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+	
+	return result, nil
 }
 
 func (c *Client) postJSON(ctx context.Context, path string, in any, out any) error {

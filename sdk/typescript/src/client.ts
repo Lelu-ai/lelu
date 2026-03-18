@@ -25,6 +25,7 @@ import {
   type DeletePolicyRequest,
   type DeletePolicyResult,
 } from "./types.js";
+import { agentTracer, type DecisionMetrics, type LatencyMetrics } from "./observability/tracer.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
@@ -92,34 +93,85 @@ export class LeluClient {
   /**
    * Checks whether an AI agent is permitted to perform an action, taking the
    * confidence score into account (Confidence-Aware Auth ★).
+   * 
+   * Enhanced with Phase 1 observability features.
    */
   async agentAuthorize(req: AgentAuthRequest): Promise<AgentAuthDecision> {
     const validated = AgentAuthRequestSchema.parse(req);
-    const body = {
-      actor: validated.actor,
-      action: validated.action,
-      resource: validated.resource,
-      confidence: validated.context.confidence,
-      acting_for: validated.context.actingFor,
-      scope: validated.context.scope,
-    };
-    const data = await this.post<{
-      allowed: boolean;
-      reason: string;
-      trace_id: string;
-      downgraded_scope?: string;
-      requires_human_review: boolean;
-      confidence_used: number;
-    }>("/v1/agent/authorize", body);
+    
+    // Start enhanced tracing span
+    return await agentTracer.withAgentSpan(
+      'ai.agent.authorize',
+      {
+        agentId: validated.actor,
+        action: validated.action,
+        confidence: validated.context.confidence,
+        actingFor: validated.context.actingFor,
+        scope: validated.context.scope,
+      },
+      async (span) => {
+        const startTime = Date.now();
+        
+        const body = {
+          actor: validated.actor,
+          action: validated.action,
+          resource: validated.resource,
+          confidence: validated.context.confidence,
+          acting_for: validated.context.actingFor,
+          scope: validated.context.scope,
+        };
+        
+        try {
+          const data = await this.post<{
+            allowed: boolean;
+            reason: string;
+            trace_id: string;
+            downgraded_scope?: string;
+            requires_human_review: boolean;
+            confidence_used: number;
+            risk_score?: number;
+          }>("/v1/agent/authorize", body);
 
-    return {
-      allowed: data.allowed,
-      reason: data.reason,
-      traceId: data.trace_id,
-      downgradedScope: data.downgraded_scope,
-      requiresHumanReview: data.requires_human_review,
-      confidenceUsed: data.confidence_used,
-    };
+          const totalLatency = Date.now() - startTime;
+          
+          // Record decision metrics
+          const decisionMetrics: DecisionMetrics = {
+            allowed: data.allowed,
+            requiresHumanReview: data.requires_human_review,
+            confidence: data.confidence_used,
+            riskScore: data.risk_score || 0,
+            outcome: data.requires_human_review ? 'review' : data.allowed ? 'allowed' : 'denied',
+          };
+          
+          const latencyMetrics: LatencyMetrics = {
+            totalMs: totalLatency,
+          };
+          
+          agentTracer.recordDecision(span, decisionMetrics);
+          agentTracer.recordLatency(span, latencyMetrics);
+          
+          // Add trace ID to span
+          span.setAttributes({
+            'lelu.trace_id': data.trace_id,
+            'lelu.engine_decision': data.allowed,
+            'lelu.downgraded_scope': data.downgraded_scope || '',
+          });
+
+          return {
+            allowed: data.allowed,
+            reason: data.reason,
+            traceId: data.trace_id,
+            downgradedScope: data.downgraded_scope,
+            requiresHumanReview: data.requires_human_review,
+            confidenceUsed: data.confidence_used,
+          };
+        } catch (error) {
+          // Record error in span
+          span.recordException(error as Error);
+          throw error;
+        }
+      }
+    );
   }
 
   // ── JIT Token minting ──────────────────────────────────────────────────────
@@ -170,37 +222,109 @@ export class LeluClient {
    *
    * The delegator's `confidence` score is checked against the policy's
    * `require_confidence_above` before delegation is granted.
+   * 
+   * Enhanced with Phase 1 observability features.
    */
   async delegateScope(req: DelegateScopeRequest): Promise<DelegateScopeResult> {
     const validated = DelegateScopeRequestSchema.parse(req);
-    const body = {
-      delegator: validated.delegator,
-      delegatee: validated.delegatee,
-      scoped_to: validated.scopedTo ?? [],
-      ttl_seconds: validated.ttlSeconds ?? 60,
-      confidence: validated.confidence ?? 1.0,
-      acting_for: validated.actingFor ?? "",
-      tenant_id: validated.tenantId ?? "",
-    };
-    const data = await this.post<{
-      token: string;
-      token_id: string;
-      expires_at: number;
-      delegator: string;
-      delegatee: string;
-      granted_scopes: string[];
-      trace_id: string;
-    }>("/v1/agent/delegate", body);
+    
+    // Start enhanced delegation tracing span
+    return await agentTracer.withAgentSpan(
+      'ai.agent.delegate',
+      {
+        agentId: validated.delegator,
+        action: 'delegate',
+        confidence: validated.confidence,
+        actingFor: validated.actingFor,
+      },
+      async (span) => {
+        const startTime = Date.now();
+        
+        // Add delegation-specific attributes
+        agentTracer.injectCorrelationContext(span, `${validated.delegator}→${validated.delegatee}`);
+        span.setAttributes({
+          'ai.parent.agent': validated.delegator,
+          'ai.child.agent': validated.delegatee,
+          'ai.delegation.scoped_to': validated.scopedTo?.join(',') || '',
+          'ai.delegation.ttl_seconds': validated.ttlSeconds || 60,
+        });
+        
+        const body = {
+          delegator: validated.delegator,
+          delegatee: validated.delegatee,
+          scoped_to: validated.scopedTo ?? [],
+          ttl_seconds: validated.ttlSeconds ?? 60,
+          confidence: validated.confidence ?? 1.0,
+          acting_for: validated.actingFor ?? "",
+          tenant_id: validated.tenantId ?? "",
+        };
+        
+        try {
+          const data = await this.post<{
+            token: string;
+            token_id: string;
+            expires_at: number;
+            delegator: string;
+            delegatee: string;
+            granted_scopes: string[];
+            trace_id: string;
+          }>("/v1/agent/delegate", body);
 
-    return {
-      token: data.token,
-      tokenId: data.token_id,
-      expiresAt: new Date(data.expires_at * 1000),
-      delegator: data.delegator,
-      delegatee: data.delegatee,
-      grantedScopes: data.granted_scopes,
-      traceId: data.trace_id,
-    };
+          const totalLatency = Date.now() - startTime;
+          
+          // Record successful delegation metrics
+          const decisionMetrics: DecisionMetrics = {
+            allowed: true,
+            requiresHumanReview: false,
+            confidence: validated.confidence ?? 1.0,
+            riskScore: 0,
+            outcome: 'delegation_allowed',
+          };
+          
+          const latencyMetrics: LatencyMetrics = {
+            totalMs: totalLatency,
+          };
+          
+          agentTracer.recordDecision(span, decisionMetrics);
+          agentTracer.recordLatency(span, latencyMetrics);
+          
+          // Add delegation result attributes
+          span.setAttributes({
+            'lelu.trace_id': data.trace_id,
+            'lelu.token_id': data.token_id,
+            'lelu.granted_scopes': data.granted_scopes.join(','),
+            'lelu.delegation_success': true,
+          });
+
+          return {
+            token: data.token,
+            tokenId: data.token_id,
+            expiresAt: new Date(data.expires_at * 1000),
+            delegator: data.delegator,
+            delegatee: data.delegatee,
+            grantedScopes: data.granted_scopes,
+            traceId: data.trace_id,
+          };
+        } catch (error) {
+          // Record delegation failure
+          const decisionMetrics: DecisionMetrics = {
+            allowed: false,
+            requiresHumanReview: false,
+            confidence: validated.confidence ?? 1.0,
+            riskScore: 1.0,
+            outcome: 'delegation_denied',
+          };
+          
+          agentTracer.recordDecision(span, decisionMetrics);
+          span.setAttributes({
+            'lelu.delegation_success': false,
+            'lelu.delegation_error': (error as Error).message,
+          });
+          
+          throw error;
+        }
+      }
+    );
   }
 
   // ── Health check ───────────────────────────────────────────────────────────

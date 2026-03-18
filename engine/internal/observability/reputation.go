@@ -331,7 +331,7 @@ func (rm *ReputationManager) UpdateAllReputations(ctx context.Context) error {
 		
 		// Recalculate calibration and reputation
 		rep.CalibrationScore = rm.calculateCalibration(&rep)
-		newReputationScore := rm.calculateReputation(&rep)
+		newReputationScore := rm.CalculateReputation(&rep)
 		
 		// Update database
 		_, err = rm.db.ExecContext(ctx, updateQuery, 

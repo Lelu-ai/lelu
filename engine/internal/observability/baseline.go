@@ -3,10 +3,8 @@ package observability
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -296,6 +294,20 @@ func (bm *BaselineManager) RefreshBaseline(ctx context.Context, agentID string) 
 	
 	// Save new baseline
 	return bm.saveBaseline(ctx, newBaseline)
+}
+
+// UpdateBaseline updates baseline with a single decision data point
+func (bm *BaselineManager) UpdateBaseline(ctx context.Context, agentID, action, outcome string, confidence float64, latency time.Duration) error {
+	// For now, we'll just trigger a refresh if enough time has passed
+	// In a production system, this could incrementally update the baseline
+	// or queue the data for batch processing
+	
+	// This is a simplified implementation - in practice you'd want to:
+	// 1. Store the individual data point
+	// 2. Check if baseline needs updating based on time/sample count
+	// 3. Potentially trigger async baseline recalculation
+	
+	return nil // No-op for now, baseline updates happen via RefreshBaseline
 }
 
 // calculateTemporalCoverage calculates how well the baseline covers different time periods

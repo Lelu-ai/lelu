@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"sort"
 	"sync"
 	"time"
 
@@ -604,14 +603,10 @@ func (ad *AnomalyDetector) startBaselineUpdater() {
 	defer ticker.Stop()
 	
 	for range ticker.C {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		
 		// Clear cache to force reload of updated baselines
 		ad.mutex.Lock()
 		ad.baselines = make(map[string]*BehavioralBaseline)
 		ad.mutex.Unlock()
-		
-		cancel()
 	}
 }
 

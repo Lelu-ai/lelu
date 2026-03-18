@@ -123,8 +123,8 @@ func UpdatePolicyEffectiveness(policyName, policyVersion string, rate float64) {
 }
 
 // UpdateConfidenceCalibration updates confidence calibration error
-func UpdateConfidenceCalibration(agentID, confidenceBucket string, error float64) {
-	ConfidenceCalibrationError.WithLabelValues(agentID, confidenceBucket).Set(error)
+func UpdateConfidenceCalibration(agentID, confidenceBucket string, errorRate float64) {
+	ConfidenceCalibrationError.WithLabelValues(agentID, confidenceBucket).Set(errorRate)
 }
 
 // UpdateAgentAnomalyScore updates an agent's anomaly score

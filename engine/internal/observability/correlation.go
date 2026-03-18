@@ -49,11 +49,11 @@ func NewCorrelationManager() *CorrelationManager {
 		swarms:      make(map[string]*SwarmContext),
 		stopCleanup: make(chan struct{}),
 	}
-	
+
 	// Start cleanup goroutine to remove old correlations
 	cm.cleanupTicker = time.NewTicker(5 * time.Minute)
 	go cm.cleanupLoop()
-	
+
 	return cm
 }
 
@@ -71,13 +71,13 @@ func (cm *CorrelationManager) StartDelegationChain(ctx context.Context, delegato
 	if span == nil {
 		return ""
 	}
-	
+
 	spanCtx := span.SpanContext()
 	chainID := fmt.Sprintf("delegation_%s_%d", delegator, time.Now().UnixNano())
-	
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	chain := &DelegationChain{
 		ID:          chainID,
 		RootAgent:   delegator,
@@ -87,16 +87,16 @@ func (cm *CorrelationManager) StartDelegationChain(ctx context.Context, delegato
 		CreatedAt:   time.Now(),
 		LastUpdated: time.Now(),
 	}
-	
+
 	cm.delegations[chainID] = chain
-	
+
 	// Add correlation attributes to span
 	span.SetAttributes(
 		attribute.String(AttrDelegationChain, strings.Join(chain.Chain, "→")),
 		attribute.String("ai.correlation.chain_id", chainID),
 		attribute.String("ai.correlation.root_agent", delegator),
 	)
-	
+
 	return chainID
 }
 
@@ -106,18 +106,18 @@ func (cm *CorrelationManager) ExtendDelegationChain(ctx context.Context, chainID
 	if span == nil || chainID == "" {
 		return
 	}
-	
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	chain, exists := cm.delegations[chainID]
 	if !exists {
 		return
 	}
-	
+
 	chain.Chain = append(chain.Chain, newAgent)
 	chain.LastUpdated = time.Now()
-	
+
 	// Update span with extended chain
 	span.SetAttributes(
 		attribute.String(AttrDelegationChain, strings.Join(chain.Chain, "→")),
@@ -132,12 +132,12 @@ func (cm *CorrelationManager) StartSwarmOperation(ctx context.Context, swarmID, 
 	if span == nil {
 		return
 	}
-	
+
 	spanCtx := span.SpanContext()
-	
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	swarm := &SwarmContext{
 		ID:           swarmID,
 		Orchestrator: orchestrator,
@@ -148,9 +148,9 @@ func (cm *CorrelationManager) StartSwarmOperation(ctx context.Context, swarmID, 
 		LastUpdated:  time.Now(),
 	}
 	copy(swarm.Agents, agents)
-	
+
 	cm.swarms[swarmID] = swarm
-	
+
 	// Add swarm correlation attributes
 	span.SetAttributes(
 		attribute.String(AttrSwarmID, swarmID),
@@ -158,7 +158,7 @@ func (cm *CorrelationManager) StartSwarmOperation(ctx context.Context, swarmID, 
 		attribute.StringSlice("ai.swarm.agents", agents),
 		attribute.Int("ai.swarm.agent_count", len(agents)),
 	)
-	
+
 	// Record swarm metrics
 	RecordSwarmOperation(swarmID, "start", "success")
 	UpdateSwarmAgentCount(swarmID, float64(len(agents)))
@@ -167,32 +167,32 @@ func (cm *CorrelationManager) StartSwarmOperation(ctx context.Context, swarmID, 
 // AddSwarmAgent adds an agent to an existing swarm
 func (cm *CorrelationManager) AddSwarmAgent(ctx context.Context, swarmID, agentID string) {
 	span := trace.SpanFromContext(ctx)
-	
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	swarm, exists := cm.swarms[swarmID]
 	if !exists {
 		return
 	}
-	
+
 	// Check if agent is already in swarm
 	for _, agent := range swarm.Agents {
 		if agent == agentID {
 			return
 		}
 	}
-	
+
 	swarm.Agents = append(swarm.Agents, agentID)
 	swarm.LastUpdated = time.Now()
-	
+
 	if span != nil {
 		span.SetAttributes(
 			attribute.StringSlice("ai.swarm.agents", swarm.Agents),
 			attribute.Int("ai.swarm.agent_count", len(swarm.Agents)),
 		)
 	}
-	
+
 	// Update metrics
 	UpdateSwarmAgentCount(swarmID, float64(len(swarm.Agents)))
 	RecordSwarmOperation(swarmID, "add_agent", "success")
@@ -202,17 +202,17 @@ func (cm *CorrelationManager) AddSwarmAgent(ctx context.Context, swarmID, agentI
 func (cm *CorrelationManager) GetDelegationChain(chainID string) *DelegationChain {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	chain, exists := cm.delegations[chainID]
 	if !exists {
 		return nil
 	}
-	
+
 	// Return a copy to avoid race conditions
 	chainCopy := *chain
 	chainCopy.Chain = make([]string, len(chain.Chain))
 	copy(chainCopy.Chain, chain.Chain)
-	
+
 	return &chainCopy
 }
 
@@ -220,17 +220,17 @@ func (cm *CorrelationManager) GetDelegationChain(chainID string) *DelegationChai
 func (cm *CorrelationManager) GetSwarmContext(swarmID string) *SwarmContext {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	swarm, exists := cm.swarms[swarmID]
 	if !exists {
 		return nil
 	}
-	
+
 	// Return a copy to avoid race conditions
 	swarmCopy := *swarm
 	swarmCopy.Agents = make([]string, len(swarm.Agents))
 	copy(swarmCopy.Agents, swarm.Agents)
-	
+
 	return &swarmCopy
 }
 
@@ -240,13 +240,13 @@ func (cm *CorrelationManager) InjectCorrelationHeaders(ctx context.Context, head
 	if span == nil {
 		return
 	}
-	
+
 	spanCtx := span.SpanContext()
 	if spanCtx.IsValid() {
 		headers["X-Trace-ID"] = spanCtx.TraceID().String()
 		headers["X-Span-ID"] = spanCtx.SpanID().String()
 	}
-	
+
 	// Add delegation chain if present
 	cm.mu.RLock()
 	for _, chain := range cm.delegations {
@@ -256,7 +256,7 @@ func (cm *CorrelationManager) InjectCorrelationHeaders(ctx context.Context, head
 			break
 		}
 	}
-	
+
 	// Add swarm context if present
 	for _, swarm := range cm.swarms {
 		if swarm.TraceID == spanCtx.TraceID().String() {
@@ -292,17 +292,17 @@ func (cm *CorrelationManager) cleanupLoop() {
 // cleanup removes correlation contexts older than 1 hour
 func (cm *CorrelationManager) cleanup() {
 	cutoff := time.Now().Add(-1 * time.Hour)
-	
+
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// Clean up old delegations
 	for id, chain := range cm.delegations {
 		if chain.LastUpdated.Before(cutoff) {
 			delete(cm.delegations, id)
 		}
 	}
-	
+
 	// Clean up old swarms
 	for id, swarm := range cm.swarms {
 		if swarm.LastUpdated.Before(cutoff) {

@@ -742,12 +742,13 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if h.tracer != nil {
 		// Fallback to basic tracing
+		var span trace.Span
 		ctx, span = h.tracer.Start(ctx, "agent.delegate")
 		defer span.End()
 	}
 
 	// Validate delegation rules via evaluator.
-	dec, err := h.eval.CheckDelegation(r.Context(), req.Delegator, req.Delegatee, req.ScopedTo, req.Confidence)
+	dec, err := h.eval.CheckDelegation(ctx, req.Delegator, req.Delegatee, req.ScopedTo, req.Confidence)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

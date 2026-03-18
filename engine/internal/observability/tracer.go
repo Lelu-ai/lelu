@@ -15,34 +15,34 @@ import (
 // These follow OpenTelemetry semantic conventions for AI systems
 const (
 	// Agent identification
-	AttrAgentID       = "ai.agent.id"
-	AttrAgentType     = "ai.agent.type"
-	AttrAgentVersion  = "ai.agent.version"
-	
+	AttrAgentID      = "ai.agent.id"
+	AttrAgentType    = "ai.agent.type"
+	AttrAgentVersion = "ai.agent.version"
+
 	// Request attributes
 	AttrRequestIntent     = "ai.request.intent"
 	AttrRequestConfidence = "ai.request.confidence"
 	AttrRequestActingFor  = "ai.request.acting_for"
 	AttrRequestScope      = "ai.request.scope"
-	
+
 	// Policy evaluation
 	AttrPolicyName    = "ai.policy.name"
 	AttrPolicyVersion = "ai.policy.version"
 	AttrPolicyResult  = "ai.policy.result"
-	
+
 	// Decision attributes
-	AttrDecisionType       = "ai.decision.type"
-	AttrDecisionConfidence = "ai.decision.confidence"
+	AttrDecisionType        = "ai.decision.type"
+	AttrDecisionConfidence  = "ai.decision.confidence"
 	AttrDecisionHumanReview = "ai.decision.human_review"
-	AttrDecisionRiskScore  = "ai.decision.risk_score"
-	AttrDecisionOutcome    = "ai.decision.outcome"
-	
+	AttrDecisionRiskScore   = "ai.decision.risk_score"
+	AttrDecisionOutcome     = "ai.decision.outcome"
+
 	// Multi-agent correlation
 	AttrSwarmID         = "ai.swarm.id"
 	AttrDelegationChain = "ai.delegation.chain"
 	AttrParentAgent     = "ai.parent.agent"
 	AttrChildAgent      = "ai.child.agent"
-	
+
 	// Performance metrics
 	AttrLatencyMs        = "ai.latency.ms"
 	AttrConfidenceGateMs = "ai.latency.confidence_gate_ms"
@@ -59,9 +59,9 @@ const (
 
 // Decision types
 const (
-	DecisionTypeAutonomous = "autonomous"
+	DecisionTypeAutonomous  = "autonomous"
 	DecisionTypeHumanReview = "human_review"
-	DecisionTypeDenied     = "denied"
+	DecisionTypeDenied      = "denied"
 )
 
 // AgentTracer provides AI agent-aware tracing capabilities
@@ -84,10 +84,10 @@ func (t *AgentTracer) StartAgentSpan(ctx context.Context, operationName string, 
 		attribute.String(AttrAgentType, AgentTypeAutonomous),
 	}
 	agentAttrs = append(agentAttrs, attrs...)
-	
+
 	ctx, span := t.tracer.Start(ctx, operationName)
 	span.SetAttributes(agentAttrs...)
-	
+
 	return ctx, span
 }
 
@@ -138,14 +138,14 @@ func (t *AgentTracer) RecordDecision(span trace.Span, allowed bool, requiresHuma
 	if span == nil {
 		return
 	}
-	
+
 	decisionType := DecisionTypeAutonomous
 	if requiresHumanReview {
 		decisionType = DecisionTypeHumanReview
 	} else if !allowed {
 		decisionType = DecisionTypeDenied
 	}
-	
+
 	span.SetAttributes(
 		attribute.String(AttrDecisionType, decisionType),
 		attribute.Float64(AttrDecisionConfidence, confidence),
@@ -173,12 +173,12 @@ func (t *AgentTracer) InjectCorrelationContext(ctx context.Context, parentSpan t
 	if parentSpan == nil {
 		return ctx
 	}
-	
+
 	// Add correlation attributes to the parent span
 	parentSpan.SetAttributes(
 		attribute.String(AttrDelegationChain, delegationChain),
 	)
-	
+
 	return ctx
 }
 
@@ -188,7 +188,7 @@ func (t *AgentTracer) ExtractCorrelationContext(ctx context.Context) (string, st
 	if span == nil {
 		return "", ""
 	}
-	
+
 	// In a real implementation, you would extract these from span context
 	// For now, we'll return empty strings as placeholders
 	return "", ""

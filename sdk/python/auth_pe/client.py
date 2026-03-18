@@ -221,6 +221,7 @@ class LeluClient:
         with agent_tracer.agent_span(
             "ai.agent.delegate",
             req.delegator,
+            AgentTypes.AUTONOMOUS,
             **{
                 "ai.parent.agent": req.delegator,
                 "ai.child.agent": req.delegatee,

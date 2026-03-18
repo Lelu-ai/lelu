@@ -4,27 +4,31 @@ Provides OpenTelemetry-based tracing with AI agent semantic conventions.
 """
 
 import time
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any, Union, Tuple
 from contextlib import contextmanager
 
 try:
-    from opentelemetry import trace
-    from opentelemetry.trace import Status, StatusCode
+    from opentelemetry import trace as otel_trace
+    from opentelemetry.trace import Status as OtelStatus, StatusCode as OtelStatusCode
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
     # Provide stub classes for when OpenTelemetry is not available
-    class trace:
+    class OtelTrace:
         @staticmethod
-        def get_tracer(name: str, version: str = None):
+        def get_tracer(name: str, version: Optional[str] = None) -> 'NoOpTracer':
             return NoOpTracer()
     
-    class Status:
+    class OtelStatus:
         pass
     
-    class StatusCode:
+    class OtelStatusCode:
         OK = "OK"
         ERROR = "ERROR"
+    
+    otel_trace = OtelTrace()
+    OtelStatus = OtelStatus  # type: ignore
+    OtelStatusCode = OtelStatusCode  # type: ignore
 
 
 class NoOpSpan:
@@ -33,7 +37,7 @@ class NoOpSpan:
     def set_attributes(self, attributes: Dict[str, Any]) -> None:
         pass
     
-    def set_status(self, status: Union[Status, StatusCode], description: str = None) -> None:
+    def set_status(self, status: Union[OtelStatus, OtelStatusCode], description: Optional[str] = None) -> None:
         pass
     
     def record_exception(self, exception: Exception) -> None:
@@ -42,17 +46,17 @@ class NoOpSpan:
     def end(self) -> None:
         pass
     
-    def __enter__(self):
+    def __enter__(self) -> 'NoOpSpan':
         return self
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         pass
 
 
 class NoOpTracer:
     """No-op tracer implementation when OpenTelemetry is not available."""
     
-    def start_span(self, name: str, **kwargs) -> NoOpSpan:
+    def start_span(self, name: str, **kwargs: Any) -> NoOpSpan:
         return NoOpSpan()
 
 
@@ -147,9 +151,9 @@ class LatencyMetrics:
 class AgentTracer:
     """AI agent-aware tracer for enhanced observability."""
     
-    def __init__(self, service_name: str = "lelu-python-sdk", service_version: str = "0.2.0"):
+    def __init__(self, service_name: str = "lelu-python-sdk", service_version: str = "0.2.0") -> None:
         if OTEL_AVAILABLE:
-            self.tracer = trace.get_tracer(service_name, service_version)
+            self.tracer = otel_trace.get_tracer(service_name, service_version)
         else:
             self.tracer = NoOpTracer()
     
@@ -158,8 +162,8 @@ class AgentTracer:
         operation_name: str,
         agent_id: str,
         agent_type: str = AgentTypes.AUTONOMOUS,
-        **attributes
-    ):
+        **attributes: Any
+    ) -> Any:
         """Start a new span with AI agent semantic conventions."""
         span_attributes = {
             AIAgentAttributes.AGENT_ID: agent_id,
@@ -178,7 +182,7 @@ class AgentTracer:
         agent_id: str,
         action: str,
         confidence: float
-    ):
+    ) -> Any:
         """Start an authorization span."""
         return self.start_agent_span(
             "ai.agent.authorize",
@@ -194,7 +198,7 @@ class AgentTracer:
         self,
         delegator: str,
         delegatee: str
-    ):
+    ) -> Any:
         """Start a delegation span."""
         return self.start_agent_span(
             "ai.agent.delegate",
@@ -211,7 +215,7 @@ class AgentTracer:
         swarm_id: str,
         orchestrator: str,
         agents: List[str]
-    ):
+    ) -> Any:
         """Start a swarm orchestration span."""
         return self.start_agent_span(
             "ai.swarm.orchestration",
@@ -227,12 +231,12 @@ class AgentTracer:
     
     def record_policy_evaluation(
         self,
-        span,
+        span: Any,
         policy_name: str,
         policy_version: str,
         result: str,
         latency_ms: float
-    ):
+    ) -> None:
         """Record policy evaluation details in the span."""
         if not span or not hasattr(span, 'set_attributes'):
             return
@@ -246,9 +250,9 @@ class AgentTracer:
     
     def record_decision(
         self,
-        span,
+        span: Any,
         metrics: DecisionMetrics
-    ):
+    ) -> None:
         """Record the final authorization decision."""
         if not span or not hasattr(span, 'set_attributes'):
             return
@@ -270,15 +274,15 @@ class AgentTracer:
         # Set span status based on decision
         if hasattr(span, 'set_status'):
             if not metrics.allowed and not metrics.requires_human_review:
-                span.set_status(StatusCode.ERROR, "Authorization denied")
+                span.set_status(OtelStatusCode.ERROR, "Authorization denied")
             else:
-                span.set_status(StatusCode.OK)
+                span.set_status(OtelStatusCode.OK)
     
     def record_latency(
         self,
-        span,
+        span: Any,
         metrics: LatencyMetrics
-    ):
+    ) -> None:
         """Record operation latency."""
         if not span or not hasattr(span, 'set_attributes'):
             return
@@ -296,9 +300,9 @@ class AgentTracer:
     
     def inject_correlation_context(
         self,
-        span,
+        span: Any,
         delegation_chain: str
-    ):
+    ) -> None:
         """Inject correlation context for multi-agent tracing."""
         if not span or not hasattr(span, 'set_attributes'):
             return
@@ -313,20 +317,20 @@ class AgentTracer:
         operation_name: str,
         agent_id: str,
         agent_type: str = AgentTypes.AUTONOMOUS,
-        **attributes
-    ):
+        **attributes: Any
+    ) -> Any:
         """Context manager for agent spans."""
         span = self.start_agent_span(operation_name, agent_id, agent_type, **attributes)
         
         try:
             yield span
             if hasattr(span, 'set_status'):
-                span.set_status(StatusCode.OK)
+                span.set_status(OtelStatusCode.OK)
         except Exception as e:
             if hasattr(span, 'record_exception'):
                 span.record_exception(e)
             if hasattr(span, 'set_status'):
-                span.set_status(StatusCode.ERROR, str(e))
+                span.set_status(OtelStatusCode.ERROR, str(e))
             raise
         finally:
             if hasattr(span, 'end'):

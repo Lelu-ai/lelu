@@ -19,15 +19,16 @@ except ImportError:
         def get_tracer(name: str, version: Optional[str] = None) -> 'NoOpTracer':
             return NoOpTracer()
     
-    class OtelStatus:
+    class _StubStatus:
         pass
     
-    class OtelStatusCode:
+    class _StubStatusCode:
         OK = "OK"
         ERROR = "ERROR"
     
     otel_trace = OtelTrace()
-    # Use the stub classes when OpenTelemetry is not available
+    OtelStatus = _StubStatus
+    OtelStatusCode = _StubStatusCode
 
 
 class NoOpSpan:

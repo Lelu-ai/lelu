@@ -13,8 +13,8 @@ type IntegratedObservability struct {
 	Tracer *AgentTracer
 
 	// Phase 2: Behavioral Analytics
-	AnomalyDetector  *AnomalyDetector
-	BaselineManager  *BaselineManager
+	AnomalyDetector   *AnomalyDetector
+	BaselineManager   *BaselineManager
 	ReputationManager *ReputationManager
 
 	// Phase 3: Real-time Intelligence

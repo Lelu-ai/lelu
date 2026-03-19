@@ -47,8 +47,8 @@ type PredictiveConfig struct {
 	PredictionCacheTime time.Duration // How long to cache predictions
 
 	// Feature engineering
-	EnableTemporalFeatures  bool // Include time-based features
-	EnableContextFeatures   bool // Include context-based features
+	EnableTemporalFeatures   bool // Include time-based features
+	EnableContextFeatures    bool // Include context-based features
 	EnableHistoricalFeatures bool // Include historical features
 }
 

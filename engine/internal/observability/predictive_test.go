@@ -74,11 +74,10 @@ func TestPredictiveAnalytics(t *testing.T) {
 	})
 
 	t.Run("SuggestPolicyOptimizations", func(t *testing.T) {
-		ctx := context.Background()
-
 		// Skip this test as it requires the full Phase 3 database schema
 		t.Skip("Skipping policy optimization test - requires Phase 3 schema (policy_evaluations table)")
 
+		ctx := context.Background()
 		suggestions, err := pa.SuggestPolicyOptimizations(ctx)
 		if err != nil {
 			t.Fatalf("Failed to get policy suggestions: %v", err)
@@ -120,7 +119,7 @@ func TestPredictiveAnalytics(t *testing.T) {
 func TestConfidencePrediction(t *testing.T) {
 	// Skip to avoid Prometheus metrics conflicts with TestPredictiveAnalytics
 	t.Skip("Skipping to avoid duplicate Prometheus metrics registration")
-	
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -156,7 +155,7 @@ func TestConfidencePrediction(t *testing.T) {
 func TestHumanReviewPrediction(t *testing.T) {
 	// Skip to avoid Prometheus metrics conflicts with TestPredictiveAnalytics
 	t.Skip("Skipping to avoid duplicate Prometheus metrics registration")
-	
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -206,7 +205,7 @@ func TestHumanReviewPrediction(t *testing.T) {
 func TestPolicyOptimization(t *testing.T) {
 	// Skip to avoid Prometheus metrics conflicts with TestPredictiveAnalytics
 	t.Skip("Skipping to avoid duplicate Prometheus metrics registration")
-	
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -257,7 +256,7 @@ func TestPolicyOptimization(t *testing.T) {
 func TestFeatureExtraction(t *testing.T) {
 	// Skip to avoid Prometheus metrics conflicts with TestPredictiveAnalytics
 	t.Skip("Skipping to avoid duplicate Prometheus metrics registration")
-	
+
 	db := setupTestDB(t)
 	defer db.Close()
 
@@ -322,7 +321,7 @@ func TestFeatureExtraction(t *testing.T) {
 func TestPredictionPerformance(t *testing.T) {
 	// Skip to avoid Prometheus metrics conflicts with TestPredictiveAnalytics
 	t.Skip("Skipping to avoid duplicate Prometheus metrics registration")
-	
+
 	db := setupTestDB(t)
 	defer db.Close()
 

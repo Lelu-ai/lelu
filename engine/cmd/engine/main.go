@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"github.com/redis/go-redis/v9"
 
 	"github.com/lelu/engine/internal/audit"
 	"github.com/lelu/engine/internal/confidence"
@@ -48,7 +48,7 @@ func main() {
 	otelEnabled := envOr("OTEL_ENABLED", "false") == "true"
 	otelEndpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 	otelSampleRate := parseFloatOr(envOr("OTEL_SAMPLE_RATE", "1.0"), 1.0)
-	
+
 	// Phase 2: Behavioral Analytics Database
 	dbPath := envOr("DATABASE_PATH", "/var/lib/lelu/lelu.db")
 	behavioralAnalyticsEnabled := envOr("BEHAVIORAL_ANALYTICS_ENABLED", "true") == "true"
@@ -112,18 +112,17 @@ func main() {
 		if err := os.MkdirAll("/var/lib/lelu", 0755); err != nil {
 			log.Printf("warning: could not create database directory: %v", err)
 		}
-		
+
 		db, err = sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=10000")
 		if err != nil {
 			log.Printf("warning: could not open database: %v", err)
-			behavioralAnalyticsEnabled = false
+			db = nil
 		} else {
 			// Run basic migrations (in production, use proper migration tool)
 			if err := initDatabase(db); err != nil {
 				log.Printf("warning: could not initialize database: %v", err)
 				db.Close()
 				db = nil
-				behavioralAnalyticsEnabled = false
 			} else {
 				log.Printf("behavioral analytics database ready: %s", dbPath)
 			}
@@ -231,13 +230,13 @@ func initDatabase(db *sql.DB) error {
 		"PRAGMA temp_store=memory",
 		"PRAGMA mmap_size=268435456", // 256MB
 	}
-	
+
 	for _, pragma := range pragmas {
 		if _, err := db.Exec(pragma); err != nil {
 			return fmt.Errorf("failed to set pragma %s: %w", pragma, err)
 		}
 	}
-	
+
 	// Create basic tables (simplified version of migration)
 	schema := `
 	CREATE TABLE IF NOT EXISTS agent_reputation (
@@ -328,11 +327,11 @@ func initDatabase(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_anomaly_results_agent_timestamp ON anomaly_results(agent_id, timestamp);
 	CREATE INDEX IF NOT EXISTS idx_alerts_agent_status ON alerts(agent_id, status);
 	`
-	
+
 	if _, err := db.Exec(schema); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
-	
+
 	return nil
 }
 

@@ -114,7 +114,7 @@ func NewReputationManager(db *sql.DB, config ReputationConfig) *ReputationManage
 
 // RecordDecision records a decision outcome for reputation calculation
 func (rm *ReputationManager) RecordDecision(ctx context.Context, agentID, agentType string, 
-	confidence float64, wasCorrect bool, outcome string) error {
+	confidence float64, wasCorrect bool, _ string) error {
 	
 	// Record metrics
 	confidenceBucket := rm.getConfidenceBucket(confidence)

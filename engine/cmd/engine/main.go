@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
 	"github.com/lelu/engine/internal/audit"
 	"github.com/lelu/engine/internal/confidence"
@@ -45,6 +48,10 @@ func main() {
 	otelEnabled := envOr("OTEL_ENABLED", "false") == "true"
 	otelEndpoint := envOr("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 	otelSampleRate := parseFloatOr(envOr("OTEL_SAMPLE_RATE", "1.0"), 1.0)
+	
+	// Phase 2: Behavioral Analytics Database
+	dbPath := envOr("DATABASE_PATH", "/var/lib/lelu/lelu.db")
+	behavioralAnalyticsEnabled := envOr("BEHAVIORAL_ANALYTICS_ENABLED", "true") == "true"
 
 	if isProductionEnv() {
 		if signingKey == "" || signingKey == "change-me-in-production" {
@@ -98,6 +105,31 @@ func main() {
 		}
 	}()
 
+	// ── Database (Phase 2: Behavioral Analytics) ─────────────────────────────
+	var db *sql.DB
+	if behavioralAnalyticsEnabled {
+		// Ensure database directory exists
+		if err := os.MkdirAll("/var/lib/lelu", 0755); err != nil {
+			log.Printf("warning: could not create database directory: %v", err)
+		}
+		
+		db, err = sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_synchronous=NORMAL&_cache_size=10000")
+		if err != nil {
+			log.Printf("warning: could not open database: %v", err)
+			behavioralAnalyticsEnabled = false
+		} else {
+			// Run basic migrations (in production, use proper migration tool)
+			if err := initDatabase(db); err != nil {
+				log.Printf("warning: could not initialize database: %v", err)
+				db.Close()
+				db = nil
+				behavioralAnalyticsEnabled = false
+			} else {
+				log.Printf("behavioral analytics database ready: %s", dbPath)
+			}
+		}
+	}
+
 	tokenSvc := tokens.New(tokens.Config{
 		SigningKey:      signingKey,
 		RedisAddr:       redisAddr,
@@ -142,7 +174,7 @@ func main() {
 	h := server.New(eval, tokenSvc, confGate, auditWriter, reviewQueue, apiKey, server.ConfidenceConfig{
 		AllowUnverifiedConfidence: allowUnverifiedConfidence,
 		MissingSignalMode:         missingConfidenceMode,
-	}, enforcementMode, incidentNotifier, rl, fb, tp)
+	}, enforcementMode, incidentNotifier, rl, fb, tp, db)
 	srv := server.NewHTTPServer(addr, h)
 
 	// ── Policy sync worker (optional) ─────────────────────────────────────────
@@ -183,7 +215,125 @@ func main() {
 	}
 
 	auditWriter.Close()
+	if db != nil {
+		db.Close()
+	}
 	log.Println("bye")
+}
+
+// initDatabase runs basic database initialization for behavioral analytics
+func initDatabase(db *sql.DB) error {
+	// Enable WAL mode and other optimizations
+	pragmas := []string{
+		"PRAGMA journal_mode=WAL",
+		"PRAGMA synchronous=NORMAL",
+		"PRAGMA cache_size=10000",
+		"PRAGMA temp_store=memory",
+		"PRAGMA mmap_size=268435456", // 256MB
+	}
+	
+	for _, pragma := range pragmas {
+		if _, err := db.Exec(pragma); err != nil {
+			return fmt.Errorf("failed to set pragma %s: %w", pragma, err)
+		}
+	}
+	
+	// Create basic tables (simplified version of migration)
+	schema := `
+	CREATE TABLE IF NOT EXISTS agent_reputation (
+		agent_id TEXT PRIMARY KEY,
+		reputation_score REAL NOT NULL DEFAULT 0.5,
+		decision_count INTEGER NOT NULL DEFAULT 0,
+		accuracy_rate REAL NOT NULL DEFAULT 0.0,
+		calibration_score REAL NOT NULL DEFAULT 0.5,
+		last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		confidence_sum REAL NOT NULL DEFAULT 0.0,
+		correct_decisions INTEGER NOT NULL DEFAULT 0,
+		high_conf_errors INTEGER NOT NULL DEFAULT 0,
+		low_conf_correct INTEGER NOT NULL DEFAULT 0,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	
+	CREATE TABLE IF NOT EXISTS behavioral_baselines (
+		agent_id TEXT PRIMARY KEY,
+		created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		sample_count INTEGER NOT NULL DEFAULT 0,
+		confidence_mean REAL NOT NULL DEFAULT 0.0,
+		confidence_std_dev REAL NOT NULL DEFAULT 0.0,
+		latency_mean REAL NOT NULL DEFAULT 0.0,
+		latency_std_dev REAL NOT NULL DEFAULT 0.0,
+		action_frequencies TEXT NOT NULL DEFAULT '{}',
+		hourly_patterns TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]',
+		decision_outcomes TEXT NOT NULL DEFAULT '{}',
+		confidence_distribution TEXT NOT NULL DEFAULT '[]',
+		latency_percentiles TEXT NOT NULL DEFAULT '{}'
+	);
+	
+	CREATE TABLE IF NOT EXISTS anomaly_results (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		agent_id TEXT NOT NULL,
+		timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		anomaly_score REAL NOT NULL,
+		is_anomaly BOOLEAN NOT NULL DEFAULT FALSE,
+		severity TEXT NOT NULL DEFAULT 'none',
+		features TEXT NOT NULL DEFAULT '{}',
+		explanation TEXT NOT NULL DEFAULT '',
+		action TEXT NOT NULL DEFAULT '',
+		confidence REAL NOT NULL DEFAULT 0.0,
+		latency_ms INTEGER NOT NULL DEFAULT 0,
+		outcome TEXT NOT NULL DEFAULT ''
+	);
+	
+	CREATE TABLE IF NOT EXISTS agent_decisions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		agent_id TEXT NOT NULL,
+		timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		action TEXT NOT NULL,
+		confidence REAL NOT NULL,
+		latency_ms INTEGER NOT NULL,
+		outcome TEXT NOT NULL,
+		was_correct BOOLEAN,
+		risk_score REAL,
+		human_review_required BOOLEAN DEFAULT FALSE,
+		policy_version TEXT,
+		trace_id TEXT,
+		span_id TEXT
+	);
+	
+	CREATE TABLE IF NOT EXISTS alerts (
+		id TEXT PRIMARY KEY,
+		rule_id TEXT NOT NULL,
+		agent_id TEXT NOT NULL,
+		timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		title TEXT NOT NULL,
+		description TEXT NOT NULL,
+		severity TEXT NOT NULL DEFAULT 'medium',
+		priority INTEGER NOT NULL DEFAULT 3,
+		trigger_data TEXT NOT NULL DEFAULT '{}',
+		context TEXT NOT NULL DEFAULT '{}',
+		status TEXT NOT NULL DEFAULT 'active',
+		acked_by TEXT,
+		acked_at TIMESTAMP,
+		resolved_at TIMESTAMP,
+		group_id TEXT,
+		group_count INTEGER DEFAULT 1,
+		tags TEXT NOT NULL DEFAULT '{}',
+		channels TEXT NOT NULL DEFAULT '[]'
+	);
+	
+	-- Create indexes
+	CREATE INDEX IF NOT EXISTS idx_agent_decisions_agent_timestamp ON agent_decisions(agent_id, timestamp);
+	CREATE INDEX IF NOT EXISTS idx_anomaly_results_agent_timestamp ON anomaly_results(agent_id, timestamp);
+	CREATE INDEX IF NOT EXISTS idx_alerts_agent_status ON alerts(agent_id, status);
+	`
+	
+	if _, err := db.Exec(schema); err != nil {
+		return fmt.Errorf("failed to create schema: %w", err)
+	}
+	
+	return nil
 }
 
 func envOr(key, fallback string) string {

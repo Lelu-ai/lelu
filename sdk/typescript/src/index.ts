@@ -7,6 +7,11 @@
 export { secureTool } from "./vercel/index.js";
 export type { SecureToolOptions, LeluDeniedResult, VercelTool } from "./vercel/index.js";
 
+// ─── Enhanced Observability (Phase 1) ─────────────────────────────────────────
+// Import via: import { AgentTracer, agentTracer } from '@lelu-auth/lelu/observability'
+export { AgentTracer, agentTracer, AI_AGENT_ATTRIBUTES, AGENT_TYPES, DECISION_TYPES } from "./observability/tracer.js";
+export type { AgentSpanOptions, DecisionMetrics, LatencyMetrics } from "./observability/tracer.js";
+
 export { LeluClient } from "./client.js";
 export { LocalStorage } from "./storage.js";
 

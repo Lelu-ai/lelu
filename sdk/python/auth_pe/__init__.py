@@ -35,6 +35,18 @@ from .models import (
     RevokeTokenResult,
 )
 
+# Enhanced Observability (Phase 1)
+from .observability import (
+    AgentTracer,
+    agent_tracer,
+    get_agent_tracer,
+    AIAgentAttributes,
+    AgentTypes,
+    DecisionTypes,
+    DecisionMetrics,
+    LatencyMetrics,
+)
+
 # CrewAI integration — requires `pip install crewai`
 try:
     from .crewai import LeluTool, PermissionDeniedError as CrewAIPermissionDeniedError  # noqa: F401
@@ -63,6 +75,15 @@ __all__ = [
     "RevokeTokenResult",
     # Errors
     "AuthEngineError",
+    # Enhanced Observability
+    "AgentTracer",
+    "agent_tracer",
+    "get_agent_tracer",
+    "AIAgentAttributes",
+    "AgentTypes",
+    "DecisionTypes",
+    "DecisionMetrics",
+    "LatencyMetrics",
 ]
 
 __version__ = "0.1.0"

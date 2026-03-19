@@ -476,11 +476,11 @@ class LeluClient:
         await self._raise_for_status(resp)
         return BaselineResponse(**resp.json())
 
-    async def refresh_agent_baseline(self, agent_id: str) -> dict[str, str]:
+    async def refresh_agent_baseline(self, agent_id: str) -> dict[str, Any]:
         """Trigger a baseline refresh for a specific agent."""
         resp = await self._client.post(f"/v1/analytics/baseline/{agent_id}/refresh", json={})
         await self._raise_for_status(resp)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
     async def get_alerts(self, agent_id: str | None = None) -> AlertsResponse:
         """Get active alerts, optionally filtered by agent."""
@@ -492,18 +492,18 @@ class LeluClient:
         await self._raise_for_status(resp)
         return AlertsResponse(**resp.json())
 
-    async def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> dict[str, str]:
+    async def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> dict[str, Any]:
         """Acknowledge an alert."""
         payload = {"acknowledged_by": acknowledged_by}
         resp = await self._client.post(f"/v1/analytics/alerts/{alert_id}/acknowledge", json=payload)
         await self._raise_for_status(resp)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
-    async def resolve_alert(self, alert_id: str) -> dict[str, str]:
+    async def resolve_alert(self, alert_id: str) -> dict[str, Any]:
         """Resolve an alert."""
         resp = await self._client.post(f"/v1/analytics/alerts/{alert_id}/resolve", json={})
         await self._raise_for_status(resp)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 

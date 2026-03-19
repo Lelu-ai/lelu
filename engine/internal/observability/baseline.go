@@ -297,7 +297,7 @@ func (bm *BaselineManager) RefreshBaseline(ctx context.Context, agentID string) 
 }
 
 // UpdateBaseline updates baseline with a single decision data point
-func (bm *BaselineManager) UpdateBaseline(_ context.Context, agentID, action, outcome string, confidence float64, latency time.Duration) error {
+func (bm *BaselineManager) UpdateBaseline(_ context.Context, _, action, outcome string, confidence float64, latency time.Duration) error {
 	// For now, we'll just trigger a refresh if enough time has passed
 	// In a production system, this could incrementally update the baseline
 	// or queue the data for batch processing
@@ -516,17 +516,17 @@ func (bm *BaselineManager) getRecentBehaviorData(ctx context.Context, agentID st
 // - startDriftDetector
 
 // Placeholder implementations for brevity
-func (bm *BaselineManager) analyzeConfidenceDrift(_ *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+func (bm *BaselineManager) analyzeConfidenceDrift(_ *BehavioralBaseline, _ []*BehaviorData) DriftMetric {
 	// Implementation would analyze confidence drift
 	return DriftMetric{MetricName: "confidence"}
 }
 
-func (bm *BaselineManager) analyzeLatencyDrift(_ *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+func (bm *BaselineManager) analyzeLatencyDrift(_ *BehavioralBaseline, _ []*BehaviorData) DriftMetric {
 	// Implementation would analyze latency drift
 	return DriftMetric{MetricName: "latency"}
 }
 
-func (bm *BaselineManager) analyzePatternDrift(baseline *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+func (bm *BaselineManager) analyzePatternDrift(_ *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
 	// Implementation would analyze pattern drift
 	return DriftMetric{MetricName: "pattern"}
 }
@@ -551,7 +551,7 @@ func (bm *BaselineManager) generateDriftExplanation(_ *DriftAnalysis) string {
 	return "No significant drift detected"
 }
 
-func (bm *BaselineManager) generateDriftRecommendations(analysis *DriftAnalysis) []string {
+func (bm *BaselineManager) generateDriftRecommendations(_ *DriftAnalysis) []string {
 	// Implementation would generate actionable recommendations
 	return []string{"Continue monitoring"}
 }
@@ -561,12 +561,12 @@ func (bm *BaselineManager) calculateBaselineFromData(agentID string, _ []*Behavi
 	return &BehavioralBaseline{AgentID: agentID}
 }
 
-func (bm *BaselineManager) saveBaseline(_ context.Context, baseline *BehavioralBaseline) error {
+func (bm *BaselineManager) saveBaseline(_ context.Context, _ *BehavioralBaseline) error {
 	// Implementation would save baseline to database
 	return nil
 }
 
-func (bm *BaselineManager) getBaselineFromDB(ctx context.Context, agentID string) (*BehavioralBaseline, error) {
+func (bm *BaselineManager) getBaselineFromDB(_ context.Context, agentID string) (*BehavioralBaseline, error) {
 	// Implementation would retrieve baseline from database
 	return nil, nil
 }

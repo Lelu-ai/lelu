@@ -434,12 +434,22 @@ func (ad *AnomalyDetector) getBaseline(ctx context.Context, agentID string) (*Be
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to get baseline: %w", err)
 	} else {
-		// Parse JSON fields
-		json.Unmarshal([]byte(actionFreqJSON), &baseline.ActionFrequencies)
-		json.Unmarshal([]byte(hourlyPatternsJSON), &baseline.HourlyPatterns)
-		json.Unmarshal([]byte(outcomesJSON), &baseline.DecisionOutcomes)
-		json.Unmarshal([]byte(confDistJSON), &baseline.ConfidenceDistribution)
-		json.Unmarshal([]byte(latencyPercJSON), &baseline.LatencyPercentiles)
+		// Parse JSON fields with error checking
+		if err := json.Unmarshal([]byte(actionFreqJSON), &baseline.ActionFrequencies); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal action frequencies: %w", err)
+		}
+		if err := json.Unmarshal([]byte(hourlyPatternsJSON), &baseline.HourlyPatterns); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal hourly patterns: %w", err)
+		}
+		if err := json.Unmarshal([]byte(outcomesJSON), &baseline.DecisionOutcomes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal decision outcomes: %w", err)
+		}
+		if err := json.Unmarshal([]byte(confDistJSON), &baseline.ConfidenceDistribution); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal confidence distribution: %w", err)
+		}
+		if err := json.Unmarshal([]byte(latencyPercJSON), &baseline.LatencyPercentiles); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal latency percentiles: %w", err)
+		}
 	}
 
 	// Cache the result

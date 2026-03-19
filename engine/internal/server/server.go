@@ -70,32 +70,32 @@ var (
 
 // Handler wires all engine sub-services into HTTP endpoints.
 type Handler struct {
-	eval           *evaluator.Evaluator
-	tokenSvc       *tokens.Service
-	confGate       *confidence.Gate
-	riskModel      *riskModel
-	actorStat      *actorStats
-	audit          *audit.Writer
-	queue          *queue.Queue
-	apiKey         string
-	confCfg        ConfidenceConfig
-	mode           EnforcementMode
-	shadow         *shadowStats
-	incident       *incident.Notifier
-	anomaly        *anomalyTracker
-	rateLimit      *ratelimit.Limiter
-	fallback       *fallback.Strategy
-	tracer         trace.Tracer
-	
+	eval      *evaluator.Evaluator
+	tokenSvc  *tokens.Service
+	confGate  *confidence.Gate
+	riskModel *riskModel
+	actorStat *actorStats
+	audit     *audit.Writer
+	queue     *queue.Queue
+	apiKey    string
+	confCfg   ConfidenceConfig
+	mode      EnforcementMode
+	shadow    *shadowStats
+	incident  *incident.Notifier
+	anomaly   *anomalyTracker
+	rateLimit *ratelimit.Limiter
+	fallback  *fallback.Strategy
+	tracer    trace.Tracer
+
 	// Phase 1: Enhanced Observability
 	agentTracer    *observability.AgentTracer
 	correlationMgr *observability.CorrelationManager
-	
+
 	// Phase 2: Behavioral Analytics
-	reputationMgr  *observability.ReputationManager
+	reputationMgr   *observability.ReputationManager
 	anomalyDetector *observability.AnomalyDetector
-	baselineMgr    *observability.BaselineManager
-	alertMgr       *observability.AlertManager
+	baselineMgr     *observability.BaselineManager
+	alertMgr        *observability.AlertManager
 }
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
@@ -241,52 +241,52 @@ func New(
 	// Initialize enhanced observability components (Phase 1)
 	agentTracer := observability.NewAgentTracer("lelu-engine")
 	correlationMgr := observability.NewCorrelationManager()
-	
+
 	// Initialize behavioral analytics components (Phase 2)
 	var reputationMgr *observability.ReputationManager
 	var anomalyDetector *observability.AnomalyDetector
 	var baselineMgr *observability.BaselineManager
 	var alertMgr *observability.AlertManager
-	
+
 	if db != nil {
 		// Initialize Phase 2 components with database
 		reputationMgr = observability.NewReputationManager(db, observability.DefaultReputationConfig())
 		anomalyDetector = observability.NewAnomalyDetector(db, observability.DefaultAnomalyConfig())
 		baselineMgr = observability.NewBaselineManager(db, observability.DefaultBaselineConfig())
 		alertMgr = observability.NewAlertManager(db, observability.DefaultAlertConfig())
-		
+
 		log.Printf("Phase 2 behavioral analytics initialized")
 	} else {
 		log.Printf("Phase 2 behavioral analytics disabled (no database)")
 	}
 
 	return &Handler{
-		eval:           eval,
-		tokenSvc:       tokenSvc,
-		confGate:       confGate,
-		riskModel:      newRiskModel(NewRiskConfigFromEnv()),
-		actorStat:      newActorStats(),
-		audit:          auditWriter,
-		queue:          q,
-		apiKey:         apiKey,
-		confCfg:        confCfg.withDefaults(),
-		mode:           mode,
-		shadow:         newShadowStats(),
-		incident:       incidentNotifier,
-		anomaly:        newAnomalyTracker(5, 60*time.Second),
-		rateLimit:      rl,
-		fallback:       fb,
-		tracer:         tracer,
-		
+		eval:      eval,
+		tokenSvc:  tokenSvc,
+		confGate:  confGate,
+		riskModel: newRiskModel(NewRiskConfigFromEnv()),
+		actorStat: newActorStats(),
+		audit:     auditWriter,
+		queue:     q,
+		apiKey:    apiKey,
+		confCfg:   confCfg.withDefaults(),
+		mode:      mode,
+		shadow:    newShadowStats(),
+		incident:  incidentNotifier,
+		anomaly:   newAnomalyTracker(5, 60*time.Second),
+		rateLimit: rl,
+		fallback:  fb,
+		tracer:    tracer,
+
 		// Phase 1: Enhanced Observability
 		agentTracer:    agentTracer,
 		correlationMgr: correlationMgr,
-		
+
 		// Phase 2: Behavioral Analytics
-		reputationMgr:  reputationMgr,
+		reputationMgr:   reputationMgr,
 		anomalyDetector: anomalyDetector,
-		baselineMgr:    baselineMgr,
-		alertMgr:       alertMgr,
+		baselineMgr:     baselineMgr,
+		alertMgr:        alertMgr,
 	}
 }
 
@@ -299,13 +299,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/shadow/summary", h.handleShadowSummary)
 	mux.HandleFunc("POST /v1/tokens/mint", h.handleMintToken)
 	mux.HandleFunc("DELETE /v1/tokens/{tokenID}", h.handleRevokeToken)
-	
+
 	// Phase 2 — Human approval queue
 	mux.HandleFunc("GET /v1/queue/pending", h.handleQueueList)
 	mux.HandleFunc("GET /v1/queue/{id}", h.handleQueueGet)
 	mux.HandleFunc("POST /v1/queue/{id}/approve", h.handleQueueApprove)
 	mux.HandleFunc("POST /v1/queue/{id}/deny", h.handleQueueDeny)
-	
+
 	// Phase 2 — Behavioral Analytics API
 	mux.HandleFunc("GET /v1/analytics/reputation/{agentID}", h.handleGetReputation)
 	mux.HandleFunc("GET /v1/analytics/reputation", h.handleListReputations)
@@ -315,7 +315,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/analytics/alerts", h.handleGetAlerts)
 	mux.HandleFunc("POST /v1/analytics/alerts/{alertID}/acknowledge", h.handleAcknowledgeAlert)
 	mux.HandleFunc("POST /v1/analytics/alerts/{alertID}/resolve", h.handleResolveAlert)
-	
+
 	mux.HandleFunc("GET /v1/fallback/status", h.handleFallbackStatus)
 	mux.HandleFunc("GET /healthz", h.handleHealth)
 	mux.Handle("GET /metrics", promhttp.Handler())
@@ -738,18 +738,18 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			// Run behavioral analytics in background to avoid blocking response
 			ctx := context.Background()
-			
+
 			// 1. Record decision for reputation tracking
 			wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
 			if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
 				log.Printf("Failed to record decision for reputation: %v", err)
 			}
-			
+
 			// 2. Update behavioral baseline
 			if err := h.baselineMgr.UpdateBaseline(ctx, req.Actor, req.Action, outcome, confidenceScore, time.Duration(totalLatency)*time.Millisecond); err != nil {
 				log.Printf("Failed to update behavioral baseline: %v", err)
 			}
-			
+
 			// 3. Perform anomaly detection
 			anomalyResult, err := h.anomalyDetector.DetectAnomaly(ctx, req.Actor, "autonomous", req.Action, confidenceScore, time.Duration(totalLatency)*time.Millisecond, outcome)
 			if err != nil {
@@ -760,14 +760,14 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 					log.Printf("Failed to check anomaly alert: %v", err)
 				}
 			}
-			
+
 			// 5. Check reputation-based alerts
 			if reputation, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil {
 				if err := h.alertMgr.CheckReputationAlert(ctx, req.Actor, reputation); err != nil {
 					log.Printf("Failed to check reputation alert: %v", err)
 				}
 			}
-			
+
 			// 6. Check for baseline drift
 			if driftAnalysis, err := h.baselineMgr.DetectDrift(ctx, req.Actor); err == nil && driftAnalysis != nil {
 				if err := h.alertMgr.CheckDriftAlert(ctx, driftAnalysis); err != nil {
@@ -1648,19 +1648,19 @@ func (h *Handler) handleGetReputation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	agentID := r.PathValue("agentID")
 	if agentID == "" {
 		writeError(w, http.StatusBadRequest, "agent ID required")
 		return
 	}
-	
+
 	reputation, err := h.reputationMgr.GetReputation(r.Context(), agentID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get reputation: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, reputation)
 }
 
@@ -1670,7 +1670,7 @@ func (h *Handler) handleListReputations(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	// Parse query parameters
 	limitStr := r.URL.Query().Get("limit")
 	limit := 50 // default
@@ -1679,7 +1679,7 @@ func (h *Handler) handleListReputations(w http.ResponseWriter, r *http.Request) 
 			limit = parsed
 		}
 	}
-	
+
 	sortBy := r.URL.Query().Get("sort")
 	switch sortBy {
 	case "top":
@@ -1722,13 +1722,13 @@ func (h *Handler) handleGetAnomalies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	agentID := r.PathValue("agentID")
 	if agentID == "" {
 		writeError(w, http.StatusBadRequest, "agent ID required")
 		return
 	}
-	
+
 	// Parse time window
 	sinceStr := r.URL.Query().Get("since")
 	since := time.Now().Add(-24 * time.Hour) // default: last 24 hours
@@ -1737,18 +1737,18 @@ func (h *Handler) handleGetAnomalies(w http.ResponseWriter, r *http.Request) {
 			since = parsed
 		}
 	}
-	
+
 	anomalies, err := h.anomalyDetector.GetRecentAnomalies(r.Context(), agentID, since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get anomalies: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"agent_id":   agentID,
-		"anomalies":  anomalies,
-		"total":      len(anomalies),
-		"since":      since,
+		"agent_id":  agentID,
+		"anomalies": anomalies,
+		"total":     len(anomalies),
+		"since":     since,
 	})
 }
 
@@ -1758,27 +1758,27 @@ func (h *Handler) handleGetBaseline(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	agentID := r.PathValue("agentID")
 	if agentID == "" {
 		writeError(w, http.StatusBadRequest, "agent ID required")
 		return
 	}
-	
+
 	// Get baseline health assessment
 	health, err := h.baselineMgr.AssessBaselineHealth(r.Context(), agentID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to assess baseline health: %v", err))
 		return
 	}
-	
+
 	// Get drift analysis
 	drift, err := h.baselineMgr.DetectDrift(r.Context(), agentID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to detect drift: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"agent_id": agentID,
 		"health":   health,
@@ -1792,19 +1792,19 @@ func (h *Handler) handleRefreshBaseline(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	agentID := r.PathValue("agentID")
 	if agentID == "" {
 		writeError(w, http.StatusBadRequest, "agent ID required")
 		return
 	}
-	
+
 	err := h.baselineMgr.RefreshBaseline(r.Context(), agentID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to refresh baseline: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"agent_id": agentID,
 		"status":   "baseline refreshed successfully",
@@ -1817,15 +1817,15 @@ func (h *Handler) handleGetAlerts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	agentID := r.URL.Query().Get("agent_id")
-	
+
 	alerts, err := h.alertMgr.GetActiveAlerts(r.Context(), agentID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to get alerts: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"alerts": alerts,
 		"total":  len(alerts),
@@ -1838,13 +1838,13 @@ func (h *Handler) handleAcknowledgeAlert(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	alertID := r.PathValue("alertID")
 	if alertID == "" {
 		writeError(w, http.StatusBadRequest, "alert ID required")
 		return
 	}
-	
+
 	var req struct {
 		AcknowledgedBy string `json:"acknowledged_by"`
 	}
@@ -1852,18 +1852,18 @@ func (h *Handler) handleAcknowledgeAlert(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	
+
 	if req.AcknowledgedBy == "" {
 		writeError(w, http.StatusBadRequest, "acknowledged_by required")
 		return
 	}
-	
+
 	err := h.alertMgr.AcknowledgeAlert(r.Context(), alertID, req.AcknowledgedBy)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to acknowledge alert: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"alert_id": alertID,
 		"status":   "acknowledged",
@@ -1876,19 +1876,19 @@ func (h *Handler) handleResolveAlert(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "behavioral analytics not enabled")
 		return
 	}
-	
+
 	alertID := r.PathValue("alertID")
 	if alertID == "" {
 		writeError(w, http.StatusBadRequest, "alert ID required")
 		return
 	}
-	
+
 	err := h.alertMgr.ResolveAlert(r.Context(), alertID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to resolve alert: %v", err))
 		return
 	}
-	
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"alert_id": alertID,
 		"status":   "resolved",

@@ -106,13 +106,13 @@ type HumanReviewPrediction struct {
 
 // PolicyOptimizationSuggestion represents a policy improvement suggestion
 type PolicyOptimizationSuggestion struct {
-	PolicyName      string    `json:"policy_name"`
-	CurrentScore    float64   `json:"current_score"`
-	Suggestion      string    `json:"suggestion"`
-	ExpectedImpact  float64   `json:"expected_impact"`
-	Priority        string    `json:"priority"` // "low", "medium", "high", "critical"
-	Rationale       string    `json:"rationale"`
-	Timestamp       time.Time `json:"timestamp"`
+	PolicyName     string    `json:"policy_name"`
+	CurrentScore   float64   `json:"current_score"`
+	Suggestion     string    `json:"suggestion"`
+	ExpectedImpact float64   `json:"expected_impact"`
+	Priority       string    `json:"priority"` // "low", "medium", "high", "critical"
+	Rationale      string    `json:"rationale"`
+	Timestamp      time.Time `json:"timestamp"`
 }
 
 // DefaultPredictiveConfig returns sensible defaults

@@ -1,6 +1,6 @@
 module github.com/lelu-auth/lelu/sdk/go
 
-go 1.22
+go 1.23
 
 require (
 	go.opentelemetry.io/otel v1.19.0

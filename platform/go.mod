@@ -1,6 +1,6 @@
 module github.com/lelu/platform
 
-go 1.22
+go 1.23
 
 require (
 	github.com/coreos/go-oidc/v3 v3.12.0

@@ -542,11 +542,11 @@ func (pa *PredictiveAnalytics) analyzePolicyEffectiveness(ctx context.Context) (
 		effectiveness := successRate // Simplified effectiveness calculation
 
 		stats[policyName] = &PolicyStats{
-			PolicyName:     policyName,
-			Effectiveness:  effectiveness,
-			TotalDecisions: total,
-			SuccessRate:    successRate,
-			AvgLatency:     avgLatency,
+			PolicyName:	policyName,
+			Effectiveness:	effectiveness,
+			TotalDecisions:	total,
+			SuccessRate:	successRate,
+			AvgLatency:	avgLatency,
 		}
 	}
 

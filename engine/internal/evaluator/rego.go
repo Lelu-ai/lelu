@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/open-policy-agent/opa/v1/rego"
+	"github.com/open-policy-agent/opa/rego"
 )
 
 type regoPolicy struct {

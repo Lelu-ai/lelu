@@ -83,25 +83,25 @@ type PolicyOptimizationModel struct {
 
 // ConfidencePrediction represents a predicted confidence score
 type ConfidencePrediction struct {
-	AgentID           string    `json:"agent_id"`
-	Action            string    `json:"action"`
-	PredictedConfidence float64 `json:"predicted_confidence"`
-	ActualConfidence    *float64 `json:"actual_confidence,omitempty"`
-	PredictionError     *float64 `json:"prediction_error,omitempty"`
+	AgentID             string             `json:"agent_id"`
+	Action              string             `json:"action"`
+	PredictedConfidence float64            `json:"predicted_confidence"`
+	ActualConfidence    *float64           `json:"actual_confidence,omitempty"`
+	PredictionError     *float64           `json:"prediction_error,omitempty"`
 	Features            map[string]float64 `json:"features"`
-	Timestamp           time.Time `json:"timestamp"`
+	Timestamp           time.Time          `json:"timestamp"`
 }
 
 // HumanReviewPrediction represents a prediction of human review need
 type HumanReviewPrediction struct {
-	AgentID              string             `json:"agent_id"`
-	Action               string             `json:"action"`
-	NeedsReview          bool               `json:"needs_review"`
-	ReviewProbability    float64            `json:"review_probability"`
-	Confidence           float64            `json:"confidence"`
-	RiskFactors          []string           `json:"risk_factors"`
-	Features             map[string]float64 `json:"features"`
-	Timestamp            time.Time          `json:"timestamp"`
+	AgentID           string             `json:"agent_id"`
+	Action            string             `json:"action"`
+	NeedsReview       bool               `json:"needs_review"`
+	ReviewProbability float64            `json:"review_probability"`
+	Confidence        float64            `json:"confidence"`
+	RiskFactors       []string           `json:"risk_factors"`
+	Features          map[string]float64 `json:"features"`
+	Timestamp         time.Time          `json:"timestamp"`
 }
 
 // PolicyOptimizationSuggestion represents a policy improvement suggestion

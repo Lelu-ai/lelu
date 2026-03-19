@@ -126,7 +126,7 @@ func DefaultPredictiveConfig() PredictiveConfig {
 		ReviewPredictionThreshold:     0.6, // 60% review probability threshold
 		PolicyOptimizationThreshold:   0.5, // 50% effectiveness threshold
 
-		ModelUpdateInterval: 6 * time.Hour,  // Retrain every 6 hours
+		ModelUpdateInterval: 6 * time.Hour, // Retrain every 6 hours
 		PredictionCacheTime: 15 * time.Minute, // Cache for 15 minutes
 
 		EnableTemporalFeatures:  true,

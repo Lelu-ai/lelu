@@ -297,7 +297,7 @@ func (bm *BaselineManager) RefreshBaseline(ctx context.Context, agentID string) 
 }
 
 // UpdateBaseline updates baseline with a single decision data point
-func (bm *BaselineManager) UpdateBaseline(_ context.Context, _, _, outcome string, confidence float64, latency time.Duration) error {
+func (bm *BaselineManager) UpdateBaseline(_ context.Context, _, _, _ string, confidence float64, latency time.Duration) error {
 	// For now, we'll just trigger a refresh if enough time has passed
 	// In a production system, this could incrementally update the baseline
 	// or queue the data for batch processing

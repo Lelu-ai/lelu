@@ -85,15 +85,12 @@ func (io *IntegratedObservability) ProcessAuthorizationRequest(
 	totalLatency := time.Since(startTime)
 
 	// Phase 1: Record decision
-	decision := DecisionMetrics{
-		Allowed:             true,
-		RequiresHumanReview: reviewPrediction != nil && reviewPrediction.NeedsReview,
-		Confidence:          confidence,
-		RiskScore:           riskScore,
-		Outcome:             "approved",
-	}
-	io.Tracer.RecordDecision(span, decision.Allowed, decision.RequiresHumanReview,
-		decision.Confidence, decision.RiskScore, decision.Outcome)
+	allowed := true
+	requiresHumanReview := reviewPrediction != nil && reviewPrediction.NeedsReview
+	outcome := "approved"
+	
+	io.Tracer.RecordDecision(span, allowed, requiresHumanReview,
+		confidence, riskScore, outcome)
 
 	// Phase 1: Record latency
 	io.Tracer.RecordLatency(span, float64(totalLatency.Milliseconds()),

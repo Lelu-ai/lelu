@@ -56,7 +56,6 @@ require_approval {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_LELU_API_KEY || 'lelu-dev-key'}`,
         },
         body: JSON.stringify({
           content: policyContent,
@@ -65,7 +64,8 @@ require_approval {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to save policy: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to save policy: ${response.statusText}`);
       }
 
       setSaveMessage({ type: 'success', text: 'Policy saved successfully!' });

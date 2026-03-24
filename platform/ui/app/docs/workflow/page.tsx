@@ -1,4 +1,10 @@
+"use client";
+
+import { useState } from "react";
+
 export default function DocsWorkflow() {
+  const [sdkTab, setSdkTab] = useState<"TypeScript" | "Python" | "Go">("TypeScript");
+
   return (
     <div className="max-w-3xl">
       <div className="mb-10">
@@ -58,12 +64,28 @@ export default function DocsWorkflow() {
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
+              <div className="flex gap-2">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-{`npm install @lelu-auth/lelu
+{sdkTab === "TypeScript" && `npm install @lelu-auth/lelu
 npx @lelu-auth/lelu init`}
+{sdkTab === "Python" && `pip install lelu-agent-auth-sdk
+lelu init`}
+{sdkTab === "Go" && `go get github.com/lelu-auth/lelu/sdk/go
+lelu init`}
             </pre>
           </div>
 
@@ -147,11 +169,25 @@ deny {
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
+              <div className="flex gap-2">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-{`npx lelu policies set auth ./config/auth.rego`}
+{sdkTab === "TypeScript" && `npx lelu policies set auth ./config/auth.rego`}
+{sdkTab === "Python" && `lelu policies set auth ./config/auth.rego`}
+{sdkTab === "Go" && `lelu policies set auth ./config/auth.rego`}
             </pre>
           </div>
 
@@ -179,16 +215,48 @@ deny {
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">lib/lelu.ts</span>
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
+              <div className="flex gap-2">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
-{`import { LeluClient } from "@lelu-auth/lelu";
+{sdkTab === "TypeScript" && `import { LeluClient } from "@lelu-auth/lelu";
 
 export const lelu = new LeluClient({
   baseUrl: process.env.LELU_ENGINE_URL!,
   apiKey: process.env.LELU_API_KEY!,
 });`}
+{sdkTab === "Python" && `from lelu import LeluClient
+import os
+
+lelu = LeluClient(
+    base_url=os.environ["LELU_ENGINE_URL"],
+    api_key=os.environ["LELU_API_KEY"]
+)`}
+{sdkTab === "Go" && `package main
+
+import (
+    "os"
+    "github.com/lelu-auth/lelu/sdk/go"
+)
+
+func main() {
+    client := lelu.NewClient(
+        os.Getenv("LELU_ENGINE_URL"),
+        os.Getenv("LELU_API_KEY"),
+    )
+}`}
             </pre>
           </div>
 
@@ -218,11 +286,23 @@ export const lelu = new LeluClient({
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">app/actions.ts</span>
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
+              <div className="flex gap-2">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
-{`import { lelu } from './lib/lelu';
+            <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed overflow-x-auto">
+{sdkTab === "TypeScript" && `import { lelu } from './lib/lelu';
 
 async function deleteUser(userId: string, confidence: number) {
   // Check authorization
@@ -248,6 +328,62 @@ async function deleteUser(userId: string, confidence: number) {
   await db.users.delete(userId);
   return { status: "completed" };
 }`}
+{sdkTab === "Python" && `from lelu import lelu
+
+def delete_user(user_id: str, confidence: float):
+    # Check authorization
+    decision = lelu.agent_authorize(
+        actor="ai-agent-123",
+        action="delete_user",
+        resource={"user_id": user_id},
+        confidence=confidence
+    )
+    
+    if decision.requires_human_review:
+        print("⏳ Queued for human approval")
+        return {"status": "pending_review"}
+    
+    if not decision.allowed:
+        print("❌ Action denied")
+        return {"status": "denied"}
+    
+    # Execute the action
+    print("✅ Action approved")
+    db.users.delete(user_id)
+    return {"status": "completed"}`}
+{sdkTab === "Go" && `package main
+
+import (
+    "fmt"
+    "github.com/lelu-auth/lelu/sdk/go"
+)
+
+func deleteUser(client *lelu.Client, userID string, confidence float64) error {
+    // Check authorization
+    decision, err := client.AgentAuthorize(&lelu.AuthRequest{
+        Actor:      "ai-agent-123",
+        Action:     "delete_user",
+        Resource:   map[string]interface{}{"userId": userID},
+        Confidence: confidence,
+    })
+    if err != nil {
+        return err
+    }
+    
+    if decision.RequiresHumanReview {
+        fmt.Println("⏳ Queued for human approval")
+        return nil
+    }
+    
+    if !decision.Allowed {
+        fmt.Println("❌ Action denied")
+        return fmt.Errorf("action denied")
+    }
+    
+    // Execute the action
+    fmt.Println("✅ Action approved")
+    return db.Users.Delete(userID)
+}`}
             </pre>
           </div>
 
@@ -270,11 +406,25 @@ async function deleteUser(userId: string, confidence: number) {
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
+              <div className="flex gap-2">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-{`npx lelu studio`}
+{sdkTab === "TypeScript" && `npx lelu studio`}
+{sdkTab === "Python" && `lelu studio`}
+{sdkTab === "Go" && `lelu studio`}
             </pre>
           </div>
 
@@ -312,7 +462,10 @@ async function deleteUser(userId: string, confidence: number) {
                 <div className="w-8 h-8 rounded-full bg-purple-600 text-white flex items-center justify-center font-bold text-sm shrink-0">2</div>
                 <div>
                   <div className="font-semibold text-zinc-900 dark:text-white">Upload policy</div>
-                  <div className="text-sm text-zinc-600 dark:text-zinc-400"><code className="bg-zinc-200 dark:bg-zinc-800 px-1 rounded">npx lelu policies set auth ./config/auth.rego</code></div>
+                  <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                    <code className="bg-zinc-200 dark:bg-zinc-800 px-1 rounded">npx lelu policies set auth ./config/auth.rego</code> (TypeScript)<br/>
+                    <code className="bg-zinc-200 dark:bg-zinc-800 px-1 rounded">lelu policies set auth ./config/auth.rego</code> (Python/Go)
+                  </div>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -369,11 +522,24 @@ async function deleteUser(userId: string, confidence: number) {
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-6">⚡ Quick Reference</h2>
           
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <span className="text-xs text-zinc-500 font-mono">Common Commands</span>
+              <div className="flex gap-2 ml-auto">
+                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setSdkTab(tab)}
+                    className={`px-3 py-1 text-xs rounded transition-colors ${
+                      sdkTab === tab ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
-{`# Initialize project
+{sdkTab === "TypeScript" && `# Initialize project
 npx @lelu-auth/lelu init
 
 # Upload policy
@@ -390,6 +556,40 @@ npx lelu studio
 
 # View audit logs
 npx lelu audit-log`}
+{sdkTab === "Python" && `# Initialize project
+lelu init
+
+# Upload policy
+lelu policies set <name> <file>
+
+# List policies
+lelu policies list
+
+# View policy
+lelu policies get <name>
+
+# Open Studio
+lelu studio
+
+# View audit logs
+lelu audit-log`}
+{sdkTab === "Go" && `# Initialize project
+lelu init
+
+# Upload policy
+lelu policies set <name> <file>
+
+# List policies
+lelu policies list
+
+# View policy
+lelu policies get <name>
+
+# Open Studio
+lelu studio
+
+# View audit logs
+lelu audit-log`}
             </pre>
           </div>
         </section>

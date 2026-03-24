@@ -68,24 +68,26 @@ Examples:
   lelu studio --no-browser             # Start without opening browser
 
 How It Works:
-  Lelu Studio works like Prisma Studio - it just needs a Platform API
-  to connect to. The Platform API can run:
+  Lelu Studio works like Prisma Studio - the UI is bundled in the npm
+  package and starts immediately. No Docker required for the UI!
   
+  The Platform API can run:
   • Locally with SQLite (no Docker needed)
   • In Docker containers (recommended for full stack)
   • On a remote server (team setup)
 
 Quick Setup:
-  1. With Docker (easiest):
-     docker-compose up -d
-     lelu studio
+  1. Instant Start (UI only):
+     npx lelu studio
+     → UI opens immediately!
+     → Connect to Platform API when ready
   
-  2. Without Docker (local):
-     cd platform && DATABASE_URL=sqlite:./lelu.db go run cmd/api/main.go
-     lelu studio
+  2. With Docker (full stack):
+     docker-compose up -d
+     npx lelu studio
   
   3. Remote API:
-     LELU_PLATFORM_URL=https://api.company.com lelu studio
+     LELU_PLATFORM_URL=https://api.company.com npx lelu studio
 `);
 }
 

@@ -173,7 +173,7 @@ cd sdk/go/cmd/lelu && go build -o lelu`,
                   <div>
                     <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Lelu Studio</h4>
                     <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
-                      Launch a visual UI for managing policies and viewing audit logs. Similar to Prisma Studio, this command automatically starts all services with Docker or provides CLI-only mode as fallback.
+                      Launch a visual UI for managing policies and viewing audit logs. Works like Prisma Studio - just install and run! The UI is bundled in the npm package and starts immediately. No Docker required.
                     </p>
                   </div>
                 </div>
@@ -188,12 +188,11 @@ cd sdk/go/cmd/lelu && go build -o lelu`,
                   </thead>
                   <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
                     {[
-                      ["studio", "Launch visual UI (auto-starts with Docker)"],
+                      ["studio", "Launch visual UI (bundled in package, no Docker needed)"],
                       ["studio -p <port>", "Launch on custom port (default: 3002)"],
                       ["studio --no-browser", "Launch without opening browser"],
                       ["studio -b <browser>", "Open in specific browser (chrome, firefox, safari)"],
-                      ["studio --docker", "Force Docker mode"],
-                      ["studio --no-docker", "Force CLI-only mode"],
+                      ["studio --docker", "Use Docker mode (starts all services with docker-compose)"],
                     ].map(([command, desc]) => (
                       <tr key={command}>
                         <td className="px-4 py-3 font-mono text-blue-600 dark:text-blue-400 whitespace-nowrap">{command}</td>

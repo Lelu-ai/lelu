@@ -50,8 +50,7 @@ Options:
   -p, --port <number>     Port number to start Studio on (default: 3002)
   -b, --browser <name>    Browser to open Studio in (chrome, firefox, safari)
   --no-browser            Don't automatically open browser
-  --docker                Force Docker mode
-  --no-docker             Force standalone mode (no Docker)
+  --docker                Use Docker mode (starts all services)
   -h, --help              Show this help
 
 Environment Variables:
@@ -61,20 +60,30 @@ Environment Variables:
   BROWSER                 Browser to open (chrome, firefox, safari)
 
 Examples:
-  lelu studio                          # Start on default port 3002
+  lelu studio                          # Check Platform API and start
+  lelu studio --docker                 # Use Docker mode (all services)
   lelu studio -p 4000                  # Start on custom port
   lelu studio --no-browser             # Start without opening browser
-  lelu studio -b firefox               # Open in Firefox
-  BROWSER=chrome lelu studio           # Open in Chrome via env var
 
-Docker Mode:
-  If Docker is available, Lelu Studio will use docker-compose to start
-  all services (UI, Platform API, Engine, Database). This provides the
-  full experience with zero configuration.
+How It Works:
+  Lelu Studio works like Prisma Studio - it just needs a Platform API
+  to connect to. The Platform API can run:
+  
+  • Locally with SQLite (no Docker needed)
+  • In Docker containers (recommended for full stack)
+  • On a remote server (team setup)
 
-Standalone Mode:
-  If Docker is not available, Lelu Studio will run in CLI-only mode.
-  You'll need to start the Platform API and Engine separately.
+Quick Setup:
+  1. With Docker (easiest):
+     docker-compose up -d
+     lelu studio
+  
+  2. Without Docker (local):
+     cd platform && DATABASE_URL=sqlite:./lelu.db go run cmd/api/main.go
+     lelu studio
+  
+  3. Remote API:
+     LELU_PLATFORM_URL=https://api.company.com lelu studio
 `);
 }
 
@@ -165,24 +174,59 @@ function startWithDocker() {
   });
 }
 
-function startStandalone() {
-  console.log("📦 Starting Lelu Studio in standalone mode...\n");
-  console.log("⚠️  Docker not detected - running in CLI-only mode");
-  console.log("   You'll need to start Platform API and Engine separately\n");
+function checkPlatformAPI(url) {
+  return new Promise((resolve) => {
+    http.get(url + '/healthz', (res) => {
+      resolve(res.statusCode === 200);
+    }).on('error', () => {
+      resolve(false);
+    });
+  });
+}
+
+async function startStandalone() {
+  console.log("📦 Lelu Studio - Standalone Mode\n");
   
-  console.log("To start the full stack:");
-  console.log("  1. Install Docker: https://docs.docker.com/get-docker/");
-  console.log("  2. Run: lelu studio\n");
+  const platformUrl = process.env.LELU_PLATFORM_URL || 'http://localhost:9091';
+  console.log(`🔍 Checking Platform API at ${platformUrl}...`);
   
-  console.log("Or start services manually:");
-  console.log("  Platform API: cd platform && go run cmd/api/main.go");
-  console.log("  Engine:       cd engine && go run cmd/engine/main.go");
-  console.log("  UI:           cd platform/ui && npm run dev\n");
+  const isAvailable = await checkPlatformAPI(platformUrl);
+  
+  if (!isAvailable) {
+    console.log("❌ Platform API not accessible\n");
+    console.log("Lelu Studio requires the Platform API to be running.");
+    console.log("The Platform API manages policies and audit logs.\n");
+    
+    console.log("📋 Setup Options:\n");
+    
+    console.log("Option 1: Quick Start with Docker (Recommended)");
+    console.log("  docker-compose up -d");
+    console.log("  → Starts Platform API, Engine, Database, and Redis\n");
+    
+    console.log("Option 2: Run Platform API Locally");
+    console.log("  cd platform");
+    console.log("  DATABASE_URL=sqlite:./lelu.db go run cmd/api/main.go");
+    console.log("  → Starts Platform API with SQLite (no Docker needed)\n");
+    
+    console.log("Option 3: Connect to Remote API");
+    console.log("  LELU_PLATFORM_URL=https://your-api.com lelu studio");
+    console.log("  → Connect to existing Platform API\n");
+    
+    console.log("💡 After starting the Platform API, run 'lelu studio' again\n");
+    process.exit(1);
+  }
+  
+  console.log("✅ Platform API is accessible!\n");
+  console.log("⚠️  Note: UI server functionality coming soon");
+  console.log("   For now, use Docker mode or access UI directly\n");
   
   console.log("📋 Available CLI commands:");
   console.log("  lelu audit-log    View audit events");
   console.log("  lelu policies     Manage policies");
   console.log("  lelu help         Show all commands\n");
+  
+  console.log("🐳 To use full UI with Docker:");
+  console.log("  lelu studio --docker\n");
 }
 
 function waitForService(url, callback, maxAttempts = 30) {
@@ -261,16 +305,26 @@ function main() {
   console.log("║         Visual UI for Authorization Management           ║");
   console.log("╚═══════════════════════════════════════════════════════════╝\n");
   
-  // Auto-detect Docker if not specified
-  if (options.docker === null) {
-    options.docker = checkDocker() && checkDockerCompose();
+  // Check if user explicitly wants Docker mode
+  if (options.docker === true) {
+    if (!checkDocker() || !checkDockerCompose()) {
+      console.error("❌ Docker or docker-compose not found");
+      console.error("   Install Docker: https://docs.docker.com/get-docker/\n");
+      process.exit(1);
+    }
+    startWithDocker();
+    return;
   }
   
-  if (options.docker) {
-    startWithDocker();
-  } else {
+  // Check if user explicitly wants no-Docker mode
+  if (options.docker === false) {
     startStandalone();
+    return;
   }
+  
+  // Auto-detect: prefer standalone mode (like Prisma)
+  // Docker is optional, not required
+  startStandalone();
 }
 
 main();

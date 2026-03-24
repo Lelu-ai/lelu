@@ -145,10 +145,10 @@ docker-compose -f docker-compose.production.yml up -d`}
                     <polyline points="14,2 14,8 20,8"/>
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">SDK with Bundled UI</h3>
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">SDK Only</h3>
               </div>
               <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                Install SDK with bundled UI (like Prisma Studio). Run <code className="bg-zinc-100 dark:bg-zinc-800 px-1 rounded font-mono text-xs">lelu studio</code> to launch the visual interface instantly - no Docker required!
+                Install the lightweight SDK with CLI tools for audit logs and policy management. Uses local SQLite storage by default (like Prisma).
               </p>
               <div className="bg-zinc-900 dark:bg-black rounded-lg border border-zinc-800 dark:border-white/10 overflow-hidden">
                 <div className="px-3 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
@@ -157,11 +157,11 @@ docker-compose -f docker-compose.production.yml up -d`}
                 <pre className="p-3 font-mono text-xs text-zinc-300">
 {`# TypeScript/JavaScript
 npm install @lelu-auth/lelu
-npx lelu studio
+npx lelu audit-log
 
 # Python
 pip install lelu-agent-auth-sdk
-lelu studio`}
+lelu audit-log`}
                 </pre>
               </div>
             </div>
@@ -186,7 +186,7 @@ lelu studio`}
                 <strong>New to Lelu?</strong> We recommend starting with the one-command setup for the quickest start.
               </p>
               <p>
-                The SDK includes a bundled UI (like Prisma Studio) that works without Docker. Just run <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">lelu studio</code> to launch the visual interface instantly!
+                The SDK includes CLI tools for audit logs and policy management with local SQLite storage. For a visual UI, use Docker or visit <a href="https://lelu-ai.com" className="underline">lelu-ai.com</a>.
               </p>
             </div>
           </div>
@@ -272,7 +272,7 @@ lelu studio`}
             After installing, you can use the built-in CLI commands to view audit logs, manage policies, and launch the visual UI directly from your terminal:
           </p>
 
-          {/* Lelu Studio - Featured */}
+          {/* Visual UI via Docker - Featured */}
           <div className="mb-8">
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-500/5 dark:to-purple-500/5 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 mb-4">
               <div className="flex items-start gap-3">
@@ -281,9 +281,9 @@ lelu studio`}
                   <path d="M3 9h18M9 21V9"/>
                 </svg>
                 <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Lelu Studio (Visual UI)</h4>
+                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">Visual UI (Docker)</h4>
                   <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
-                    Launch a visual UI for managing policies and viewing audit logs. Works like Prisma Studio - the UI is bundled in the npm package and starts immediately. No Docker required!
+                    Launch the visual dashboard for managing policies and viewing audit logs. The UI runs as a separate Docker container (like Prisma Studio).
                   </p>
                 </div>
               </div>
@@ -293,14 +293,11 @@ lelu studio`}
                 <span className="text-xs text-zinc-500 font-mono">terminal</span>
               </div>
               <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# Launch visual UI (bundled in package)
-npx @lelu-auth/lelu studio
+                {`# Launch visual UI via Docker
+docker run -p 3002:3002 abenezer0923/lelu-platform:latest
 
-# Launch on custom port
-npx @lelu-auth/lelu studio -p 4000
-
-# Launch without opening browser
-npx @lelu-auth/lelu studio --no-browser`}
+# Or visit the hosted version
+# https://lelu-ai.com/`}
               </pre>
             </div>
           </div>
@@ -333,7 +330,6 @@ npx @lelu-auth/lelu policies set auth ./auth.rego`}
               </div>
               <pre className="p-4 font-mono text-sm text-blue-300">
                 {`# After installing: pip install lelu-agent-auth-sdk
-lelu studio
 lelu audit-log
 lelu policies list
 lelu policies get auth
@@ -353,7 +349,6 @@ lelu policies set auth ./auth.rego`}
                 {`# Build and run CLI
 cd sdk/go/cmd/lelu
 go build -o lelu
-./lelu studio
 ./lelu audit-log
 ./lelu policies list`}
               </pre>
@@ -376,10 +371,10 @@ go build -o lelu
             </svg>
             <div className="text-sm text-blue-800 dark:text-blue-300">
               <p className="mb-2">
-                <strong>Note:</strong> CLI commands require the Lelu platform service to be running (not just the engine).
+                <strong>Note:</strong> CLI commands use local SQLite storage by default (<code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">~/.lelu/lelu.db</code>).
               </p>
               <p className="text-xs">
-                Set <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">LELU_PLATFORM_URL</code> to point to your platform instance (default: http://localhost:9091).
+                To use a remote platform, set <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">LELU_PLATFORM_URL</code> environment variable.
               </p>
             </div>
           </div>

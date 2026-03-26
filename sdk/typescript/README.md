@@ -55,12 +55,16 @@ LELU_BASE_URL=http://host.docker.internal:8083
 
 ## Quick Start
 
+### Option 1: Use Hosted Engine (Recommended)
+
+Connect to the hosted Lelu engine for instant setup:
+
 ```typescript
 import { createClient } from "@lelu-auth/lelu";
 
-// Initialize the client
+// Initialize with hosted engine
 const lelu = createClient({ 
-  baseUrl: "http://localhost:8083" 
+  baseUrl: "https://lelu-engine.onrender.com"
 });
 
 // Authorize an agent action
@@ -82,6 +86,27 @@ async function runAgent() {
 }
 ```
 
+### Option 2: Run Locally
+
+For development, you can run the engine locally:
+
+```typescript
+import { createClient } from "@lelu-auth/lelu";
+
+// Initialize with local engine
+const lelu = createClient({ 
+  baseUrl: "http://localhost:8083" 
+});
+```
+
+Start the local engine:
+
+```bash
+npx @lelu-auth/lelu dashboard
+```
+
+Then open: `http://localhost:3002/audit`
+
 ## Features
 
 - **Confidence-Aware**: Dynamically adjust permissions based on the AI agent's confidence level.
@@ -91,7 +116,7 @@ async function runAgent() {
 
 ## Documentation
 
-For full documentation, visit [https://ui-seven-amber.vercel.app/](https://ui-seven-amber.vercel.app/).
+For full documentation, visit [https://lelu-ai.com/](https://lelu-ai.com/).
 
 ## License
 

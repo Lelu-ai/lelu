@@ -35,6 +35,7 @@ engine/.gomodcache/
 .env
 .env.*
 !.env.example
+!.env.vercel.example
 
 # OS
 .DS_Store

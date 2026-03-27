@@ -28,6 +28,6 @@ services:
       - key: JWT_SIGNING_KEY
         generateValue: true
       - key: API_KEY
-        generateValue: true
+        value: ""
       - key: LELU_MODE
         value: enforce

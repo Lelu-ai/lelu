@@ -33,9 +33,16 @@ type Client struct {
 
 // NewClient constructs a new Lelu SDK client.
 func NewClient(cfg ClientConfig) *Client {
+	// Dual-mode logic: If API key is provided and looks like a SaaS key, default to Render URL
+	isSaaSKey := cfg.APIKey != "" && (strings.HasPrefix(cfg.APIKey, "lelu_live_") || strings.HasPrefix(cfg.APIKey, "lelu_test_"))
+	defaultURL := "http://localhost:8080"
+	if isSaaSKey {
+		defaultURL = "https://lelu-engine.onrender.com"
+	}
+	
 	baseURL := strings.TrimSuffix(cfg.BaseURL, "/")
 	if baseURL == "" {
-		baseURL = "http://localhost:8080"
+		baseURL = defaultURL
 	}
 
 	hc := cfg.HTTPClient

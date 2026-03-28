@@ -76,6 +76,7 @@ const sections: NavSection[] = [
       </svg>
     ),
     items: [
+      { href: "/docs/api-keys", label: "API Keys" },
       { href: "/docs/api/authorize", label: "/authorize" },
       { href: "/docs/api/queue", label: "/queue" },
       { href: "/docs/api/agent", label: "Agent SDK" },

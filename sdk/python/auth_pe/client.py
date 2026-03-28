@@ -75,10 +75,17 @@ class LeluClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8080",
+        base_url: str | None = None,
         timeout: float = 5.0,
         api_key: str | None = None,
     ) -> None:
+        # Dual-mode logic: If API key is provided and looks like a SaaS key, default to Render URL
+        is_saas_key = api_key and (api_key.startswith("lelu_live_") or api_key.startswith("lelu_test_"))
+        default_url = "https://lelu-engine.onrender.com" if is_saas_key else "http://localhost:8080"
+        
+        if base_url is None:
+            base_url = default_url
+        
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"

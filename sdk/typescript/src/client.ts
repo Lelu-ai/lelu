@@ -69,7 +69,12 @@ export class LeluClient {
       typeof process !== "undefined" && process.env
         ? process.env["LELU_BASE_URL"]
         : undefined;
-    this.baseUrl = (cfg.baseUrl ?? envBaseUrl ?? "http://localhost:8080").replace(/\/$/, "");
+    
+    // Dual-mode logic: If API key is provided and looks like a SaaS key, default to Render URL
+    const isSaaSKey = cfg.apiKey && (cfg.apiKey.startsWith("lelu_live_") || cfg.apiKey.startsWith("lelu_test_"));
+    const defaultUrl = isSaaSKey ? "https://lelu-engine.onrender.com" : "http://localhost:8080";
+    
+    this.baseUrl = (cfg.baseUrl ?? envBaseUrl ?? defaultUrl).replace(/\/$/, "");
     this.timeoutMs = cfg.timeoutMs ?? 5_000;
     this.apiKey = cfg.apiKey;
   }

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -287,7 +288,9 @@ func extractJSONField(jsonStr, field string) string {
 
 // IsValidKeyFormat checks if a string matches the API key format
 func IsValidKeyFormat(key string) bool {
-	return strings.HasPrefix(key, PrefixLive) || strings.HasPrefix(key, PrefixTest)
+	return strings.HasPrefix(key, PrefixLive) || 
+	       strings.HasPrefix(key, PrefixTest) || 
+	       strings.HasPrefix(key, PrefixAnon)
 }
 
 // ExtractEnv returns the environment from an API key
@@ -297,6 +300,9 @@ func ExtractEnv(key string) string {
 	}
 	if strings.HasPrefix(key, PrefixTest) {
 		return "test"
+	}
+	if strings.HasPrefix(key, PrefixAnon) {
+		return "anon"
 	}
 	return ""
 }
@@ -471,25 +477,4 @@ func (s *Service) BindIPToKey(ctx context.Context, apiKey, ip string) error {
 // IsAnonymousKey checks if a key is an anonymous beta key
 func IsAnonymousKey(key string) bool {
 	return strings.HasPrefix(key, PrefixAnon)
-}
-
-// UpdateIsValidKeyFormat to include anonymous keys
-func IsValidKeyFormat(key string) bool {
-	return strings.HasPrefix(key, PrefixLive) || 
-	       strings.HasPrefix(key, PrefixTest) || 
-	       strings.HasPrefix(key, PrefixAnon)
-}
-
-// ExtractEnv returns the environment from an API key
-func ExtractEnv(key string) string {
-	if strings.HasPrefix(key, PrefixLive) {
-		return "live"
-	}
-	if strings.HasPrefix(key, PrefixTest) {
-		return "test"
-	}
-	if strings.HasPrefix(key, PrefixAnon) {
-		return "anon"
-	}
-	return ""
 }

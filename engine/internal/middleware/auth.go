@@ -149,7 +149,6 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	_, _ = w.Write([]byte(`{"error":"` + message + `"}`))
 }
 
-
 const (
 	// ContextKeyClientIP is the context key for client IP
 	ContextKeyClientIP contextKey = "client_ip"

@@ -65,19 +65,19 @@ func New(cfg Config) (*Service, error) {
 	if cfg.RedisAddr == "" {
 		return nil, errors.New("redis address is required")
 	}
-	
+
 	rdb := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisAddr,
 	})
-	
+
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("redis connection failed: %w", err)
 	}
-	
+
 	return &Service{rdb: rdb}, nil
 }
 
@@ -86,7 +86,7 @@ func (s *Service) GenerateKey(ctx context.Context, tenantID, env, name string) (
 	if tenantID == "" {
 		return "", errors.New("tenant_id is required")
 	}
-	
+
 	// Validate environment
 	var prefix string
 	switch strings.ToLower(env) {
@@ -99,17 +99,17 @@ func (s *Service) GenerateKey(ctx context.Context, tenantID, env, name string) (
 	default:
 		return "", fmt.Errorf("invalid environment: %s (must be 'live' or 'test')", env)
 	}
-	
+
 	// Generate secure random key
 	randomBytes := make([]byte, defaultKeyLength)
 	if _, err := rand.Read(randomBytes); err != nil {
 		return "", fmt.Errorf("failed to generate random key: %w", err)
 	}
-	
+
 	// Encode as base64 URL-safe
 	randomPart := base64.RawURLEncoding.EncodeToString(randomBytes)
 	apiKey := prefix + randomPart
-	
+
 	// Store metadata in Redis
 	metadata := KeyMetadata{
 		TenantID:  tenantID,
@@ -119,7 +119,7 @@ func (s *Service) GenerateKey(ctx context.Context, tenantID, env, name string) (
 		Name:      name,
 		Env:       env,
 	}
-	
+
 	// Serialize metadata as JSON
 	data := fmt.Sprintf(`{"tenant_id":"%s","key_id":"%s","created_at":"%s","revoked":false,"name":"%s","env":"%s"}`,
 		metadata.TenantID,
@@ -128,12 +128,12 @@ func (s *Service) GenerateKey(ctx context.Context, tenantID, env, name string) (
 		metadata.Name,
 		metadata.Env,
 	)
-	
+
 	// Store with no expiration (keys don't expire unless explicitly revoked)
 	if err := s.rdb.Set(ctx, redisKey(apiKey), data, 0).Err(); err != nil {
 		return "", fmt.Errorf("failed to store API key: %w", err)
 	}
-	
+
 	return apiKey, nil
 }
 
@@ -143,7 +143,7 @@ func (s *Service) ValidateKey(ctx context.Context, apiKey string) (string, error
 	if !strings.HasPrefix(apiKey, PrefixLive) && !strings.HasPrefix(apiKey, PrefixTest) {
 		return "", ErrInvalidKey
 	}
-	
+
 	// Lookup in Redis
 	data, err := s.rdb.Get(ctx, redisKey(apiKey)).Result()
 	if err == redis.Nil {
@@ -152,19 +152,19 @@ func (s *Service) ValidateKey(ctx context.Context, apiKey string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("redis lookup failed: %w", err)
 	}
-	
+
 	// Parse metadata (simple JSON parsing for tenant_id and revoked status)
 	tenantID := extractJSONField(data, "tenant_id")
 	revoked := extractJSONField(data, "revoked")
-	
+
 	if tenantID == "" {
 		return "", ErrKeyNotFound
 	}
-	
+
 	if revoked == "true" {
 		return "", ErrKeyRevoked
 	}
-	
+
 	return tenantID, nil
 }
 
@@ -178,22 +178,22 @@ func (s *Service) RevokeKey(ctx context.Context, apiKey string) error {
 	if err != nil {
 		return fmt.Errorf("redis lookup failed: %w", err)
 	}
-	
+
 	// Update revoked status
 	tenantID := extractJSONField(data, "tenant_id")
 	keyID := extractJSONField(data, "key_id")
 	createdAt := extractJSONField(data, "created_at")
 	name := extractJSONField(data, "name")
 	env := extractJSONField(data, "env")
-	
+
 	updatedData := fmt.Sprintf(`{"tenant_id":"%s","key_id":"%s","created_at":"%s","revoked":true,"name":"%s","env":"%s"}`,
 		tenantID, keyID, createdAt, name, env,
 	)
-	
+
 	if err := s.rdb.Set(ctx, redisKey(apiKey), updatedData, 0).Err(); err != nil {
 		return fmt.Errorf("failed to revoke key: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -206,7 +206,7 @@ func (s *Service) GetKeyMetadata(ctx context.Context, apiKey string) (*KeyMetada
 	if err != nil {
 		return nil, fmt.Errorf("redis lookup failed: %w", err)
 	}
-	
+
 	// Parse metadata
 	tenantID := extractJSONField(data, "tenant_id")
 	keyID := extractJSONField(data, "key_id")
@@ -214,9 +214,9 @@ func (s *Service) GetKeyMetadata(ctx context.Context, apiKey string) (*KeyMetada
 	revoked := extractJSONField(data, "revoked") == "true"
 	name := extractJSONField(data, "name")
 	env := extractJSONField(data, "env")
-	
+
 	createdAt, _ := time.Parse(time.RFC3339, createdAtStr)
-	
+
 	return &KeyMetadata{
 		TenantID:  tenantID,
 		KeyID:     keyID,
@@ -232,28 +232,28 @@ func (s *Service) ListKeysForTenant(ctx context.Context, tenantID string) ([]str
 	// Scan for all keys matching the pattern
 	pattern := redisKeyPrefix + "*"
 	var keys []string
-	
+
 	iter := s.rdb.Scan(ctx, 0, pattern, 100).Iterator()
 	for iter.Next(ctx) {
 		key := iter.Val()
-		
+
 		// Get metadata to check tenant_id
 		data, err := s.rdb.Get(ctx, key).Result()
 		if err != nil {
 			continue
 		}
-		
+
 		if extractJSONField(data, "tenant_id") == tenantID {
 			// Extract API key from Redis key
 			apiKey := strings.TrimPrefix(key, redisKeyPrefix)
 			keys = append(keys, apiKey)
 		}
 	}
-	
+
 	if err := iter.Err(); err != nil {
 		return nil, fmt.Errorf("redis scan failed: %w", err)
 	}
-	
+
 	return keys, nil
 }
 
@@ -277,12 +277,12 @@ func extractJSONField(jsonStr, field string) string {
 		return ""
 	}
 	start += len(searchStr)
-	
+
 	end := strings.Index(jsonStr[start:], `"`)
 	if end == -1 {
 		return ""
 	}
-	
+
 	return jsonStr[start : start+end]
 }
 
@@ -307,35 +307,34 @@ func ExtractEnv(key string) string {
 	return ""
 }
 
-
 // GenerateAnonymousKey creates a new anonymous beta key with IP binding
 func (s *Service) GenerateAnonymousKey(ctx context.Context, createdIP string) (string, error) {
 	if createdIP == "" {
 		return "", errors.New("created_ip is required for anonymous keys")
 	}
-	
+
 	// Check IP rate limit (5 keys per hour)
 	if err := s.checkIPRateLimit(ctx, createdIP); err != nil {
 		return "", err
 	}
-	
+
 	// Generate 8-character short ID
 	shortIDBytes := make([]byte, 6)
 	if _, err := rand.Read(shortIDBytes); err != nil {
 		return "", fmt.Errorf("failed to generate short ID: %w", err)
 	}
 	shortID := base64.RawURLEncoding.EncodeToString(shortIDBytes)[:8]
-	
+
 	// Generate 32-character random part
 	randomBytes := make([]byte, 24)
 	if _, err := rand.Read(randomBytes); err != nil {
 		return "", fmt.Errorf("failed to generate random key: %w", err)
 	}
 	randomPart := base64.RawURLEncoding.EncodeToString(randomBytes)[:32]
-	
+
 	apiKey := fmt.Sprintf("%s%s_%s", PrefixAnon, shortID, randomPart)
 	tenantID := fmt.Sprintf("anon_%s", shortID)
-	
+
 	// Store metadata
 	metadata := KeyMetadata{
 		TenantID:    tenantID,
@@ -347,7 +346,7 @@ func (s *Service) GenerateAnonymousKey(ctx context.Context, createdIP string) (s
 		CreatedIP:   createdIP,
 		IsAnonymous: true,
 	}
-	
+
 	// Serialize metadata
 	data := fmt.Sprintf(`{"tenant_id":"%s","key_id":"%s","created_at":"%s","revoked":false,"name":"%s","env":"anon","created_ip":"%s","is_anonymous":true}`,
 		metadata.TenantID,
@@ -356,18 +355,18 @@ func (s *Service) GenerateAnonymousKey(ctx context.Context, createdIP string) (s
 		metadata.Name,
 		metadata.CreatedIP,
 	)
-	
+
 	// Store with 30-day expiration
 	expiration := 30 * 24 * time.Hour
 	if err := s.rdb.Set(ctx, redisKey(apiKey), data, expiration).Err(); err != nil {
 		return "", fmt.Errorf("failed to store anonymous key: %w", err)
 	}
-	
+
 	// Increment IP counter
 	if err := s.incrementIPCounter(ctx, createdIP); err != nil {
 		return "", fmt.Errorf("failed to increment IP counter: %w", err)
 	}
-	
+
 	return apiKey, nil
 }
 
@@ -379,43 +378,43 @@ func (s *Service) checkIPRateLimit(ctx context.Context, ip string) error {
 	if err != nil && err != redis.Nil {
 		return fmt.Errorf("failed to check hourly limit: %w", err)
 	}
-	
+
 	if hourCount >= 5 {
 		return errors.New("rate limit exceeded: maximum 5 keys per hour")
 	}
-	
+
 	// Check daily limit (10 keys per day)
 	dayKey := fmt.Sprintf("%sgen:day:%s:%s", redisIPPrefix, ip, time.Now().Format("2006-01-02"))
 	dayCount, err := s.rdb.Get(ctx, dayKey).Int()
 	if err != nil && err != redis.Nil {
 		return fmt.Errorf("failed to check daily limit: %w", err)
 	}
-	
+
 	if dayCount >= 10 {
 		return errors.New("rate limit exceeded: maximum 10 keys per day")
 	}
-	
+
 	return nil
 }
 
 // incrementIPCounter increments the IP-based key generation counter
 func (s *Service) incrementIPCounter(ctx context.Context, ip string) error {
 	now := time.Now()
-	
+
 	// Increment hourly counter
 	hourKey := fmt.Sprintf("%sgen:hour:%s:%s", redisIPPrefix, ip, now.Format("2006-01-02-15"))
 	if err := s.rdb.Incr(ctx, hourKey).Err(); err != nil {
 		return err
 	}
 	s.rdb.Expire(ctx, hourKey, 2*time.Hour) // Expire after 2 hours
-	
+
 	// Increment daily counter
 	dayKey := fmt.Sprintf("%sgen:day:%s:%s", redisIPPrefix, ip, now.Format("2006-01-02"))
 	if err := s.rdb.Incr(ctx, dayKey).Err(); err != nil {
 		return err
 	}
 	s.rdb.Expire(ctx, dayKey, 48*time.Hour) // Expire after 2 days
-	
+
 	return nil
 }
 
@@ -426,51 +425,51 @@ func (s *Service) BindIPToKey(ctx context.Context, apiKey, ip string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get key metadata: %w", err)
 	}
-	
+
 	tenantID := extractJSONField(data, "tenant_id")
 	boundIP := extractJSONField(data, "bound_ip")
-	
+
 	// Check if already bound to a different IP
 	if boundIP != "" && boundIP != ip {
 		// Track IP change for monitoring (don't block legitimate users)
-		log.Printf("IP change detected for anonymous key: tenant=%s, old_ip=%s, new_ip=%s", 
+		log.Printf("IP change detected for anonymous key: tenant=%s, old_ip=%s, new_ip=%s",
 			tenantID, boundIP, ip)
-		
+
 		// Check if this is suspicious behavior (many IP changes in short time)
 		ipChangeKey := fmt.Sprintf("lelu:ip:changes:%s", tenantID)
 		changes, _ := s.rdb.Incr(ctx, ipChangeKey).Result()
 		s.rdb.Expire(ctx, ipChangeKey, time.Hour) // Reset counter every hour
-		
+
 		// Only block if excessive IP changes (10+ per hour = likely abuse)
 		if changes > 10 {
-			log.Printf("Excessive IP changes detected for tenant %s: %d changes in last hour", 
+			log.Printf("Excessive IP changes detected for tenant %s: %d changes in last hour",
 				tenantID, changes)
 			return fmt.Errorf("excessive IP changes detected - possible key sharing")
 		}
-		
+
 		// Allow the IP change but update the bound IP
 		// This handles legitimate cases: VPN, WiFi switching, CI/CD, mobile hotspot
 		log.Printf("Allowing IP change for tenant %s (change #%d this hour)", tenantID, changes)
 	}
-	
+
 	// Bind or update to this IP
 	if boundIP == "" || boundIP != ip {
 		keyID := extractJSONField(data, "key_id")
 		createdAt := extractJSONField(data, "created_at")
 		name := extractJSONField(data, "name")
 		createdIP := extractJSONField(data, "created_ip")
-		
+
 		updatedData := fmt.Sprintf(`{"tenant_id":"%s","key_id":"%s","created_at":"%s","revoked":false,"name":"%s","env":"anon","created_ip":"%s","bound_ip":"%s","is_anonymous":true}`,
 			tenantID, keyID, createdAt, name, createdIP, ip,
 		)
-		
+
 		// Update with same expiration
 		ttl, _ := s.rdb.TTL(ctx, redisKey(apiKey)).Result()
 		if err := s.rdb.Set(ctx, redisKey(apiKey), updatedData, ttl).Err(); err != nil {
 			return fmt.Errorf("failed to bind IP: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 

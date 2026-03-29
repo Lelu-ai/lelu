@@ -1,16 +1,7 @@
 name: Vercel Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "platform/ui/**"
-      - ".github/workflows/vercel-deploy.yml"
-  pull_request:
-    paths:
-      - "platform/ui/**"
-      - ".github/workflows/vercel-deploy.yml"
-  workflow_dispatch:
+  workflow_dispatch:  # Only manual triggers, disable automatic deployment
 
 permissions:
   contents: read

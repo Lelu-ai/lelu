@@ -57,37 +57,20 @@ jobs:
         working-directory: platform/ui
         run: npm ci
 
+      - name: Build Next.js application
+        working-directory: platform/ui
+        run: npm run build
+        env:
+          NODE_ENV: production
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
-
-      - name: Link Vercel project
-        working-directory: platform/ui
-        run: |
-          vercel link --yes --token="$VERCEL_TOKEN" --scope="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID"
-
-      - name: Pull Vercel environment
-        working-directory: platform/ui
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
-          else
-            vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          fi
-
-      - name: Build with Vercel
-        working-directory: platform/ui
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            vercel build --token="$VERCEL_TOKEN"
-          else
-            vercel build --prod --token="$VERCEL_TOKEN"
-          fi
 
       - name: Deploy to Vercel
         working-directory: platform/ui
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            vercel deploy --prebuilt --token="$VERCEL_TOKEN"
+            vercel deploy --token="$VERCEL_TOKEN" --yes
           else
-            vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+            vercel deploy --prod --token="$VERCEL_TOKEN" --yes
           fi

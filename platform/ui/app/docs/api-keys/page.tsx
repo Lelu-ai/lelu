@@ -21,10 +21,10 @@ export default function ApiKeysPage() {
                 No registration required! Generate an anonymous API key instantly and start testing Lelu in under 60 seconds.
               </p>
               <a 
-                href="/beta" 
+                href="/api-key" 
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors no-underline"
               >
-                Generate Beta Key
+                Generate API Key
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
@@ -60,9 +60,9 @@ export default function ApiKeysPage() {
 
       <h2>Getting API Keys</h2>
 
-      <h3>Option 1: Anonymous Beta Key (Recommended for Testing)</h3>
+      <h3>Option 1: Anonymous API Key (Recommended for Testing)</h3>
       <p>
-        The fastest way to get started! Visit the <a href="/beta">beta page</a> to generate an anonymous API key instantly:
+        The fastest way to get started! Visit the <a href="/api-key">API key page</a> to generate an anonymous API key instantly:
       </p>
       <ul>
         <li>✅ No registration or email required</li>
@@ -108,10 +108,10 @@ docker exec lelu-redis redis-cli SET "lelu:apikey:$apiKey" '{"tenant_id":"your_t
         </pre>
       </div>
 
-      <h3>Method 3: Anonymous Beta Keys</h3>
+      <h3>Method 3: Anonymous API Keys</h3>
       <p>
-        For beta testing, you can generate anonymous keys through the web UI at{' '}
-        <a href="/beta" className="text-blue-600 dark:text-blue-400 hover:underline">/beta</a>.
+        For testing, you can generate anonymous keys through the web UI at{' '}
+        <a href="/api-key" className="text-blue-600 dark:text-blue-400 hover:underline">/api-key</a>.
         These keys:
       </p>
       <ul>
@@ -294,7 +294,7 @@ docker exec lelu-redis redis-cli PING`}</code>
         <li><a href="/docs/quickstart">Quickstart Guide</a> - Get started with your first authorization request</li>
         <li><a href="/docs/concepts/api">API Reference</a> - Learn about all available endpoints</li>
         <li><a href="/docs/audit-trail">Audit Trail</a> - Monitor API key usage</li>
-        <li><a href="/beta">Beta Access</a> - Try anonymous keys without signup</li>
+        <li><a href="/api-key">Get API Key</a> - Generate anonymous keys without signup</li>
       </ul>
     </div>
   );

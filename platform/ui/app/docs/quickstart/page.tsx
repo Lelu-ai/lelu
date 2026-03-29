@@ -73,8 +73,8 @@ npx @lelu-auth/lelu init`}</code></pre>
                   <pre><code>{`# Generate and store API key
 ./generate-api-key.ps1
 
-# Or try anonymous beta access (no key needed)
-# Visit http://localhost:3002/beta`}</code></pre>
+# Or try anonymous API key access (no registration needed)
+# Visit http://localhost:3002/api-key`}</code></pre>
                 </div>
                 <div className="p-4 font-mono text-xs text-green-400 border-t border-zinc-800">
                   <div>✓ Your API key will be:</div>

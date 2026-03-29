@@ -1,0 +1,12 @@
+engine/
+helm/
+config/
+sdk/
+*.md
+!platform/ui/README.md
+.github/
+.git/
+docker-compose*.yml
+Dockerfile
+*.sh
+*.ps1

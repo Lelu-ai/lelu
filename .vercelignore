@@ -1,8 +1,18 @@
-# Exclude everything except platform/ui
-/*
-!/platform/ui
+# Exclude all other directories
+/engine
+/helm
+/config
+/sdk
+/.github
+/.git
 
-# But exclude these from platform/ui
-platform/ui/node_modules
-platform/ui/.next
-platform/ui/.vercel
+# Exclude files
+*.md
+!platform/ui/README.md
+docker-compose*.yml
+Dockerfile
+*.sh
+*.ps1
+.env
+.env.*
+!.env.example

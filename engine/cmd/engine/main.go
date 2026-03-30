@@ -213,6 +213,7 @@ func main() {
 		log.Printf("forced shutdown: %v", err)
 	}
 
+	h.Shutdown() // Shutdown handler components (e.g., ReputationManager)
 	auditWriter.Close()
 	if db != nil {
 		db.Close()

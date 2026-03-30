@@ -117,6 +117,7 @@ func TestReputationManager(t *testing.T) {
 	config.UpdateInterval = 100 * time.Millisecond // Fast updates for testing
 
 	rm := NewReputationManager(db, config)
+	defer rm.Shutdown() // Ensure background goroutine is stopped
 
 	t.Run("RecordDecision", func(t *testing.T) {
 		agentID := "test_agent"
@@ -348,6 +349,7 @@ func TestIntegration(t *testing.T) {
 
 	// Initialize all components
 	rm := NewReputationManager(db, DefaultReputationConfig())
+	defer rm.Shutdown() // Ensure background goroutine is stopped
 	ad := NewAnomalyDetector(db, DefaultAnomalyConfig())
 	bm := NewBaselineManager(db, DefaultBaselineConfig())
 	am := NewAlertManager(db, DefaultAlertConfig())

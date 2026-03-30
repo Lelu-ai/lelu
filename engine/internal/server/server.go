@@ -290,6 +290,13 @@ func New(
 	}
 }
 
+// Shutdown gracefully shuts down the handler and its components
+func (h *Handler) Shutdown() {
+	if h.reputationMgr != nil {
+		h.reputationMgr.Shutdown()
+	}
+}
+
 // RegisterRoutes attaches all engine endpoints to mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/authorize", h.handleAuthorize)

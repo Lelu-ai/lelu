@@ -1,12 +1,8 @@
-engine/
-helm/
-config/
-sdk/
-*.md
-!platform/ui/README.md
-.github/
-.git/
-docker-compose*.yml
-Dockerfile
-*.sh
-*.ps1
+# Exclude everything except platform/ui
+/*
+!/platform/ui
+
+# But exclude these from platform/ui
+platform/ui/node_modules
+platform/ui/.next
+platform/ui/.vercel

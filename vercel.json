@@ -1,0 +1,41 @@
+{
+  "buildCommand": "cd platform/ui && npm run build",
+  "devCommand": "cd platform/ui && npm run dev",
+  "installCommand": "cd platform/ui && npm install",
+  "outputDirectory": "platform/ui/.next",
+  "framework": "nextjs",
+  "redirects": [
+    {
+      "source": "/www.:path*",
+      "destination": "/:path*",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
+  ]
+}

@@ -1,10 +1,9 @@
 {
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "outputDirectory": ".next",
+  "buildCommand": "cd platform/ui && npm run build",
+  "devCommand": "cd platform/ui && npm run dev",
+  "installCommand": "cd platform/ui && npm install",
+  "outputDirectory": "platform/ui/.next",
   "framework": "nextjs",
-  "rootDirectory": "platform/ui",
   "redirects": [
     {
       "source": "/www.:path*",

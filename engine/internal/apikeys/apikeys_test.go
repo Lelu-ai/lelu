@@ -473,10 +473,12 @@ func TestKeyExpiration(t *testing.T) {
 		t.Fatalf("Failed to generate key: %v", err)
 	}
 
+	t.Logf("Generated anonymous key: %s", apiKey)
+
 	// Verify key exists
 	_, err = svc.ValidateKey(ctx, apiKey)
 	if err != nil {
-		t.Fatalf("Key should be valid: %v", err)
+		t.Fatalf("Key should be valid: %v (key=%s)", err, apiKey)
 	}
 
 	// Fast-forward time in miniredis (30 days + 1 second)

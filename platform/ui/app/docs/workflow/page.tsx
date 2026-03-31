@@ -80,8 +80,8 @@ export default function DocsWorkflow() {
               </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-{sdkTab === "TypeScript" && `npm install @lelu-auth/lelu
-npx @lelu-auth/lelu init`}
+{sdkTab === "TypeScript" && `npm install lelu-agent-auth
+npx lelu-agent-auth init`}
 {sdkTab === "Python" && `pip install lelu-agent-auth-sdk
 lelu init`}
 {sdkTab === "Go" && `go get github.com/lelu-auth/lelu/sdk/go
@@ -231,7 +231,7 @@ deny {
               </div>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
-{sdkTab === "TypeScript" && `import { LeluClient } from "@lelu-auth/lelu";
+{sdkTab === "TypeScript" && `import { LeluClient } from "lelu-agent-auth";
 
 export const lelu = new LeluClient({
   baseUrl: process.env.LELU_ENGINE_URL!,
@@ -540,7 +540,7 @@ func deleteUser(client *lelu.Client, userID string, confidence float64) error {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
 {sdkTab === "TypeScript" && `# Initialize project
-npx @lelu-auth/lelu init
+npx lelu-agent-auth init
 
 # Upload policy
 npx lelu policies set <name> <file>

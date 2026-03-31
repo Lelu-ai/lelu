@@ -29,8 +29,8 @@ export default function DocsQuickStart() {
                 </div>
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                   <pre><code>{`# Install SDK and start all services
-npm install @lelu-auth/lelu
-npx @lelu-auth/lelu init`}</code></pre>
+npm install lelu-agent-auth
+npx lelu-agent-auth init`}</code></pre>
                 </div>
                 <div className="p-4 font-mono text-xs text-blue-400 border-t border-zinc-800">
                   <div>✨ This command will:</div>
@@ -183,12 +183,12 @@ npx @lelu-auth/lelu init`}</code></pre>
                 </div>
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                   <pre><code>{`# View audit logs
-npx @lelu-auth/lelu audit-log
+npx lelu-agent-auth audit-log
 
 # Manage policies
-npx @lelu-auth/lelu policies list
-npx @lelu-auth/lelu policies get auth
-npx @lelu-auth/lelu policies set auth ./auth.rego`}</code></pre>
+npx lelu-agent-auth policies list
+npx lelu-agent-auth policies get auth
+npx lelu-agent-auth policies set auth ./auth.rego`}</code></pre>
                 </div>
               </div>
               <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg p-3 flex gap-2">
@@ -219,7 +219,7 @@ npx @lelu-auth/lelu policies set auth ./auth.rego`}</code></pre>
                   <span className="text-xs text-zinc-500 font-mono">typescript</span>
                 </div>
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre><code>{`import { LeluClient } from "@lelu-auth/lelu";
+                  <pre><code>{`import { LeluClient } from "lelu-agent-auth";
 
 const client = new LeluClient({
   baseUrl: "http://localhost:8083",

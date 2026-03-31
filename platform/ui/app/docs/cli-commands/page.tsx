@@ -7,30 +7,30 @@ export default function DocsCliCommands() {
 
   const cliExamples: Record<typeof sdkTab, { install: string; commands: string }> = {
     TypeScript: {
-      install: "npm install -g @lelu-auth/lelu",
+      install: "npm install -g lelu-agent-auth",
       commands: `# Launch visual UI (Lelu Studio)
-npx @lelu-auth/lelu studio
+npx lelu-agent-auth studio
 
 # Launch on custom port
-npx @lelu-auth/lelu studio -p 4000
+npx lelu-agent-auth studio -p 4000
 
 # View audit logs
-npx @lelu-auth/lelu audit-log
+npx lelu-agent-auth audit-log
 
 # List all policies
-npx @lelu-auth/lelu policies list
+npx lelu-agent-auth policies list
 
 # View specific policy
-npx @lelu-auth/lelu policies get auth
+npx lelu-agent-auth policies get auth
 
 # Create/update policy from file
-npx @lelu-auth/lelu policies set auth ./auth.rego
+npx lelu-agent-auth policies set auth ./auth.rego
 
 # Delete policy
-npx @lelu-auth/lelu policies delete old-policy
+npx lelu-agent-auth policies delete old-policy
 
 # Show help
-npx @lelu-auth/lelu help`
+npx lelu-agent-auth help`
     },
     Python: {
       install: "pip install lelu-agent-auth-sdk",

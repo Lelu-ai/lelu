@@ -1,4 +1,6 @@
-[![Lelu logo](https://lelu-ai.com/logo.svg)](https://lelu-ai.com/)
+<div align="center">
+  <img src="https://lelu-ai.com/logo.svg" alt="Lelu logo" width="120" />
+</div>
 
 # Lelu
 

@@ -4,12 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lelu-agent-auth-sdk"
-version = "0.3.6"
+version = "0.0.1"
 description = "Python SDK for Lelu — framework-agnostic authorization engine for AI agents with confidence-aware controls, Docker deployment, and human-in-the-loop workflows"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
     { name = "Abenezer Getachew", email = "abenezer.getachew@lelu-ai.com" }
+]
+maintainers = [
+    { name = "Abenezer Getachew", url = "https://github.com/Abenezer0923" }
 ]
 requires-python = ">=3.11"
 keywords = ["auth", "authorization", "ai-agents", "langchain", "langgraph", "permissions", "docker", "policy-engine", "human-in-the-loop", "risk-evaluation", "audit-trail", "crewai", "fastapi"]

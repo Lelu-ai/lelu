@@ -2,8 +2,6 @@
 
 # Lelu
 
-> **⚠️ Beta Version 0.2.71-beta** - This is a beta release. Features and APIs may change.
-
 The TypeScript SDK for Lelu — the confidence-aware authorization engine for autonomous AI agents.
 
 **Author:** Abenezer Getachew  

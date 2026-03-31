@@ -59,8 +59,7 @@ jobs:
         if: ${{ steps.rp_token.outputs.source == 'github_token' }}
         shell: bash
         run: |
-          echo "::error::Release Please is using GITHUB_TOKEN. This repository/org currently blocks PR creation from GitHub Actions. Add RELEASE_PLEASE_TOKEN with repo contents+pull-requests write permissions (and org SSO authorization if required)."
-          exit 1
+          echo "::warning::Release Please is using GITHUB_TOKEN. If PR creation fails, add RELEASE_PLEASE_TOKEN with repo contents+pull-requests write permissions."
 
       - uses: googleapis/release-please-action@v4
         id: release

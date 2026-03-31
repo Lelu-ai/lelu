@@ -276,20 +276,39 @@ func redisKey(apiKey string) string {
 
 // Simple JSON field extractor (avoids full JSON parsing for performance)
 func extractJSONField(jsonStr, field string) string {
-	// Look for "field":"value"
-	searchStr := `"` + field + `":"`
+	// Look for "field":"value" or "field":true/false
+	searchStr := `"` + field + `":`
 	start := strings.Index(jsonStr, searchStr)
 	if start == -1 {
 		return ""
 	}
 	start += len(searchStr)
 
-	end := strings.Index(jsonStr[start:], `"`)
-	if end == -1 {
+	// Skip whitespace
+	for start < len(jsonStr) && (jsonStr[start] == ' ' || jsonStr[start] == '\t') {
+		start++
+	}
+
+	if start >= len(jsonStr) {
 		return ""
 	}
 
-	return jsonStr[start : start+end]
+	// Check if value is a string (starts with ")
+	if jsonStr[start] == '"' {
+		start++ // Skip opening quote
+		end := strings.Index(jsonStr[start:], `"`)
+		if end == -1 {
+			return ""
+		}
+		return jsonStr[start : start+end]
+	}
+
+	// Check if value is a boolean or number
+	end := start
+	for end < len(jsonStr) && jsonStr[end] != ',' && jsonStr[end] != '}' && jsonStr[end] != ' ' {
+		end++
+	}
+	return jsonStr[start:end]
 }
 
 // IsValidKeyFormat checks if a string matches the API key format

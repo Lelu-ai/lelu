@@ -211,3 +211,20 @@ func (q *Queue) resolve(ctx context.Context, id string, status Status, resolvedB
 	}
 	return nil
 }
+
+// HealthCheck validates Redis connectivity for the review queue.
+func (q *Queue) HealthCheck(ctx context.Context) error {
+	if q.rdb == nil {
+		return nil
+	}
+	if err := q.rdb.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("queue: redis ping: %w", err)
+	}
+	if err := q.rdb.Set(ctx, PendingKey+"health", "ok", 5*time.Second).Err(); err != nil {
+		return fmt.Errorf("queue: redis write: %w", err)
+	}
+	if err := q.rdb.Del(ctx, PendingKey+"health").Err(); err != nil {
+		return fmt.Errorf("queue: redis cleanup: %w", err)
+	}
+	return nil
+}

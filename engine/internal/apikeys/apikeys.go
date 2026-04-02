@@ -373,19 +373,27 @@ func (s *Service) GenerateAnonymousKey(ctx context.Context, createdIP string) (s
 		return "", err
 	}
 
-	// Generate 8-character short ID
+	// Generate 8-character short ID (remove underscores and hyphens from base64)
 	shortIDBytes := make([]byte, 6)
 	if _, err := rand.Read(shortIDBytes); err != nil {
 		return "", fmt.Errorf("failed to generate short ID: %w", err)
 	}
-	shortID := base64.RawURLEncoding.EncodeToString(shortIDBytes)[:8]
+	shortID := strings.ReplaceAll(base64.RawURLEncoding.EncodeToString(shortIDBytes), "_", "")
+	shortID = strings.ReplaceAll(shortID, "-", "")
+	if len(shortID) > 8 {
+		shortID = shortID[:8]
+	}
 
-	// Generate 32-character random part
+	// Generate 32-character random part (remove underscores and hyphens from base64)
 	randomBytes := make([]byte, 24)
 	if _, err := rand.Read(randomBytes); err != nil {
 		return "", fmt.Errorf("failed to generate random key: %w", err)
 	}
-	randomPart := base64.RawURLEncoding.EncodeToString(randomBytes)[:32]
+	randomPart := strings.ReplaceAll(base64.RawURLEncoding.EncodeToString(randomBytes), "_", "")
+	randomPart = strings.ReplaceAll(randomPart, "-", "")
+	if len(randomPart) > 32 {
+		randomPart = randomPart[:32]
+	}
 
 	apiKey := fmt.Sprintf("%s%s_%s", PrefixAnon, shortID, randomPart)
 	tenantID := fmt.Sprintf("anon_%s", shortID)

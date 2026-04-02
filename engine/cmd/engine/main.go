@@ -129,9 +129,16 @@ func main() {
 		}
 	}
 
+	// ── Redis configuration validation ────────────────────────────────────────
+	redisOpts, err := tokens.ParseRedisAddr(redisAddr)
+	if err != nil {
+		log.Fatalf("invalid REDIS_ADDR %q: %v", redisAddr, err)
+	}
+
 	tokenSvc := tokens.New(tokens.Config{
 		SigningKey:      signingKey,
 		RedisAddr:       redisAddr,
+		RedisOptions:    redisOpts,
 		FallbackService: fb,
 	})
 	confGate := confidence.New()
@@ -143,15 +150,15 @@ func main() {
 
 	// ── Human review queue (Phase 2) ──────────────────────────────────────────
 	var reviewQueue *queue.Queue
-	if redisAddr != "" {
-		rdb := redis.NewClient(&redis.Options{Addr: redisAddr})
+	if redisOpts != nil {
+		rdb := redis.NewClient(redisOpts)
 		var qErr error
 		reviewQueue, qErr = queue.New(rdb)
 		if qErr != nil {
 			log.Printf("warning: could not init review queue: %v", qErr)
 			reviewQueue = queue.NewInMemory()
 		} else {
-			log.Printf("human review queue ready (Redis %s)", redisAddr)
+			log.Printf("human review queue ready (Redis %s)", redisOpts.Addr)
 		}
 	} else {
 		reviewQueue = queue.NewInMemory()

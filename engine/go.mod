@@ -1,6 +1,8 @@
 module github.com/lelu/engine
 
-go 1.23
+go 1.24.0
+
+toolchain go1.24.13
 
 require (
 	github.com/alicebob/miniredis/v2 v2.33.0

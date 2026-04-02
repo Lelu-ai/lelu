@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -34,6 +36,7 @@ type AgentClaims struct {
 type Service struct {
 	signingKey  []byte
 	rdb         *redis.Client
+	initErr     error
 	defaultTTL  time.Duration
 	memCache    *inMemoryCache
 	fallbackSvc *fallback.Strategy
@@ -43,6 +46,7 @@ type Service struct {
 type Config struct {
 	SigningKey      string
 	RedisAddr       string
+	RedisOptions    *redis.Options
 	DefaultTTL      time.Duration
 	FallbackService *fallback.Strategy
 }
@@ -63,8 +67,20 @@ func New(cfg ...Config) *Service {
 		if c.DefaultTTL > 0 {
 			s.defaultTTL = c.DefaultTTL
 		}
-		if c.RedisAddr != "" {
-			s.rdb = redis.NewClient(&redis.Options{Addr: c.RedisAddr})
+		var redisOpts *redis.Options
+		switch {
+		case c.RedisOptions != nil:
+			redisOpts = c.RedisOptions
+		case c.RedisAddr != "":
+			var err error
+			redisOpts, err = ParseRedisAddr(c.RedisAddr)
+			if err != nil {
+				s.initErr = err
+				log.Printf("tokens: invalid redis address: %v", err)
+			}
+		}
+		if redisOpts != nil {
+			s.rdb = redis.NewClient(redisOpts)
 		}
 		s.fallbackSvc = c.FallbackService
 	}
@@ -221,6 +237,52 @@ func (s *Service) RevokeToken(ctx context.Context, tokenID string) error {
 	}
 	// Also remove from in-memory cache
 	return s.memCache.Delete(ctx, tokenID)
+}
+
+// HealthCheck validates Redis connectivity and basic read/write semantics for tokens.
+// Returns nil when healthy; otherwise a wrapped error describing the failure.
+func (s *Service) HealthCheck(ctx context.Context) error {
+	if s.initErr != nil {
+		return s.initErr
+	}
+	if s.rdb == nil {
+		return nil // no Redis configured; nothing to check
+	}
+	if err := s.rdb.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("tokens: redis ping: %w", err)
+	}
+	key := "lelu:health:tokens"
+	if err := s.rdb.Set(ctx, key, "ok", 10*time.Second).Err(); err != nil {
+		return fmt.Errorf("tokens: redis write: %w", err)
+	}
+	if err := s.rdb.Del(ctx, key).Err(); err != nil {
+		return fmt.Errorf("tokens: redis cleanup: %w", err)
+	}
+	return nil
+}
+
+// ParseRedisAddr validates a Redis address and returns redis.Options suitable for redis.NewClient.
+// Accepts host:port or redis:// / rediss:// URLs. Ensures a port is present to avoid misconfiguration.
+func ParseRedisAddr(addr string) (*redis.Options, error) {
+	trimmed := strings.TrimSpace(addr)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if strings.HasPrefix(trimmed, "redis://") || strings.HasPrefix(trimmed, "rediss://") {
+		opts, err := redis.ParseURL(trimmed)
+		if err != nil {
+			return nil, fmt.Errorf("redis url: %w", err)
+		}
+		return opts, nil
+	}
+
+	if !strings.Contains(trimmed, ":") {
+		return nil, fmt.Errorf("redis address %q missing port; expected host:port or redis://", trimmed)
+	}
+	if _, _, err := net.SplitHostPort(trimmed); err != nil {
+		return nil, fmt.Errorf("redis address %q invalid: %w", trimmed, err)
+	}
+	return &redis.Options{Addr: trimmed}, nil
 }
 
 func redisKey(tokenID string) string {

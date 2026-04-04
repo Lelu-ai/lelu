@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { FaLocationArrow, FaGithub } from "react-icons/fa6";
-import { FiBook } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -17,10 +16,13 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
   const showCTA = manualShowCTA ?? pathname === "/";
   return (
     <footer
-      className={cn("w-full pb-10 relative overflow-hidden", showCTA ? "pt-32" : "pt-0")}
+      className={cn(
+        "w-full pb-10 relative overflow-hidden bg-white dark:bg-black-100",
+        showCTA ? "pt-32" : "pt-0",
+      )}
       id="contact"
     >
-      {/* Background Ambient Glow */}
+      {/* Background Ambient Glow — matches the hero/about page glow pattern */}
       <div className="absolute top-0 left-0 w-full h-full opacity-30 dark:opacity-20 pointer-events-none z-0">
         <div className="absolute top-[-20%] left-[20%] w-[50%] h-[50%] rounded-full bg-[#3b82f6]/20 blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[10%] w-[50%] h-[50%] rounded-full bg-[#CBACF9]/20 blur-[120px]" />
@@ -35,7 +37,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
           transition={{ duration: 0.8 }}
           className="flex flex-col items-center text-center relative z-10 px-4"
         >
-          <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 dark:text-white text-zinc-900">
+          <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-6 text-zinc-900 dark:text-white">
             Ready to secure your{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#CBACF9] to-[#393BB2]">
               AI agents?
@@ -49,11 +51,12 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
             <Link href="/docs/quickstart">
               <MagicButton title="Get Started" icon={<FaLocationArrow />} position="right" />
             </Link>
+            {/* GitHub button uses same glassmorphism pattern as the navbar */}
             <a
               href="https://github.com/lelu-auth/lelu"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-xl border border-zinc-200 bg-white/80 px-8 py-4 text-sm font-bold text-zinc-900 backdrop-blur-md transition-all hover:bg-zinc-100 dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 shadow-sm hover:shadow-md"
+              className="inline-flex items-center justify-center rounded-xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-white/5 backdrop-blur-md px-8 py-4 text-sm font-bold text-zinc-900 dark:text-white transition-all hover:bg-zinc-100/80 dark:hover:bg-white/10 shadow-sm hover:shadow-md"
             >
               <FaGithub className="w-5 h-5 mr-2" />
               View on GitHub
@@ -62,14 +65,14 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
         </motion.div>
       )}
 
-      {/* FOOTER BOTTOM SECTION */}
+      {/* FOOTER BOTTOM SECTION — border uses same token as navbar: border-black/5 dark:border-white/10 */}
       <motion.div
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8, delay: 0.2 }}
         className={cn(
-          "w-full border-t border-zinc-200 dark:border-white/10 pt-10 flex flex-col md:flex-row justify-between items-center relative z-10 gap-8 px-4",
+          "w-full border-t border-black/5 dark:border-white/10 pt-10 flex flex-col md:flex-row justify-between items-center relative z-10 gap-8 px-4",
           showCTA ? "mt-32" : "mt-12",
         )}
       >
@@ -80,16 +83,18 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
               alt="Lelu logo"
               className="w-8 h-8 rounded-lg transition-transform duration-500 group-hover:scale-110"
             />
-            <span className="font-bold text-xl tracking-tight dark:text-white text-zinc-900">
+            <span className="font-bold text-xl tracking-tight text-zinc-900 dark:text-white">
               Lelu Engine
             </span>
           </Link>
-          <p className="md:border-l md:border-zinc-300 dark:md:border-zinc-700 md:pl-6 text-zinc-500 dark:text-zinc-400 text-sm">
+          {/* Divider uses same token as navbar */}
+          <p className="md:border-l md:border-black/10 dark:md:border-white/10 md:pl-6 text-zinc-500 dark:text-neutral-400 text-sm">
             Copyright © {new Date().getFullYear()} Lelu Security.
           </p>
         </div>
 
-        <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm font-medium text-zinc-600 dark:text-zinc-400">
+        {/* Nav links use same text scale as the floating navbar: text-zinc-600 dark:text-neutral-300 */}
+        <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm font-medium text-zinc-600 dark:text-neutral-300">
           <li>
             <Link href="/about" className="hover:text-[#CBACF9] transition-colors">
               About

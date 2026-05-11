@@ -4,6 +4,20 @@
 
 # Lelu
 
+> **WARNING — NOT PRODUCTION READY**
+>
+> This repository contains early-stage code, prototypes, and research features. It is not production ready.
+> Do not use this code for production workloads without following the `docs/PROJECT_PLAN.md` remediation steps.
+
+### Quick Risks
+
+- Missing hardened deployment defaults (secrets, TLS, IAM)
+- Incomplete integration and e2e test coverage
+- Migration and backup procedures not validated for production
+- Operational monitoring and runbooks are minimal
+
+See `docs/PROJECT_PLAN.md` for the required work to reach production readiness.
+
 ## About the Project
 
 Lelu is a framework-agnostic authorization engine for AI agents. It combines policy evaluation, confidence-aware controls, runtime risk checks, and human-review workflows in one system.

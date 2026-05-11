@@ -1,0 +1,21 @@
+name: Shadow Detector Smoke Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  shadow-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+      - name: Run unit tests (engine)
+        run: |
+          cd engine
+          go test ./... 

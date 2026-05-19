@@ -25,7 +25,7 @@ func TestDetectShadowAgent(t *testing.T) {
         "actor":          "shadow_bot",
     }
     registry := map[string]bool{} // empty registry
-    reporter := NewReporter()
+    reporter := NewReporter(nil)
     detector := New(registry, reporter)
 
     result, err := detector.Detect(req)
@@ -48,7 +48,7 @@ func TestDetectRegisteredAgent(t *testing.T) {
     }
     fp := Fingerprint(req)
     registry := map[string]bool{fp: true}
-    reporter := NewReporter()
+    reporter := NewReporter(nil)
     detector := New(registry, reporter)
 
     result, err := detector.Detect(req)

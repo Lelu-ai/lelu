@@ -13,7 +13,7 @@ func TestShadowDetectionIntegration(t *testing.T) {
     knownAgents := map[string]bool{
         "abc123": true, // registered agent fingerprint
     }
-    reporter := shadow.NewReporter()
+    reporter := shadow.NewReporter(nil)
     detector := shadow.New(knownAgents, reporter)
 
     // 2. Simulate an incoming request from an unknown (shadow) agent
@@ -69,7 +69,7 @@ func TestShadowDetectionIntegration(t *testing.T) {
 func TestShadowPlusConfidencePipeline(t *testing.T) {
     // Setup
     registry := map[string]bool{} // empty = all agents are shadows in this test
-    detector := shadow.New(registry, shadow.NewReporter())
+    detector := shadow.New(registry, shadow.NewReporter(nil))
     auditor := confidence.NewExternalAuditor("http://localhost:8000", "key")
     scorer := confidence.NewScorer(0.25)
     escalator := confidence.NewEscalator(nil)

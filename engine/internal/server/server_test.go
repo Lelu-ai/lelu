@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -409,16 +410,23 @@ func TestAgentDelegate_Denied(t *testing.T) {
 }
 
 func TestQueueApproveDenyFlows(t *testing.T) {
-	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", queue.NewInMemory())
+	q := queue.NewInMemory()
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
 	defer srv.Close()
 
-	approveResp := postJSON(t, srv, "/v1/queue/fake-id/approve", map[string]any{
+	// Enqueue two separate items so each can be resolved independently.
+	approveID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u")
+	require.NoError(t, err)
+	denyID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u")
+	require.NoError(t, err)
+
+	approveResp := postJSON(t, srv, "/v1/queue/"+approveID+"/approve", map[string]any{
 		"resolved_by": "reviewer_1",
 		"note":        "looks good",
 	})
 	assert.Equal(t, http.StatusOK, approveResp.StatusCode)
 
-	denyResp := postJSON(t, srv, "/v1/queue/fake-id/deny", map[string]any{
+	denyResp := postJSON(t, srv, "/v1/queue/"+denyID+"/deny", map[string]any{
 		"resolved_by": "reviewer_2",
 		"note":        "too risky",
 	})

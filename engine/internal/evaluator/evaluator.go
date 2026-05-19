@@ -231,7 +231,19 @@ func (e *Evaluator) EvaluateAgent(_ context.Context, req AgentAuthRequest) (*Dec
 func (e *Evaluator) CheckDelegation(_ context.Context, delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
 	e.mu.RLock()
 	p := e.policy
+	rp := e.rego
 	e.mu.RUnlock()
+
+	// Try Rego first; nil return means "no delegation rule defined" → fall through.
+	if rp != nil {
+		dec, err := rp.CheckDelegation(delegator, delegatee, scopedTo, confidence)
+		if err != nil {
+			return nil, err
+		}
+		if dec != nil {
+			return dec, nil
+		}
+	}
 
 	scope, ok := p.AgentScopes[delegator]
 	if !ok {

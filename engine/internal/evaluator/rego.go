@@ -104,6 +104,74 @@ func (r *regoPolicy) evaluate(input map[string]any) (*Decision, error) {
 	}
 }
 
+// CheckDelegation evaluates a delegation request via the loaded Rego policy.
+// The policy should handle input with kind="delegation". Returns nil (no
+// decision) when the policy produces no result for delegation, allowing the
+// caller to fall back to YAML rules.
+func (r *regoPolicy) CheckDelegation(delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
+	input := map[string]any{
+		"kind":       "delegation",
+		"delegator":  delegator,
+		"delegatee":  delegatee,
+		"scoped_to":  scopedTo,
+		"confidence": confidence,
+	}
+	results, err := r.query.Eval(context.Background(), rego.EvalInput(input))
+	if err != nil {
+		return nil, fmt.Errorf("evaluator: rego delegation eval: %w", err)
+	}
+	if len(results) == 0 || len(results[0].Expressions) == 0 {
+		return nil, nil // no delegation rule in rego — fall through to YAML
+	}
+	value := results[0].Expressions[0].Value
+	switch v := value.(type) {
+	case bool:
+		if v {
+			return &DelegationDecision{
+				Allowed:       true,
+				Reason:        "allowed by rego policy",
+				GrantedScopes: scopedTo,
+			}, nil
+		}
+		return &DelegationDecision{Allowed: false, Reason: "denied by rego policy"}, nil
+	case map[string]any:
+		return delegationDecisionFromMap(v, scopedTo), nil
+	default:
+		return nil, nil // unrecognised type — fall through to YAML
+	}
+}
+
+func delegationDecisionFromMap(v map[string]any, fallbackScopes []string) *DelegationDecision {
+	dec := &DelegationDecision{}
+	if allowed, ok := v["allowed"].(bool); ok {
+		dec.Allowed = allowed
+	}
+	if reason, ok := v["reason"].(string); ok {
+		dec.Reason = reason
+	}
+	if maxTTL, ok := v["max_ttl_seconds"].(float64); ok {
+		dec.MaxTTL = int64(maxTTL)
+	}
+	if scopes, ok := v["granted_scopes"].([]interface{}); ok {
+		for _, s := range scopes {
+			if str, ok := s.(string); ok {
+				dec.GrantedScopes = append(dec.GrantedScopes, str)
+			}
+		}
+	}
+	if len(dec.GrantedScopes) == 0 {
+		dec.GrantedScopes = fallbackScopes
+	}
+	if dec.Reason == "" {
+		if dec.Allowed {
+			dec.Reason = "allowed by rego policy"
+		} else {
+			dec.Reason = "denied by rego policy"
+		}
+	}
+	return dec
+}
+
 func decisionFromMap(v map[string]any) *Decision {
 	dec := &Decision{}
 	if allowed, ok := v["allowed"].(bool); ok {

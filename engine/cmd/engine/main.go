@@ -334,6 +334,24 @@ func initDatabase(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_agent_decisions_agent_timestamp ON agent_decisions(agent_id, timestamp);
 	CREATE INDEX IF NOT EXISTS idx_anomaly_results_agent_timestamp ON anomaly_results(agent_id, timestamp);
 	CREATE INDEX IF NOT EXISTS idx_alerts_agent_status ON alerts(agent_id, status);
+
+	-- Shadow agent detection
+	CREATE TABLE IF NOT EXISTS shadow_agents (
+		id              TEXT PRIMARY KEY,
+		tenant_id       TEXT NOT NULL DEFAULT '',
+		fingerprint_hash TEXT NOT NULL UNIQUE,
+		user_agent      TEXT NOT NULL DEFAULT '',
+		api_key_prefix  TEXT NOT NULL DEFAULT '',
+		first_seen      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		last_seen       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		request_count   INTEGER NOT NULL DEFAULT 1,
+		risk_score      REAL NOT NULL DEFAULT 0.0,
+		status          TEXT NOT NULL DEFAULT 'unreviewed',
+		endpoints_hit   TEXT NOT NULL DEFAULT '[]',
+		created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE INDEX IF NOT EXISTS idx_shadow_agents_status ON shadow_agents(status);
+	CREATE INDEX IF NOT EXISTS idx_shadow_agents_tenant ON shadow_agents(tenant_id);
 	`
 
 	if _, err := db.Exec(schema); err != nil {

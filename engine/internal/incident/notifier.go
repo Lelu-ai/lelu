@@ -85,9 +85,6 @@ func NewFromEnv() *Notifier {
 	teamsMode := envBool("INCIDENT_WEBHOOK_TEAMS_MODE")
 	pagerDutyMode := envBool("INCIDENT_WEBHOOK_PAGERDUTY_MODE")
 	engineURL := os.Getenv("LELU_ENGINE_PUBLIC_URL")
-	if engineURL == "" {
-		engineURL = os.Getenv("LELU_ENGINE_PUBLIC_URL") // backward compat
-	}
 	return New(Config{
 		WebhookURL:          os.Getenv("INCIDENT_WEBHOOK_URL"),
 		Timeout:             timeout,

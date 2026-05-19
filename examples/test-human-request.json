@@ -1,9 +1,0 @@
-{
-  "tenant_id": "acme-corp",
-  "user_id": "user_123",
-  "action": "approve_refunds",
-  "resource": {
-    "amount": "500",
-    "currency": "USD"
-  }
-}

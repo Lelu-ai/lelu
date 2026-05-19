@@ -32,6 +32,7 @@ import (
 	"github.com/lelu/engine/internal/observability"
 	"github.com/lelu/engine/internal/queue"
 	"github.com/lelu/engine/internal/ratelimit"
+	"github.com/lelu/engine/internal/shadow"
 	"github.com/lelu/engine/internal/telemetry"
 	"github.com/lelu/engine/internal/tokens"
 )
@@ -58,6 +59,11 @@ var (
 	injectionAttemptsTotal = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "lelu_injection_attempts_total",
 		Help: "Total number of detected prompt injection attempts",
+	})
+
+	shadowAgentsDetectedTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "lelu_shadow_agents_detected_total",
+		Help: "Total number of requests from unregistered (shadow) agents",
 	})
 
 	anomalyAlertsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -96,6 +102,8 @@ type Handler struct {
 	anomalyDetector *observability.AnomalyDetector
 	baselineMgr     *observability.BaselineManager
 	alertMgr        *observability.AlertManager
+
+	shadowDetector *shadow.Detector
 }
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
@@ -248,12 +256,21 @@ func New(
 	var baselineMgr *observability.BaselineManager
 	var alertMgr *observability.AlertManager
 
+	var shadowDet *shadow.Detector
 	if db != nil {
 		// Initialize Phase 2 components with database
 		reputationMgr = observability.NewReputationManager(db, observability.DefaultReputationConfig())
 		anomalyDetector = observability.NewAnomalyDetector(db, observability.DefaultAnomalyConfig())
 		baselineMgr = observability.NewBaselineManager(db, observability.DefaultBaselineConfig())
 		alertMgr = observability.NewAlertManager(db, observability.DefaultAlertConfig())
+
+		var sdErr error
+		shadowDet, sdErr = shadow.NewWithDB(db)
+		if sdErr != nil {
+			log.Printf("warning: shadow detector init failed: %v", sdErr)
+		} else {
+			log.Printf("shadow agent detector ready")
+		}
 
 		log.Printf("Phase 2 behavioral analytics initialized")
 	} else {
@@ -287,6 +304,8 @@ func New(
 		anomalyDetector: anomalyDetector,
 		baselineMgr:     baselineMgr,
 		alertMgr:        alertMgr,
+
+		shadowDetector: shadowDet,
 	}
 }
 
@@ -483,6 +502,24 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	if h.rateLimit != nil && !h.rateLimit.AllowAuth(req.TenantID) {
 		writeError(w, http.StatusTooManyRequests, "rate limit exceeded for tenant")
 		return
+	}
+
+	// ── Shadow agent detection ────────────────────────────────────────────────
+	if h.shadowDetector != nil {
+		shadowReq := map[string]interface{}{
+			"user_agent":     r.Header.Get("User-Agent"),
+			"api_key_prefix": apiKeyPrefix(r),
+			"actor":          req.Actor,
+			"tenant_id":      req.TenantID,
+			"endpoint":       r.URL.Path,
+		}
+		if res, err := h.shadowDetector.Detect(shadowReq); err != nil {
+			log.Printf("shadow detection error: %v", err)
+		} else if res.IsShadow {
+			shadowAgentsDetectedTotal.Inc()
+			h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource,
+				true, "shadow agent detected: "+res.Reason, 0, 0)
+		}
 	}
 
 	// ── Prompt injection pre-filter (fastest path, before confidence gate) ──
@@ -1668,6 +1705,21 @@ func decisionString(allowed, requiresReview bool) string {
 		return "allowed"
 	}
 	return "denied"
+}
+
+// apiKeyPrefix returns the first 8 characters of the Bearer token in the
+// Authorization header, safe to store as an identifier without leaking the key.
+func apiKeyPrefix(r *http.Request) string {
+	auth := r.Header.Get("Authorization")
+	const prefix = "Bearer "
+	if len(auth) > len(prefix) {
+		key := auth[len(prefix):]
+		if len(key) > 8 {
+			return key[:8]
+		}
+		return key
+	}
+	return ""
 }
 
 // getConfidenceFromRequest extracts confidence score from request for tracing

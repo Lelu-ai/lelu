@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -54,14 +55,55 @@ type ReviewRequest struct {
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
-// Queue manages the human-review lifecycle via Redis Streams + Hashes.
-type Queue struct {
-	rdb *redis.Client
+// inMemoryStore is a thread-safe map-backed store used when Redis is not
+// available. It preserves full ReviewRequest lifecycle (pending → approved/denied).
+type inMemoryStore struct {
+	mu    sync.Mutex
+	items map[string]*ReviewRequest
 }
 
-// New creates a Queue and ensures the consumer group exists.
+func newInMemoryStore() *inMemoryStore {
+	return &inMemoryStore{items: make(map[string]*ReviewRequest)}
+}
+
+func (s *inMemoryStore) set(req *ReviewRequest) {
+	s.mu.Lock()
+	s.items[req.ID] = req
+	s.mu.Unlock()
+}
+
+func (s *inMemoryStore) get(id string) (*ReviewRequest, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.items[id]
+	return r, ok
+}
+
+func (s *inMemoryStore) listPending(limit int64) []ReviewRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]ReviewRequest, 0)
+	for _, r := range s.items {
+		if r.Status == StatusPending {
+			out = append(out, *r)
+			if int64(len(out)) >= limit {
+				break
+			}
+		}
+	}
+	return out
+}
+
+// Queue manages the human-review lifecycle via Redis Streams + Hashes.
+// When rdb is nil it falls back to an in-memory store so no items are lost.
+type Queue struct {
+	rdb   *redis.Client
+	inmem *inMemoryStore
+}
+
+// New creates a Queue backed by Redis and ensures the consumer group exists.
 func New(rdb *redis.Client) (*Queue, error) {
-	q := &Queue{rdb: rdb}
+	q := &Queue{rdb: rdb, inmem: newInMemoryStore()}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Create group; ignore BUSYGROUP error (already exists).
@@ -73,20 +115,18 @@ func New(rdb *redis.Client) (*Queue, error) {
 	return q, nil
 }
 
-// NewInMemory returns a Queue without Redis (no-op approvals) for testing.
+// NewInMemory returns a Queue backed by an in-memory store (no Redis required).
+// All operations work correctly; data is lost on restart.
 func NewInMemory() *Queue {
-	return &Queue{}
+	return &Queue{inmem: newInMemoryStore()}
 }
 
 // ─── Enqueue ──────────────────────────────────────────────────────────────────
 
 // Enqueue adds a new ReviewRequest to the stream and writes the full payload.
-// Returns the assigned review ID.
+// Returns the assigned review ID. Falls back to the in-memory store when Redis
+// is not configured so no review requests are silently dropped.
 func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, resource map[string]string, confidence float64, reason, actingFor string) (string, error) {
-	if q.rdb == nil {
-		return "", nil // no-op without Redis
-	}
-
 	id := uuid.NewString()
 	req := ReviewRequest{
 		ID:              id,
@@ -99,6 +139,11 @@ func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, res
 		ActingFor:       actingFor,
 		EnqueuedAt:      time.Now().UTC(),
 		Status:          StatusPending,
+	}
+
+	if q.rdb == nil {
+		q.inmem.set(&req)
+		return id, nil
 	}
 
 	payload, err := json.Marshal(req)
@@ -114,7 +159,7 @@ func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, res
 		return "", fmt.Errorf("queue: xadd: %w", err)
 	}
 
-	// Write full payload to a hash for fast O(1) GET by ID.
+	// Write full payload for fast O(1) GET by ID.
 	if err := q.rdb.Set(ctx, PendingKey+id, payload, 24*time.Hour).Err(); err != nil {
 		return "", fmt.Errorf("queue: set: %w", err)
 	}
@@ -127,7 +172,11 @@ func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, res
 // Get returns a single ReviewRequest by ID.
 func (q *Queue) Get(ctx context.Context, id string) (*ReviewRequest, error) {
 	if q.rdb == nil {
-		return nil, errors.New("queue: no Redis configured")
+		req, ok := q.inmem.get(id)
+		if !ok {
+			return nil, fmt.Errorf("queue: item %q not found", id)
+		}
+		return req, nil
 	}
 	raw, err := q.rdb.Get(ctx, PendingKey+id).Result()
 	if errors.Is(err, redis.Nil) {
@@ -144,10 +193,9 @@ func (q *Queue) Get(ctx context.Context, id string) (*ReviewRequest, error) {
 }
 
 // ListPending returns up to `limit` items that are still in StatusPending.
-// It reads recent stream entries and filters by status.
 func (q *Queue) ListPending(ctx context.Context, limit int64) ([]ReviewRequest, error) {
 	if q.rdb == nil {
-		return nil, nil
+		return q.inmem.listPending(limit), nil
 	}
 	msgs, err := q.rdb.XRevRangeN(ctx, StreamKey, "+", "-", limit).Result()
 	if err != nil {
@@ -184,9 +232,6 @@ func (q *Queue) Deny(ctx context.Context, id, resolvedBy, note string) error {
 }
 
 func (q *Queue) resolve(ctx context.Context, id string, status Status, resolvedBy, note string) error {
-	if q.rdb == nil {
-		return nil
-	}
 	req, err := q.Get(ctx, id)
 	if err != nil {
 		return err
@@ -200,6 +245,11 @@ func (q *Queue) resolve(ctx context.Context, id string, status Status, resolvedB
 	req.ResolvedAt = &now
 	req.ResolvedBy = resolvedBy
 	req.ResolutionNote = note
+
+	if q.rdb == nil {
+		q.inmem.set(req)
+		return nil
+	}
 
 	payload, err := json.Marshal(req)
 	if err != nil {

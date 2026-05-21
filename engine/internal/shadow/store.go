@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 )
@@ -16,8 +17,11 @@ type store struct {
 // upsert inserts a new shadow agent row keyed by fingerprint_hash, or updates
 // last_seen, request_count, and endpoints_hit on conflict.
 func (s *store) upsert(ctx context.Context, fp, tenantID, userAgent, apiKeyPrefix string, endpoints []string) error {
-	endpointsJSON, _ := json.Marshal(endpoints)
-	_, err := s.db.ExecContext(ctx, `
+	endpointsJSON, err := json.Marshal(endpoints)
+	if err != nil {
+		return fmt.Errorf("shadow: marshal endpoints: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO shadow_agents
 			(id, tenant_id, fingerprint_hash, user_agent, api_key_prefix, endpoints_hit)
 		VALUES

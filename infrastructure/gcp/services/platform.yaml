@@ -1,0 +1,64 @@
+# Cloud Run service spec — lelu-platform (control plane API)
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: lelu-platform
+  labels:
+    app: lelu
+    component: platform
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/cloudsql-instances: __PROJECT__:__REGION__:lelu-postgres
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      serviceAccountName: lelu-platform@__PROJECT__.iam.gserviceaccount.com
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - image: __IMAGE__
+          ports:
+            - name: http1
+              containerPort: 9090
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: LISTEN_ADDR
+              value: ":9090"
+            # Cloud SQL socket path (via Cloud SQL Auth Proxy sidecar)
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-database-url
+                  key: latest
+            - name: PLATFORM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-platform-api-key
+                  key: latest
+            - name: EVIDENCE_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-evidence-signing-key
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9090
+            periodSeconds: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

@@ -58,17 +58,17 @@ func loadRegoPolicy(path, query string) (*regoPolicy, error) {
 	return &regoPolicy{query: r}, nil
 }
 
-func (r *regoPolicy) EvaluateHuman(req AuthRequest) (*Decision, error) {
+func (r *regoPolicy) EvaluateHuman(ctx context.Context, req AuthRequest) (*Decision, error) {
 	input := map[string]any{
 		"kind":     "human",
 		"user_id":  req.UserID,
 		"action":   req.Action,
 		"resource": req.Resource,
 	}
-	return r.evaluate(input)
+	return r.evaluate(ctx, input)
 }
 
-func (r *regoPolicy) EvaluateAgent(req AgentAuthRequest) (*Decision, error) {
+func (r *regoPolicy) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*Decision, error) {
 	input := map[string]any{
 		"kind":       "agent",
 		"actor":      req.Actor,
@@ -78,11 +78,11 @@ func (r *regoPolicy) EvaluateAgent(req AgentAuthRequest) (*Decision, error) {
 		"acting_for": req.ActingFor,
 		"scope":      req.Scope,
 	}
-	return r.evaluate(input)
+	return r.evaluate(ctx, input)
 }
 
-func (r *regoPolicy) evaluate(input map[string]any) (*Decision, error) {
-	results, err := r.query.Eval(context.Background(), rego.EvalInput(input))
+func (r *regoPolicy) evaluate(ctx context.Context, input map[string]any) (*Decision, error) {
+	results, err := r.query.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
 		return nil, fmt.Errorf("evaluator: rego eval failed: %w", err)
 	}
@@ -108,7 +108,7 @@ func (r *regoPolicy) evaluate(input map[string]any) (*Decision, error) {
 // The policy should handle input with kind="delegation". Returns nil (no
 // decision) when the policy produces no result for delegation, allowing the
 // caller to fall back to YAML rules.
-func (r *regoPolicy) CheckDelegation(delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
+func (r *regoPolicy) CheckDelegation(ctx context.Context, delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
 	input := map[string]any{
 		"kind":       "delegation",
 		"delegator":  delegator,
@@ -116,7 +116,7 @@ func (r *regoPolicy) CheckDelegation(delegator, delegatee string, scopedTo []str
 		"scoped_to":  scopedTo,
 		"confidence": confidence,
 	}
-	results, err := r.query.Eval(context.Background(), rego.EvalInput(input))
+	results, err := r.query.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
 		return nil, fmt.Errorf("evaluator: rego delegation eval: %w", err)
 	}

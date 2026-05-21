@@ -119,7 +119,11 @@ func (w *Writer) start() {
 				return
 			}
 			for _, e := range buf {
-				b, _ := json.Marshal(e)
+				b, err := json.Marshal(e)
+				if err != nil {
+					fmt.Fprintf(w.sink, `{"error":"audit marshal failed","trace_id":%q}`+"\n", e.TraceID)
+					continue
+				}
 				fmt.Fprintf(w.sink, "%s\n", b)
 			}
 			buf = buf[:0]

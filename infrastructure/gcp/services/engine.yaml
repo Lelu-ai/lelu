@@ -1,0 +1,90 @@
+# Cloud Run service spec — lelu-engine
+# Deploy with:  gcloud run services replace infrastructure/gcp/services/engine.yaml --region=REGION
+# Or let the deploy-gcp.yml workflow handle it automatically.
+#
+# Template variables (replaced by sed in the workflow):
+#   __PROJECT__   GCP project ID
+#   __REGION__    GCP region (e.g. us-central1)
+#   __IMAGE__     Full image URI with digest/tag
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: lelu-engine
+  labels:
+    app: lelu
+    component: engine
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # Cloud SQL connection (proxy socket)
+        run.googleapis.com/cloudsql-instances: __PROJECT__:__REGION__:lelu-postgres
+        # Memorystore access via VPC connector
+        run.googleapis.com/vpc-access-connector: projects/__PROJECT__/locations/__REGION__/connectors/lelu-connector
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+        # Scaling — keep at least 1 instance warm (auth is latency-sensitive)
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "20"
+    spec:
+      serviceAccountName: lelu-engine@__PROJECT__.iam.gserviceaccount.com
+      containerConcurrency: 80
+      timeoutSeconds: 30
+      containers:
+        - image: __IMAGE__
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: POLICY_PATH
+              value: "/etc/lelu/auth.yaml"
+            - name: LELU_MODE
+              value: "enforce"
+            - name: CONFIDENCE_MISSING_MODE
+              value: "deny"
+            - name: CONFIDENCE_ALLOW_UNVERIFIED
+              value: "false"
+            - name: FALLBACK_REDIS_MODE
+              value: "closed"
+            - name: FALLBACK_CP_MODE
+              value: "closed"
+            - name: BEHAVIORAL_ANALYTICS_ENABLED
+              value: "true"
+            # Secrets injected from Secret Manager
+            - name: JWT_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-jwt-signing-key
+                  key: latest
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-api-key
+                  key: latest
+            - name: REDIS_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-redis-addr
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

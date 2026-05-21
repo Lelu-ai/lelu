@@ -3,8 +3,11 @@ package observability
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,8 +16,9 @@ import (
 
 // BaselineManager handles behavioral baseline establishment and management
 type BaselineManager struct {
-	db     *sql.DB
-	config BaselineConfig
+	db       *sql.DB
+	config   BaselineConfig
+	shutdown chan struct{}
 
 	// Prometheus metrics
 	baselineHealthGauge prometheus.GaugeVec
@@ -121,8 +125,9 @@ func DefaultBaselineConfig() BaselineConfig {
 // NewBaselineManager creates a new baseline manager
 func NewBaselineManager(db *sql.DB, config BaselineConfig) *BaselineManager {
 	bm := &BaselineManager{
-		db:     db,
-		config: config,
+		db:       db,
+		config:   config,
+		shutdown: make(chan struct{}),
 
 		baselineHealthGauge: *promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -154,6 +159,11 @@ func NewBaselineManager(db *sql.DB, config BaselineConfig) *BaselineManager {
 	go bm.startDriftDetector()
 
 	return bm
+}
+
+// Shutdown stops background goroutines. Safe to call once.
+func (bm *BaselineManager) Shutdown() {
+	close(bm.shutdown)
 }
 
 // AssessBaselineHealth evaluates the health of an agent's behavioral baseline
@@ -297,17 +307,17 @@ func (bm *BaselineManager) RefreshBaseline(ctx context.Context, agentID string) 
 }
 
 // UpdateBaseline updates baseline with a single decision data point
-func (bm *BaselineManager) UpdateBaseline(_ context.Context, _, _, _ string, _ float64, _ time.Duration) error {
-	// For now, we'll just trigger a refresh if enough time has passed
-	// In a production system, this could incrementally update the baseline
-	// or queue the data for batch processing
-
-	// This is a simplified implementation - in practice you'd want to:
-	// 1. Store the individual data point
-	// 2. Check if baseline needs updating based on time/sample count
-	// 3. Potentially trigger async baseline recalculation
-
-	return nil // No-op for now, baseline updates happen via RefreshBaseline
+// UpdateBaseline records a single decision data point to agent_decisions so
+// that drift detection and baseline refresh can use it later.
+func (bm *BaselineManager) UpdateBaseline(ctx context.Context, agentID, action, outcome string, confidence float64, latency time.Duration) error {
+	_, err := bm.db.ExecContext(ctx, `
+		INSERT INTO agent_decisions (agent_id, action, confidence, latency_ms, outcome)
+		VALUES (?, ?, ?, ?, ?)
+	`, agentID, action, confidence, latency.Milliseconds(), outcome)
+	if err != nil {
+		return fmt.Errorf("baseline: record decision: %w", err)
+	}
+	return nil
 }
 
 // calculateTemporalCoverage calculates how well the baseline covers different time periods
@@ -500,81 +510,437 @@ func (bm *BaselineManager) getRecentBehaviorData(ctx context.Context, agentID st
 	return data, nil
 }
 
-// Additional helper methods would be implemented here for:
-// - analyzeConfidenceDrift
-// - analyzeLatencyDrift
-// - analyzePatternDrift
-// - calculateOverallDriftScore
-// - determineDriftType
-// - determineDriftSeverity
-// - generateDriftExplanation
-// - generateDriftRecommendations
-// - calculateBaselineFromData
-// - saveBaseline
-// - getBaselineFromDB
-// - startBaselineRefresher
-// - startDriftDetector
-
-// Placeholder implementations for brevity
-func (bm *BaselineManager) analyzeConfidenceDrift(_ *BehavioralBaseline, _ []*BehaviorData) DriftMetric {
-	// Implementation would analyze confidence drift
-	return DriftMetric{MetricName: "confidence"}
+func (bm *BaselineManager) analyzeConfidenceDrift(baseline *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+	if len(recentData) == 0 {
+		return DriftMetric{MetricName: "confidence"}
+	}
+	var sum float64
+	for _, d := range recentData {
+		sum += d.Confidence
+	}
+	recentMean := sum / float64(len(recentData))
+	magnitude := math.Abs(recentMean - baseline.ConfidenceMean)
+	pct := 0.0
+	if baseline.ConfidenceMean > 0 {
+		pct = magnitude / baseline.ConfidenceMean
+	}
+	return DriftMetric{
+		MetricName:      "confidence",
+		BaselineValue:   baseline.ConfidenceMean,
+		CurrentValue:    recentMean,
+		DriftMagnitude:  magnitude,
+		DriftPercentage: pct,
+		IsSignificant:   magnitude > bm.config.DriftThreshold,
+	}
 }
 
-func (bm *BaselineManager) analyzeLatencyDrift(_ *BehavioralBaseline, _ []*BehaviorData) DriftMetric {
-	// Implementation would analyze latency drift
-	return DriftMetric{MetricName: "latency"}
+func (bm *BaselineManager) analyzeLatencyDrift(baseline *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+	if len(recentData) == 0 {
+		return DriftMetric{MetricName: "latency"}
+	}
+	var sum float64
+	for _, d := range recentData {
+		sum += d.Latency.Seconds()
+	}
+	recentMean := sum / float64(len(recentData))
+	magnitude := math.Abs(recentMean - baseline.LatencyMean)
+	pct := 0.0
+	if baseline.LatencyMean > 0 {
+		pct = magnitude / baseline.LatencyMean
+	}
+	return DriftMetric{
+		MetricName:      "latency",
+		BaselineValue:   baseline.LatencyMean,
+		CurrentValue:    recentMean,
+		DriftMagnitude:  magnitude,
+		DriftPercentage: pct,
+		IsSignificant:   pct > bm.config.DriftThreshold,
+	}
 }
 
-func (bm *BaselineManager) analyzePatternDrift(_ *BehavioralBaseline, _ []*BehaviorData) DriftMetric {
-	// Implementation would analyze pattern drift
-	return DriftMetric{MetricName: "pattern"}
+func (bm *BaselineManager) analyzePatternDrift(baseline *BehavioralBaseline, recentData []*BehaviorData) DriftMetric {
+	if len(recentData) == 0 {
+		return DriftMetric{MetricName: "pattern"}
+	}
+	recentFreq := make(map[string]float64)
+	for _, d := range recentData {
+		recentFreq[d.Action]++
+	}
+	n := float64(len(recentData))
+	for k := range recentFreq {
+		recentFreq[k] /= n
+	}
+	// Total variation distance between distributions.
+	tvd := 0.0
+	seen := make(map[string]bool)
+	for action, baseFreq := range baseline.ActionFrequencies {
+		tvd += math.Abs(baseFreq - recentFreq[action])
+		seen[action] = true
+	}
+	for action, recentF := range recentFreq {
+		if !seen[action] {
+			tvd += recentF
+		}
+	}
+	// TVD is in [0,2]; divide by 2 to normalize to [0,1].
+	magnitude := math.Min(tvd/2.0, 1.0)
+	return DriftMetric{
+		MetricName:      "pattern",
+		DriftMagnitude:  magnitude,
+		DriftPercentage: magnitude,
+		IsSignificant:   magnitude > bm.config.DriftThreshold,
+	}
 }
 
-func (bm *BaselineManager) calculateOverallDriftScore(_ *DriftAnalysis) float64 {
-	// Implementation would calculate overall drift score
-	return 0.0
+func (bm *BaselineManager) calculateOverallDriftScore(analysis *DriftAnalysis) float64 {
+	// Normalize: confidence magnitude is already [0,1]; latency uses percentage; pattern is [0,1].
+	confScore := math.Min(analysis.ConfidenceDrift.DriftMagnitude, 1.0)
+	latScore := math.Min(analysis.LatencyDrift.DriftPercentage, 1.0)
+	patScore := math.Min(analysis.PatternDrift.DriftMagnitude, 1.0)
+	return confScore*0.4 + latScore*0.3 + patScore*0.3
 }
 
-func (bm *BaselineManager) determineDriftType(_ *DriftAnalysis) string {
-	// Implementation would determine primary drift type
+func (bm *BaselineManager) determineDriftType(analysis *DriftAnalysis) string {
+	t := bm.config.DriftSensitivity
+	confSig := analysis.ConfidenceDrift.DriftMagnitude > t
+	latSig := analysis.LatencyDrift.DriftPercentage > t
+	patSig := analysis.PatternDrift.DriftMagnitude > t
+
+	count := 0
+	if confSig {
+		count++
+	}
+	if latSig {
+		count++
+	}
+	if patSig {
+		count++
+	}
+	if count >= 2 {
+		return "combined"
+	}
+	if confSig {
+		return "confidence"
+	}
+	if latSig {
+		return "latency"
+	}
+	if patSig {
+		return "pattern"
+	}
 	return "none"
 }
 
-func (bm *BaselineManager) determineDriftSeverity(_ float64) string {
-	// Implementation would determine drift severity
-	return "none"
+func (bm *BaselineManager) determineDriftSeverity(score float64) string {
+	switch {
+	case score < 0.1:
+		return "none"
+	case score < 0.3:
+		return "low"
+	case score < 0.5:
+		return "medium"
+	case score < 0.7:
+		return "high"
+	default:
+		return "critical"
+	}
 }
 
-func (bm *BaselineManager) generateDriftExplanation(_ *DriftAnalysis) string {
-	// Implementation would generate human-readable explanation
-	return "No significant drift detected"
+func (bm *BaselineManager) generateDriftExplanation(analysis *DriftAnalysis) string {
+	if analysis.DriftType == "none" {
+		return "No significant behavioral drift detected."
+	}
+	var parts []string
+	if analysis.ConfidenceDrift.IsSignificant {
+		parts = append(parts, fmt.Sprintf("confidence shifted from %.2f to %.2f (%.0f%% change)",
+			analysis.ConfidenceDrift.BaselineValue, analysis.ConfidenceDrift.CurrentValue,
+			analysis.ConfidenceDrift.DriftPercentage*100))
+	}
+	if analysis.LatencyDrift.IsSignificant {
+		parts = append(parts, fmt.Sprintf("latency shifted from %.3fs to %.3fs (%.0f%% change)",
+			analysis.LatencyDrift.BaselineValue, analysis.LatencyDrift.CurrentValue,
+			analysis.LatencyDrift.DriftPercentage*100))
+	}
+	if analysis.PatternDrift.IsSignificant {
+		parts = append(parts, fmt.Sprintf("action pattern divergence %.0f%%",
+			analysis.PatternDrift.DriftPercentage*100))
+	}
+	if len(parts) == 0 {
+		return fmt.Sprintf("%s drift detected (score=%.2f)", analysis.DriftType, analysis.DriftScore)
+	}
+	return "Behavioral drift: " + strings.Join(parts, "; ") + "."
 }
 
-func (bm *BaselineManager) generateDriftRecommendations(_ *DriftAnalysis) []string {
-	// Implementation would generate actionable recommendations
-	return []string{"Continue monitoring"}
+func (bm *BaselineManager) generateDriftRecommendations(analysis *DriftAnalysis) []string {
+	var recs []string
+	switch analysis.Severity {
+	case "critical":
+		recs = append(recs, "Immediately review agent authorization policies")
+		recs = append(recs, "Consider temporarily restricting agent permissions")
+	case "high":
+		recs = append(recs, "Investigate root cause of behavioral changes")
+		recs = append(recs, "Review recent policy or environment changes")
+	case "medium":
+		recs = append(recs, "Monitor closely over the next 24 hours")
+	case "low":
+		recs = append(recs, "Consider refreshing baseline if drift persists")
+	}
+	if analysis.ConfidenceDrift.IsSignificant {
+		if analysis.ConfidenceDrift.CurrentValue < analysis.ConfidenceDrift.BaselineValue {
+			recs = append(recs, "Agent confidence declining — check for model uncertainty")
+		} else {
+			recs = append(recs, "Agent confidence unusually high — check for overconfidence")
+		}
+	}
+	if analysis.LatencyDrift.IsSignificant && analysis.LatencyDrift.CurrentValue > analysis.LatencyDrift.BaselineValue {
+		recs = append(recs, "Latency increased — investigate infrastructure or model performance")
+	}
+	if analysis.PatternDrift.IsSignificant {
+		recs = append(recs, "Action patterns changed — verify against expected behavior")
+	}
+	if analysis.DriftType == "combined" {
+		recs = append(recs, "Multiple metrics drifting — may indicate a systemic change")
+	}
+	if len(recs) == 0 {
+		recs = append(recs, "Continue monitoring")
+	}
+	return recs
 }
 
-func (bm *BaselineManager) calculateBaselineFromData(agentID string, _ []*BehaviorData) *BehavioralBaseline {
-	// Implementation would calculate new baseline from data
-	return &BehavioralBaseline{AgentID: agentID}
+func (bm *BaselineManager) calculateBaselineFromData(agentID string, data []*BehaviorData) *BehavioralBaseline {
+	baseline := &BehavioralBaseline{
+		AgentID:           agentID,
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+		SampleCount:       len(data),
+		ActionFrequencies: make(map[string]float64),
+		DecisionOutcomes:  make(map[string]float64),
+	}
+	if len(data) == 0 {
+		return baseline
+	}
+	n := float64(len(data))
+	actionCounts := make(map[string]int)
+	outcomeCounts := make(map[string]int)
+	latencies := make([]float64, len(data))
+
+	// First pass: sums for means.
+	for i, d := range data {
+		baseline.ConfidenceMean += d.Confidence
+		baseline.LatencyMean += d.Latency.Seconds()
+		latencies[i] = d.Latency.Seconds()
+		actionCounts[d.Action]++
+		outcomeCounts[d.Outcome]++
+		baseline.HourlyPatterns[d.Timestamp.Hour()]++
+	}
+	baseline.ConfidenceMean /= n
+	baseline.LatencyMean /= n
+
+	// Second pass: variance.
+	var confVar, latVar float64
+	for _, d := range data {
+		confVar += math.Pow(d.Confidence-baseline.ConfidenceMean, 2)
+		latVar += math.Pow(d.Latency.Seconds()-baseline.LatencyMean, 2)
+	}
+	if n > 1 {
+		baseline.ConfidenceStdDev = math.Sqrt(confVar / (n - 1))
+		baseline.LatencyStdDev = math.Sqrt(latVar / (n - 1))
+	}
+
+	// Action frequencies as fractions.
+	for action, count := range actionCounts {
+		baseline.ActionFrequencies[action] = float64(count) / n
+	}
+	for outcome, count := range outcomeCounts {
+		baseline.DecisionOutcomes[outcome] = float64(count) / n
+	}
+	for h := range baseline.HourlyPatterns {
+		baseline.HourlyPatterns[h] /= n
+	}
+
+	// Confidence distribution in 10 buckets of width 0.1.
+	buckets := make([]float64, 10)
+	for _, d := range data {
+		b := int(math.Min(d.Confidence*10, 9))
+		buckets[b]++
+	}
+	for i := range buckets {
+		buckets[i] /= n
+	}
+	baseline.ConfidenceDistribution = buckets
+
+	// Latency percentiles.
+	sort.Float64s(latencies)
+	baseline.LatencyPercentiles = map[string]float64{
+		"p50": baselinePercentile(latencies, 0.50),
+		"p90": baselinePercentile(latencies, 0.90),
+		"p95": baselinePercentile(latencies, 0.95),
+		"p99": baselinePercentile(latencies, 0.99),
+	}
+	return baseline
 }
 
-func (bm *BaselineManager) saveBaseline(_ context.Context, _ *BehavioralBaseline) error {
-	// Implementation would save baseline to database
-	return nil
+func baselinePercentile(sorted []float64, p float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := int(math.Round(p * float64(len(sorted)-1)))
+	return sorted[idx]
 }
 
-func (bm *BaselineManager) getBaselineFromDB(_ context.Context, _ string) (*BehavioralBaseline, error) {
-	// Implementation would retrieve baseline from database
-	return nil, nil
+func (bm *BaselineManager) saveBaseline(ctx context.Context, baseline *BehavioralBaseline) error {
+	actionFreqJSON, err := json.Marshal(baseline.ActionFrequencies)
+	if err != nil {
+		return fmt.Errorf("baseline: marshal action_frequencies: %w", err)
+	}
+	hourlyJSON, err := json.Marshal(baseline.HourlyPatterns)
+	if err != nil {
+		return fmt.Errorf("baseline: marshal hourly_patterns: %w", err)
+	}
+	outcomesJSON, err := json.Marshal(baseline.DecisionOutcomes)
+	if err != nil {
+		return fmt.Errorf("baseline: marshal decision_outcomes: %w", err)
+	}
+	confDistJSON, err := json.Marshal(baseline.ConfidenceDistribution)
+	if err != nil {
+		return fmt.Errorf("baseline: marshal confidence_distribution: %w", err)
+	}
+	latencyPercJSON, err := json.Marshal(baseline.LatencyPercentiles)
+	if err != nil {
+		return fmt.Errorf("baseline: marshal latency_percentiles: %w", err)
+	}
+
+	_, err = bm.db.ExecContext(ctx, `
+		INSERT INTO behavioral_baselines (
+			agent_id, created_at, updated_at, sample_count,
+			confidence_mean, confidence_std_dev, latency_mean, latency_std_dev,
+			action_frequencies, hourly_patterns, decision_outcomes,
+			confidence_distribution, latency_percentiles
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(agent_id) DO UPDATE SET
+			updated_at = ?, sample_count = ?, confidence_mean = ?, confidence_std_dev = ?,
+			latency_mean = ?, latency_std_dev = ?, action_frequencies = ?,
+			hourly_patterns = ?, decision_outcomes = ?, confidence_distribution = ?,
+			latency_percentiles = ?
+	`,
+		baseline.AgentID, baseline.CreatedAt, baseline.UpdatedAt, baseline.SampleCount,
+		baseline.ConfidenceMean, baseline.ConfidenceStdDev, baseline.LatencyMean, baseline.LatencyStdDev,
+		string(actionFreqJSON), string(hourlyJSON), string(outcomesJSON),
+		string(confDistJSON), string(latencyPercJSON),
+		baseline.UpdatedAt, baseline.SampleCount, baseline.ConfidenceMean, baseline.ConfidenceStdDev,
+		baseline.LatencyMean, baseline.LatencyStdDev, string(actionFreqJSON),
+		string(hourlyJSON), string(outcomesJSON), string(confDistJSON), string(latencyPercJSON),
+	)
+	return err
+}
+
+func (bm *BaselineManager) getBaselineFromDB(ctx context.Context, agentID string) (*BehavioralBaseline, error) {
+	var b BehavioralBaseline
+	var actionFreqJSON, hourlyJSON, outcomesJSON, confDistJSON, latencyPercJSON string
+
+	err := bm.db.QueryRowContext(ctx, `
+		SELECT agent_id, created_at, updated_at, sample_count,
+		       confidence_mean, confidence_std_dev, latency_mean, latency_std_dev,
+		       action_frequencies, hourly_patterns, decision_outcomes,
+		       confidence_distribution, latency_percentiles
+		FROM behavioral_baselines WHERE agent_id = ?
+	`, agentID).Scan(
+		&b.AgentID, &b.CreatedAt, &b.UpdatedAt, &b.SampleCount,
+		&b.ConfidenceMean, &b.ConfidenceStdDev, &b.LatencyMean, &b.LatencyStdDev,
+		&actionFreqJSON, &hourlyJSON, &outcomesJSON, &confDistJSON, &latencyPercJSON,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("baseline: query: %w", err)
+	}
+
+	if b.ActionFrequencies == nil {
+		b.ActionFrequencies = make(map[string]float64)
+	}
+	if b.DecisionOutcomes == nil {
+		b.DecisionOutcomes = make(map[string]float64)
+	}
+	_ = json.Unmarshal([]byte(actionFreqJSON), &b.ActionFrequencies)
+	_ = json.Unmarshal([]byte(hourlyJSON), &b.HourlyPatterns)
+	_ = json.Unmarshal([]byte(outcomesJSON), &b.DecisionOutcomes)
+	_ = json.Unmarshal([]byte(confDistJSON), &b.ConfidenceDistribution)
+	_ = json.Unmarshal([]byte(latencyPercJSON), &b.LatencyPercentiles)
+
+	return &b, nil
 }
 
 func (bm *BaselineManager) startBaselineRefresher() {
-	// Implementation would run background baseline refresh
+	ticker := time.NewTicker(bm.config.BaselineRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-bm.shutdown:
+			return
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			bm.refreshAllBaselines(ctx)
+			cancel()
+		}
+	}
+}
+
+func (bm *BaselineManager) refreshAllBaselines(ctx context.Context) {
+	rows, err := bm.db.QueryContext(ctx, `SELECT DISTINCT agent_id FROM agent_decisions`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	var agents []string
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil {
+			agents = append(agents, id)
+		}
+	}
+	for _, agentID := range agents {
+		// RefreshBaseline returns an error if there are not enough samples; skip silently.
+		_ = bm.RefreshBaseline(ctx, agentID)
+	}
 }
 
 func (bm *BaselineManager) startDriftDetector() {
-	// Implementation would run background drift detection
+	ticker := time.NewTicker(bm.config.DriftCheckInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-bm.shutdown:
+			return
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			bm.detectDriftForAllAgents(ctx)
+			cancel()
+		}
+	}
+}
+
+func (bm *BaselineManager) detectDriftForAllAgents(ctx context.Context) {
+	rows, err := bm.db.QueryContext(ctx,
+		`SELECT agent_id FROM behavioral_baselines WHERE sample_count >= ?`,
+		bm.config.MinSamplesForBaseline)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var agentID string
+		if rows.Scan(&agentID) != nil {
+			continue
+		}
+		analysis, err := bm.DetectDrift(ctx, agentID)
+		if err != nil || analysis == nil {
+			continue
+		}
+		if analysis.DriftScore >= bm.config.DriftThreshold {
+			// Significant drift detected; callers (AlertManager) will act on this
+			// when they poll DetectDrift from CheckDriftAlert.
+			_ = analysis
+		}
+	}
 }

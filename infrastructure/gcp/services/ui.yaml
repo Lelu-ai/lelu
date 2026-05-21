@@ -1,0 +1,56 @@
+# Cloud Run service spec — lelu-ui (Next.js dashboard)
+# __ENGINE_URL__ and __PLATFORM_URL__ are filled in by post-deploy.sh
+# after the engine and platform services are deployed.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: lelu-ui
+  labels:
+    app: lelu
+    component: ui
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      serviceAccountName: lelu-ui@__PROJECT__.iam.gserviceaccount.com
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - image: __IMAGE__
+          ports:
+            - name: http1
+              containerPort: 3000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: PLATFORM_URL
+              value: "__PLATFORM_URL__"
+            - name: LELU_ENGINE_URL
+              value: "__ENGINE_URL__"
+            - name: PLATFORM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-platform-api-key
+                  key: latest
+            - name: LELU_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-api-key
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+  traffic:
+    - percent: 100
+      latestRevision: true

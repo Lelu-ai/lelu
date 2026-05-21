@@ -529,12 +529,26 @@ func (ad *AnomalyDetector) UpdateBaseline(ctx context.Context, agentID, action, 
 
 // saveBaseline saves behavioral baseline to database
 func (ad *AnomalyDetector) saveBaseline(ctx context.Context, baseline *BehavioralBaseline) error {
-	// Convert maps to JSON
-	actionFreqJSON, _ := json.Marshal(baseline.ActionFrequencies)
-	hourlyPatternsJSON, _ := json.Marshal(baseline.HourlyPatterns)
-	outcomesJSON, _ := json.Marshal(baseline.DecisionOutcomes)
-	confDistJSON, _ := json.Marshal(baseline.ConfidenceDistribution)
-	latencyPercJSON, _ := json.Marshal(baseline.LatencyPercentiles)
+	actionFreqJSON, err := json.Marshal(baseline.ActionFrequencies)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal action_frequencies: %w", err)
+	}
+	hourlyPatternsJSON, err := json.Marshal(baseline.HourlyPatterns)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal hourly_patterns: %w", err)
+	}
+	outcomesJSON, err := json.Marshal(baseline.DecisionOutcomes)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal decision_outcomes: %w", err)
+	}
+	confDistJSON, err := json.Marshal(baseline.ConfidenceDistribution)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal confidence_distribution: %w", err)
+	}
+	latencyPercJSON, err := json.Marshal(baseline.LatencyPercentiles)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal latency_percentiles: %w", err)
+	}
 
 	query := `
 		INSERT INTO behavioral_baselines (
@@ -550,7 +564,7 @@ func (ad *AnomalyDetector) saveBaseline(ctx context.Context, baseline *Behaviora
 			latency_percentiles = ?
 	`
 
-	_, err := ad.db.ExecContext(ctx, query,
+	_, err = ad.db.ExecContext(ctx, query,
 		baseline.AgentID, baseline.CreatedAt, baseline.UpdatedAt, baseline.SampleCount,
 		baseline.ConfidenceMean, baseline.ConfidenceStdDev, baseline.LatencyMean, baseline.LatencyStdDev,
 		string(actionFreqJSON), string(hourlyPatternsJSON), string(outcomesJSON),
@@ -573,7 +587,10 @@ func (ad *AnomalyDetector) saveBaseline(ctx context.Context, baseline *Behaviora
 
 // storeAnomalyResult stores anomaly detection result
 func (ad *AnomalyDetector) storeAnomalyResult(ctx context.Context, result *AnomalyResult) error {
-	featuresJSON, _ := json.Marshal(result.Features)
+	featuresJSON, err := json.Marshal(result.Features)
+	if err != nil {
+		return fmt.Errorf("anomaly: marshal features: %w", err)
+	}
 
 	query := `
 		INSERT INTO anomaly_results (
@@ -582,7 +599,7 @@ func (ad *AnomalyDetector) storeAnomalyResult(ctx context.Context, result *Anoma
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := ad.db.ExecContext(ctx, query,
+	_, err = ad.db.ExecContext(ctx, query,
 		result.AgentID, result.Timestamp, result.AnomalyScore, result.IsAnomaly, result.Severity,
 		string(featuresJSON), result.Explanation, result.Action, result.Confidence,
 		result.Latency.Milliseconds(), result.Outcome,

@@ -1,30 +1,22 @@
-name: Deploy to Render
+# ── RETIRED ──────────────────────────────────────────────────────────────────
+# Render deployment has been replaced by deploy-gcp.yml (Cloud Run).
+# This file is kept for historical reference only and will never trigger.
+# ─────────────────────────────────────────────────────────────────────────────
+name: Deploy to Render (retired)
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "This workflow is retired. Use deploy-gcp.yml instead."
+        required: true
 
 jobs:
-  deploy:
-    name: Deploy to Render
+  retired:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to Render
-        env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      - name: Migration notice
         run: |
-          echo "Triggering Render deployment..."
-          # Render automatically deploys when you push to main
-          # This workflow is mainly for manual triggers
-          echo "Deployment will be triggered automatically by Render"
-          
-      - name: Notify deployment
-        run: |
-          echo "✅ Deployment triggered successfully"
-          echo "🔗 Check status at: https://dashboard.render.com"
+          echo "This workflow is retired."
+          echo "Deployment now uses GCP Cloud Run via .github/workflows/deploy-gcp.yml"
+          exit 1

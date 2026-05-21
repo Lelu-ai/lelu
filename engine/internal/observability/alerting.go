@@ -13,8 +13,9 @@ import (
 
 // AlertManager handles real-time alerting for behavioral anomalies and reputation issues
 type AlertManager struct {
-	db     *sql.DB
-	config AlertConfig
+	db       *sql.DB
+	config   AlertConfig
+	shutdown chan struct{}
 
 	// Alert channels and handlers
 	alertChannels map[string]AlertChannel
@@ -161,6 +162,7 @@ func NewAlertManager(db *sql.DB, config AlertConfig) *AlertManager {
 	am := &AlertManager{
 		db:            db,
 		config:        config,
+		shutdown:      make(chan struct{}),
 		alertChannels: make(map[string]AlertChannel),
 		alertRules:    []*AlertRule{},
 
@@ -612,19 +614,139 @@ func (am *AlertManager) scanAlert(rows *sql.Rows) (*Alert, error) {
 	return &alert, nil
 }
 
-func (am *AlertManager) findOrCreateGroup(_ context.Context, _ *Alert) string {
-	// Implementation would find or create alert groups
-	return ""
+// Shutdown stops background goroutines. Safe to call once.
+func (am *AlertManager) Shutdown() {
+	close(am.shutdown)
+}
+
+func (am *AlertManager) findOrCreateGroup(ctx context.Context, alert *Alert) string {
+	// Look for a recent active alert from the same agent+rule within the grouping window.
+	since := time.Now().Add(-am.config.GroupingWindow)
+	var groupID string
+	err := am.db.QueryRowContext(ctx, `
+		SELECT COALESCE(group_id, id) FROM alerts
+		WHERE agent_id = ? AND rule_id = ? AND status = 'active' AND timestamp >= ?
+		ORDER BY timestamp DESC LIMIT 1
+	`, alert.AgentID, alert.RuleID, since).Scan(&groupID)
+	if err != nil || groupID == "" {
+		// No existing group — the alert's own ID becomes the group anchor.
+		return alert.ID
+	}
+	// Increment group_count on the existing group.
+	_, _ = am.db.ExecContext(ctx,
+		`UPDATE alerts SET group_count = group_count + 1 WHERE id = ? OR group_id = ?`,
+		groupID, groupID)
+	return groupID
 }
 
 func (am *AlertManager) loadDefaultAlertRules() {
-	// Implementation would load default alert rules
+	now := time.Now()
+	am.alertRules = []*AlertRule{
+		{
+			ID:          "reputation_low",
+			Name:        "Low Agent Reputation",
+			Description: "Agent reputation score dropped below threshold",
+			Enabled:     true,
+			Conditions:  []AlertCondition{{Field: "reputation_score", Operator: "lt", Value: am.config.ReputationThreshold}},
+			Operator:    "AND",
+			Channels:    []string{"slack", "email"},
+			Severity:    "high",
+			Priority:    2,
+			Cooldown:    am.config.AlertCooldown,
+			Escalation:  am.config.AlertEscalation,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			ID:          "anomaly_detected",
+			Name:        "Behavioral Anomaly Detected",
+			Description: "Agent behavioral anomaly score exceeded threshold",
+			Enabled:     true,
+			Conditions:  []AlertCondition{{Field: "anomaly_score", Operator: "gt", Value: am.config.AnomalyThreshold}},
+			Operator:    "AND",
+			Channels:    []string{"slack", "email"},
+			Severity:    "high",
+			Priority:    1,
+			Cooldown:    am.config.AlertCooldown,
+			Escalation:  am.config.AlertEscalation,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+		{
+			ID:          "baseline_drift",
+			Name:        "Baseline Drift Detected",
+			Description: "Agent behavioral drift score exceeded threshold",
+			Enabled:     true,
+			Conditions:  []AlertCondition{{Field: "drift_score", Operator: "gt", Value: am.config.DriftThreshold}},
+			Operator:    "AND",
+			Channels:    []string{"slack", "email"},
+			Severity:    "medium",
+			Priority:    3,
+			Cooldown:    am.config.AlertCooldown,
+			Escalation:  am.config.AlertEscalation,
+			CreatedAt:   now,
+			UpdatedAt:   now,
+		},
+	}
 }
 
 func (am *AlertManager) startAlertProcessor() {
-	// Implementation would run background alert processing
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-am.shutdown:
+			return
+		case <-ticker.C:
+			// Re-check if any rule-based alerts should fire for active agents.
+			// The actual alert checks happen via CheckReputationAlert/CheckAnomalyAlert/CheckDriftAlert
+			// called by the server's behavioral analytics goroutine. This processor handles
+			// escalation of alerts that have been active too long.
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			am.escalateStalledAlerts(ctx)
+			cancel()
+		}
+	}
+}
+
+func (am *AlertManager) escalateStalledAlerts(ctx context.Context) {
+	threshold := time.Now().Add(-am.config.AlertEscalation)
+	rows, err := am.db.QueryContext(ctx,
+		`SELECT id FROM alerts WHERE status = 'active' AND timestamp < ?`, threshold)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) != nil {
+			continue
+		}
+		_, _ = am.db.ExecContext(ctx,
+			`UPDATE alerts SET priority = MIN(priority + 1, 5) WHERE id = ? AND status = 'active'`, id)
+	}
 }
 
 func (am *AlertManager) startAlertResolver() {
-	// Implementation would run background alert resolution
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-am.shutdown:
+			return
+		case <-ticker.C:
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			am.autoResolveOldAlerts(ctx)
+			cancel()
+		}
+	}
+}
+
+func (am *AlertManager) autoResolveOldAlerts(ctx context.Context) {
+	threshold := time.Now().Add(-am.config.AlertResolution)
+	now := time.Now()
+	_, _ = am.db.ExecContext(ctx,
+		`UPDATE alerts SET status = 'resolved', resolved_at = ?
+		 WHERE status = 'acknowledged' AND timestamp < ?`,
+		now, threshold)
 }

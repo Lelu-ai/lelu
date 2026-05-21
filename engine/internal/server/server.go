@@ -103,7 +103,10 @@ type Handler struct {
 	baselineMgr     *observability.BaselineManager
 	alertMgr        *observability.AlertManager
 
-	shadowDetector *shadow.Detector
+	shadowDetector  *shadow.Detector
+	extAuditor      *confidence.ExternalAuditor
+	confScorer      *confidence.Scorer
+	confEscalator   *confidence.Escalator
 }
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
@@ -277,6 +280,16 @@ func New(
 		log.Printf("Phase 2 behavioral analytics disabled (no database)")
 	}
 
+	// External confidence auditor (optional — only active when API key configured)
+	extAuditor := confidence.NewExternalAuditorFromEnv()
+	var confScorer *confidence.Scorer
+	var confEscalator *confidence.Escalator
+	if extAuditor != nil {
+		confScorer = confidence.NewScorer(0.3)
+		confEscalator = confidence.NewEscalator(q)
+		log.Printf("external confidence auditor enabled")
+	}
+
 	return &Handler{
 		eval:      eval,
 		tokenSvc:  tokenSvc,
@@ -305,7 +318,10 @@ func New(
 		baselineMgr:     baselineMgr,
 		alertMgr:        alertMgr,
 
-		shadowDetector: shadowDet,
+		shadowDetector:  shadowDet,
+		extAuditor:      extAuditor,
+		confScorer:      confScorer,
+		confEscalator:   confEscalator,
 	}
 }
 
@@ -775,6 +791,34 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Normal behavior, lower anomaly score
 		observability.UpdateAgentAnomalyScore(req.Actor, 0.1)
+	}
+
+	// ── External confidence audit (async — does not block response) ──────────
+	if h.extAuditor != nil {
+		auditActor := req.Actor
+		auditAction := req.Action
+		auditScore := confidenceScore
+		auditTenant := req.TenantID
+		auditActingFor := req.ActingFor
+		auditPromptCtx := req.Scope // use scope as proxy prompt context; real prompt not in request
+		go func() {
+			auditReq := &confidence.AuditRequest{
+				Prompt:          auditPromptCtx,
+				Action:          auditAction,
+				ActorConfidence: auditScore,
+				ActingForUserID: auditActingFor,
+				TenantID:        auditTenant,
+			}
+			result, err := h.extAuditor.Audit(auditReq)
+			if err != nil {
+				log.Printf("external auditor error for actor=%s: %v", auditActor, err)
+				return
+			}
+			severity := h.confScorer.AssessSeverity(result)
+			if _, err := h.confEscalator.EnqueueReview(context.Background(), auditReq, result, severity); err != nil {
+				log.Printf("escalator enqueue error for actor=%s: %v", auditActor, err)
+			}
+		}()
 	}
 
 	// ── Phase 2: Behavioral Analytics Integration ────────────────────────────

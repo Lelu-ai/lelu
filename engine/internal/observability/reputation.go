@@ -419,13 +419,20 @@ func (rm *ReputationManager) startReputationUpdater() {
 	}
 }
 
-// Shutdown gracefully stops the reputation updater
+// Shutdown gracefully stops the reputation updater. Safe to call multiple times.
 func (rm *ReputationManager) Shutdown() {
-	close(rm.shutdown)
-	<-rm.done // Wait for updater to finish
-	
+	// Use a select with default to guard against double-close.
+	select {
+	case <-rm.shutdown:
+		// Already closed — nothing to do.
+		return
+	default:
+		close(rm.shutdown)
+	}
+	<-rm.done // Wait for updater to finish.
+
 	rm.mutex.Lock()
-	rm.db = nil // Mark database as closed
+	rm.db = nil
 	rm.mutex.Unlock()
 }
 

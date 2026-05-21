@@ -1,0 +1,303 @@
+name: Deploy to GCP Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy (engine|platform|ui|mcp|all)"
+        required: false
+        default: "all"
+
+concurrency:
+  group: deploy-gcp-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a running deploy
+
+env:
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  AR_PREFIX: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/lelu
+
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── 1. Build + push images to Artifact Registry ───────────────────────────
+  build:
+    name: "Build & push images"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for Workload Identity Federation
+
+    outputs:
+      engine_image:   ${{ steps.meta.outputs.engine }}
+      platform_image: ${{ steps.meta.outputs.platform }}
+      ui_image:       ${{ steps.meta.outputs.ui }}
+      mcp_image:      ${{ steps.meta.outputs.mcp }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Keyless auth via Workload Identity Federation — no long-lived keys
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      # Compute short SHA tag used for traceability
+      - name: Compute image tags
+        id: meta
+        run: |
+          SHA="${GITHUB_SHA::8}"
+          PREFIX="${{ env.AR_PREFIX }}"
+          echo "engine=${PREFIX}/engine:${SHA}"     >> "$GITHUB_OUTPUT"
+          echo "platform=${PREFIX}/platform:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "ui=${PREFIX}/ui:${SHA}"             >> "$GITHUB_OUTPUT"
+          echo "mcp=${PREFIX}/mcp:${SHA}"           >> "$GITHUB_OUTPUT"
+
+      # ── Engine ──────────────────────────────────────────────────────────────
+      - name: Build & push engine
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'engine' ||
+          github.event.inputs.service == ''
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: engine/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.engine_image }}
+            ${{ env.AR_PREFIX }}/engine:latest
+          platforms: linux/amd64
+          cache-from: type=gha,scope=engine
+          cache-to:   type=gha,scope=engine,mode=max
+
+      # ── Platform ────────────────────────────────────────────────────────────
+      - name: Build & push platform
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'platform' ||
+          github.event.inputs.service == ''
+        uses: docker/build-push-action@v5
+        with:
+          context: platform
+          file: platform/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.platform_image }}
+            ${{ env.AR_PREFIX }}/platform:latest
+          platforms: linux/amd64
+          cache-from: type=gha,scope=platform
+          cache-to:   type=gha,scope=platform,mode=max
+
+      # ── UI ──────────────────────────────────────────────────────────────────
+      - name: Build & push ui
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'ui' ||
+          github.event.inputs.service == ''
+        uses: docker/build-push-action@v5
+        with:
+          context: platform/ui
+          file: platform/ui/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.ui_image }}
+            ${{ env.AR_PREFIX }}/ui:latest
+          platforms: linux/amd64
+          cache-from: type=gha,scope=ui
+          cache-to:   type=gha,scope=ui,mode=max
+
+      # ── MCP ─────────────────────────────────────────────────────────────────
+      - name: Build & push mcp
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'mcp' ||
+          github.event.inputs.service == ''
+        uses: docker/build-push-action@v5
+        with:
+          context: sdk/mcp
+          file: sdk/mcp/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.mcp_image }}
+            ${{ env.AR_PREFIX }}/mcp:latest
+          platforms: linux/amd64
+          cache-from: type=gha,scope=mcp
+          cache-to:   type=gha,scope=mcp,mode=max
+
+  # ── 2. Deploy to Cloud Run ────────────────────────────────────────────────
+  deploy:
+    name: "Deploy to Cloud Run"
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # ── Engine ──────────────────────────────────────────────────────────────
+      - name: Deploy engine
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'engine' ||
+          github.event.inputs.service == ''
+        run: |
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          REGION="${{ env.GCP_REGION }}"
+          IMAGE="${{ needs.build.outputs.engine_image }}"
+
+          # Substitute template variables in the service YAML
+          sed \
+            -e "s|__PROJECT__|${PROJECT}|g" \
+            -e "s|__REGION__|${REGION}|g" \
+            -e "s|__IMAGE__|${IMAGE}|g" \
+            infrastructure/gcp/services/engine.yaml \
+            > /tmp/engine.yaml
+
+          gcloud run services replace /tmp/engine.yaml \
+            --region="${REGION}" \
+            --quiet
+
+          # Make it publicly accessible (override policy if needed)
+          gcloud run services add-iam-policy-binding lelu-engine \
+            --region="${REGION}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet || true
+
+      # ── Platform ────────────────────────────────────────────────────────────
+      - name: Deploy platform
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'platform' ||
+          github.event.inputs.service == ''
+        run: |
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          REGION="${{ env.GCP_REGION }}"
+          IMAGE="${{ needs.build.outputs.platform_image }}"
+
+          sed \
+            -e "s|__PROJECT__|${PROJECT}|g" \
+            -e "s|__REGION__|${REGION}|g" \
+            -e "s|__IMAGE__|${IMAGE}|g" \
+            infrastructure/gcp/services/platform.yaml \
+            > /tmp/platform.yaml
+
+          gcloud run services replace /tmp/platform.yaml \
+            --region="${REGION}" \
+            --quiet
+
+          gcloud run services add-iam-policy-binding lelu-platform \
+            --region="${REGION}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet || true
+
+      # ── Resolve service URLs for UI + MCP ───────────────────────────────────
+      - name: Resolve service URLs
+        id: urls
+        run: |
+          REGION="${{ env.GCP_REGION }}"
+          ENGINE_URL=$(gcloud run services describe lelu-engine \
+            --region="$REGION" --format="value(status.url)")
+          PLATFORM_URL=$(gcloud run services describe lelu-platform \
+            --region="$REGION" --format="value(status.url)")
+          echo "engine=${ENGINE_URL}"   >> "$GITHUB_OUTPUT"
+          echo "platform=${PLATFORM_URL}" >> "$GITHUB_OUTPUT"
+
+      # ── UI ──────────────────────────────────────────────────────────────────
+      - name: Deploy ui
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'ui' ||
+          github.event.inputs.service == ''
+        run: |
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          REGION="${{ env.GCP_REGION }}"
+          IMAGE="${{ needs.build.outputs.ui_image }}"
+          ENGINE_URL="${{ steps.urls.outputs.engine }}"
+          PLATFORM_URL="${{ steps.urls.outputs.platform }}"
+
+          sed \
+            -e "s|__PROJECT__|${PROJECT}|g" \
+            -e "s|__REGION__|${REGION}|g" \
+            -e "s|__IMAGE__|${IMAGE}|g" \
+            -e "s|__ENGINE_URL__|${ENGINE_URL}|g" \
+            -e "s|__PLATFORM_URL__|${PLATFORM_URL}|g" \
+            infrastructure/gcp/services/ui.yaml \
+            > /tmp/ui.yaml
+
+          gcloud run services replace /tmp/ui.yaml \
+            --region="${REGION}" \
+            --quiet
+
+          gcloud run services add-iam-policy-binding lelu-ui \
+            --region="${REGION}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet || true
+
+      # ── MCP ─────────────────────────────────────────────────────────────────
+      - name: Deploy mcp
+        if: >
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == 'mcp' ||
+          github.event.inputs.service == ''
+        run: |
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          REGION="${{ env.GCP_REGION }}"
+          IMAGE="${{ needs.build.outputs.mcp_image }}"
+          ENGINE_URL="${{ steps.urls.outputs.engine }}"
+
+          sed \
+            -e "s|__PROJECT__|${PROJECT}|g" \
+            -e "s|__REGION__|${REGION}|g" \
+            -e "s|__IMAGE__|${IMAGE}|g" \
+            -e "s|__ENGINE_URL__|${ENGINE_URL}|g" \
+            infrastructure/gcp/services/mcp.yaml \
+            > /tmp/mcp.yaml
+
+          gcloud run services replace /tmp/mcp.yaml \
+            --region="${REGION}" \
+            --quiet
+
+          gcloud run services add-iam-policy-binding lelu-mcp \
+            --region="${REGION}" \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --quiet || true
+
+      # ── Summary ─────────────────────────────────────────────────────────────
+      - name: Deployment summary
+        run: |
+          REGION="${{ env.GCP_REGION }}"
+          echo "## Deployment complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | URL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-----|" >> "$GITHUB_STEP_SUMMARY"
+          for svc in lelu-engine lelu-platform lelu-ui lelu-mcp; do
+            URL=$(gcloud run services describe "$svc" \
+              --region="$REGION" --format="value(status.url)" 2>/dev/null || echo "not deployed")
+            echo "| $svc | $URL |" >> "$GITHUB_STEP_SUMMARY"
+          done

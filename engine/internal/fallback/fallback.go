@@ -77,6 +77,9 @@ func New(cfg Config) *Strategy {
 
 // ModeFor returns the configured fallback mode for a given dependency.
 func (s *Strategy) ModeFor(dep Dep) Mode {
+	if s == nil {
+		return ModeClosed
+	}
 	switch dep {
 	case DepRedis:
 		return s.cfg.RedisMode

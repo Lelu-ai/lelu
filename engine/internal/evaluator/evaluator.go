@@ -131,14 +131,14 @@ func (e *Evaluator) LoadPolicyBytes(data []byte) error {
 }
 
 // Evaluate checks a human auth request against the loaded policy.
-func (e *Evaluator) Evaluate(_ context.Context, req AuthRequest) (*Decision, error) {
+func (e *Evaluator) Evaluate(ctx context.Context, req AuthRequest) (*Decision, error) {
 	e.mu.RLock()
 	p := e.policy
 	rp := e.rego
 	e.mu.RUnlock()
 
 	if rp != nil {
-		return rp.EvaluateHuman(req)
+		return rp.EvaluateHuman(ctx, req)
 	}
 
 	// Walk all roles to find one assigned to the user (future: user→role mapping).
@@ -159,14 +159,14 @@ func (e *Evaluator) Evaluate(_ context.Context, req AuthRequest) (*Decision, err
 }
 
 // EvaluateAgent checks an agent auth request with confidence-aware logic.
-func (e *Evaluator) EvaluateAgent(_ context.Context, req AgentAuthRequest) (*Decision, error) {
+func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*Decision, error) {
 	e.mu.RLock()
 	p := e.policy
 	rp := e.rego
 	e.mu.RUnlock()
 
 	if rp != nil {
-		return rp.EvaluateAgent(req)
+		return rp.EvaluateAgent(ctx, req)
 	}
 
 	scope, ok := p.AgentScopes[req.Actor]
@@ -228,7 +228,7 @@ func (e *Evaluator) EvaluateAgent(_ context.Context, req AgentAuthRequest) (*Dec
 // CheckDelegation validates whether delegator can delegate scopedTo actions
 // to delegatee at the given confidence. Returns the matching DelegationRule
 // details on success.
-func (e *Evaluator) CheckDelegation(_ context.Context, delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
+func (e *Evaluator) CheckDelegation(ctx context.Context, delegator, delegatee string, scopedTo []string, confidence float64) (*DelegationDecision, error) {
 	e.mu.RLock()
 	p := e.policy
 	rp := e.rego
@@ -236,7 +236,7 @@ func (e *Evaluator) CheckDelegation(_ context.Context, delegator, delegatee stri
 
 	// Try Rego first; nil return means "no delegation rule defined" → fall through.
 	if rp != nil {
-		dec, err := rp.CheckDelegation(delegator, delegatee, scopedTo, confidence)
+		dec, err := rp.CheckDelegation(ctx, delegator, delegatee, scopedTo, confidence)
 		if err != nil {
 			return nil, err
 		}

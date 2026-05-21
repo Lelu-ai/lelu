@@ -86,22 +86,34 @@ export const MovingBorder = ({
   const progress = useMotionValue<number>(0);
 
   useAnimationFrame((time) => {
-    const length = pathRef.current?.getTotalLength();
-    if (length) {
-      const pxPerMillisecond = length / duration;
-      progress.set((time * pxPerMillisecond) % length);
+    try {
+      const length = pathRef.current?.getTotalLength();
+      if (length) {
+        const pxPerMillisecond = length / duration;
+        progress.set((time * pxPerMillisecond) % length);
+      }
+    } catch {
+      // element not yet rendered or unmounting — skip frame
     }
   });
 
   const x = useTransform(progress, (val) => {
-    const length = pathRef.current?.getTotalLength();
-    if (!length || length === 0) return 0;
-    return pathRef.current?.getPointAtLength(val).x ?? 0;
+    try {
+      const length = pathRef.current?.getTotalLength();
+      if (!length || length === 0) return 0;
+      return pathRef.current?.getPointAtLength(val).x ?? 0;
+    } catch {
+      return 0;
+    }
   });
   const y = useTransform(progress, (val) => {
-    const length = pathRef.current?.getTotalLength();
-    if (!length || length === 0) return 0;
-    return pathRef.current?.getPointAtLength(val).y ?? 0;
+    try {
+      const length = pathRef.current?.getTotalLength();
+      if (!length || length === 0) return 0;
+      return pathRef.current?.getPointAtLength(val).y ?? 0;
+    } catch {
+      return 0;
+    }
   });
 
   const transform = useMotionTemplate`translateX(${x}px) translateY(${y}px) translateX(-50%) translateY(-50%)`;

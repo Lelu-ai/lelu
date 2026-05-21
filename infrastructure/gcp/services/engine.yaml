@@ -21,9 +21,7 @@ spec:
       annotations:
         # Cloud SQL connection (proxy socket)
         run.googleapis.com/cloudsql-instances: __PROJECT__:__REGION__:lelu-postgres
-        # Memorystore access via VPC connector
-        run.googleapis.com/vpc-access-connector: projects/__PROJECT__/locations/__REGION__/connectors/lelu-connector
-        run.googleapis.com/vpc-access-egress: private-ranges-only
+        # VPC connector removed — Redis uses in-memory fallback until connector is available
         # Scaling — keep at least 1 instance warm (auth is latency-sensitive)
         autoscaling.knative.dev/minScale: "1"
         autoscaling.knative.dev/maxScale: "20"
@@ -52,7 +50,7 @@ spec:
             - name: CONFIDENCE_ALLOW_UNVERIFIED
               value: "false"
             - name: FALLBACK_REDIS_MODE
-              value: "closed"
+              value: "open"
             - name: FALLBACK_CP_MODE
               value: "closed"
             - name: BEHAVIORAL_ANALYTICS_ENABLED
@@ -68,11 +66,8 @@ spec:
                 secretKeyRef:
                   name: lelu-api-key
                   key: latest
-            - name: REDIS_ADDR
-              valueFrom:
-                secretKeyRef:
-                  name: lelu-redis-addr
-                  key: latest
+            # REDIS_ADDR intentionally omitted — engine runs in-memory mode until
+            # VPC connector is provisioned (open a GCP support ticket for code-13 error)
           startupProbe:
             httpGet:
               path: /healthz

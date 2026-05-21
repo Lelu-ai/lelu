@@ -1,0 +1,333 @@
+{
+  "info": {
+    "name": "Lelu Engine API",
+    "description": "Authorization engine for AI agents. Base URL: https://lelu-engine-666101080696.us-central1.run.app\n\nAuth: Set 'api_key' collection variable, used as 'Authorization: Bearer {{api_key}}'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://lelu-engine-666101080696.us-central1.run.app",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "9011685a3bdb0fc491923418d19a286653d75a682f09ca56b9936df27553d7f0",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{api_key}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/healthz",
+            "description": "Returns service health status. Note: this path is intercepted by Cloud Run for internal probes — use /v1/fallback/status for external health monitoring."
+          }
+        },
+        {
+          "name": "Fallback Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/fallback/status",
+            "description": "Returns Redis and control-plane fallback strategy status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authorization",
+      "item": [
+        {
+          "name": "Agent Authorize (OpenAI logprobs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"actor\": \"gpt4-orchestrator\",\n  \"action\": \"read_file\",\n  \"resource\": { \"path\": \"/data/report.pdf\", \"type\": \"file\" },\n  \"acting_for\": \"alice@example.com\",\n  \"scope\": \"reader\",\n  \"confidence_signal\": {\n    \"provider\": \"openai\",\n    \"token_logprobs\": [-0.05, -0.04, -0.06, -0.03, -0.07]\n  }\n}"
+            },
+            "url": "{{base_url}}/v1/agent/authorize",
+            "description": "Main AI agent authorization endpoint. Passes OpenAI token log-probabilities as the confidence signal.\n\ntoken_logprobs are the raw log-prob values from the LLM's top-token output. High values (close to 0) = high confidence. Low values (e.g. -3.0) = low confidence.\n\nThe engine computes: score = mean(exp(logprob)) and blocks if < 50%."
+          }
+        },
+        {
+          "name": "Agent Authorize (Anthropic logprobs)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"actor\": \"claude-agent\",\n  \"action\": \"send_email\",\n  \"resource\": { \"to\": \"bob@example.com\", \"subject\": \"Report\" },\n  \"acting_for\": \"alice@example.com\",\n  \"scope\": \"email-sender\",\n  \"confidence_signal\": {\n    \"provider\": \"anthropic\",\n    \"token_logprobs\": [-0.12, -0.08, -0.15, -0.10]\n  }\n}"
+            },
+            "url": "{{base_url}}/v1/agent/authorize",
+            "description": "Agent authorize with Anthropic confidence signal."
+          }
+        },
+        {
+          "name": "Agent Authorize (local probabilities)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"actor\": \"local-agent\",\n  \"action\": \"query_database\",\n  \"resource\": { \"db\": \"analytics\", \"query\": \"SELECT * FROM events\" },\n  \"acting_for\": \"bob@example.com\",\n  \"scope\": \"db-reader\",\n  \"confidence_signal\": {\n    \"provider\": \"local\",\n    \"token_probabilities\": [0.92, 0.88, 0.95, 0.90]\n  }\n}"
+            },
+            "url": "{{base_url}}/v1/agent/authorize",
+            "description": "Agent authorize using a local model with raw token probabilities (0–1 range, not log-prob)."
+          }
+        },
+        {
+          "name": "Agent Authorize — Low Confidence (blocked)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"actor\": \"uncertain-agent\",\n  \"action\": \"delete_records\",\n  \"resource\": { \"table\": \"users\" },\n  \"acting_for\": \"bob@example.com\",\n  \"scope\": \"admin\",\n  \"confidence_signal\": {\n    \"provider\": \"openai\",\n    \"token_logprobs\": [-2.3, -2.8, -3.1, -2.6]\n  }\n}"
+            },
+            "url": "{{base_url}}/v1/agent/authorize",
+            "description": "Demonstrates the confidence hard-deny. Low log-probs → confidence ~8% → blocked with 'confidence X% is below hard-deny threshold (50%)'."
+          }
+        },
+        {
+          "name": "Human Authorize",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"user_id\": \"alice\",\n  \"action\": \"read_file\",\n  \"resource\": { \"path\": \"/data/report.pdf\" }\n}"
+            },
+            "url": "{{base_url}}/v1/authorize",
+            "description": "Authorization for human users (no confidence signal required). Returns allowed/denied based on policy rules."
+          }
+        },
+        {
+          "name": "Agent Delegate",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"delegator\": \"orchestrator-agent\",\n  \"delegatee\": \"sub-agent-001\",\n  \"scoped_to\": [\"read_file\", \"search\"],\n  \"ttl_seconds\": 300,\n  \"confidence\": 0.88,\n  \"acting_for\": \"alice@example.com\"\n}"
+            },
+            "url": "{{base_url}}/v1/agent/delegate",
+            "description": "Delegates a subset of scopes from an orchestrator agent to a sub-agent. Returns a scoped JWT valid for ttl_seconds. Requires a delegation policy in auth.yaml."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tokens",
+      "item": [
+        {
+          "name": "Mint Agent Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"demo\",\n  \"scope\": \"reader-agent\",\n  \"acting_for\": \"alice@example.com\",\n  \"ttl_seconds\": 300\n}"
+            },
+            "url": "{{base_url}}/v1/tokens/mint",
+            "description": "Mints a short-lived JWT for an agent. The token encodes scope + acting_for and expires in ttl_seconds. Use in downstream service calls instead of sharing the master API key."
+          }
+        },
+        {
+          "name": "Revoke Token",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/v1/tokens/TOKEN_ID_HERE",
+            "description": "Revokes an agent token by its token_id (returned from /v1/tokens/mint). Replace TOKEN_ID_HERE with the actual token_id."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Human Review Queue",
+      "item": [
+        {
+          "name": "List Pending Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/queue/pending",
+            "description": "Returns up to 50 actions queued for human review. These are created when an agent action has confidence in the 50–70% range and the policy requires human review."
+          }
+        },
+        {
+          "name": "Get Queue Item",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/queue/QUEUE_ITEM_ID",
+            "description": "Returns details of a specific queued item. Replace QUEUE_ITEM_ID with the actual ID."
+          }
+        },
+        {
+          "name": "Approve Queue Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolved_by\": \"security-team\",\n  \"note\": \"Reviewed and approved — legitimate business operation.\"\n}"
+            },
+            "url": "{{base_url}}/v1/queue/QUEUE_ITEM_ID/approve",
+            "description": "Approves a pending human review item. Replace QUEUE_ITEM_ID with the actual ID."
+          }
+        },
+        {
+          "name": "Deny Queue Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolved_by\": \"security-team\",\n  \"note\": \"Action denied — policy violation.\"\n}"
+            },
+            "url": "{{base_url}}/v1/queue/QUEUE_ITEM_ID/deny",
+            "description": "Denies a pending human review item. Replace QUEUE_ITEM_ID with the actual ID."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Policy Simulator",
+      "item": [
+        {
+          "name": "Replay Traces Against Proposed Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposed_policy_yaml\": \"version: 1\\nrules:\\n  - id: allow-agent-read\\n    principal:\\n      type: agent\\n      scope: reader\\n    action: read_file\\n    resource:\\n      type: file\\n    decision: allow\\n  - id: allow-human-read\\n    principal:\\n      type: user\\n    action: read_file\\n    resource:\\n      type: file\\n    decision: allow\\n\",\n  \"traces\": [\n    {\n      \"id\": \"trace-001\",\n      \"kind\": \"human\",\n      \"tenant_id\": \"demo\",\n      \"user_id\": \"alice\",\n      \"action\": \"read_file\",\n      \"resource\": { \"type\": \"file\", \"path\": \"/data/report.pdf\" }\n    },\n    {\n      \"id\": \"trace-002\",\n      \"kind\": \"agent\",\n      \"tenant_id\": \"demo\",\n      \"actor\": \"reader-agent\",\n      \"action\": \"read_file\",\n      \"resource\": { \"type\": \"file\" },\n      \"acting_for\": \"alice@example.com\",\n      \"confidence_signal\": {\n        \"provider\": \"openai\",\n        \"token_logprobs\": [-0.05, -0.04, -0.06]\n      }\n    },\n    {\n      \"id\": \"trace-003\",\n      \"kind\": \"agent\",\n      \"tenant_id\": \"demo\",\n      \"actor\": \"admin-agent\",\n      \"action\": \"delete_records\",\n      \"resource\": { \"table\": \"users\" },\n      \"acting_for\": \"bob@example.com\",\n      \"confidence_signal\": {\n        \"provider\": \"openai\",\n        \"token_logprobs\": [-0.05, -0.04]\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": "{{base_url}}/v1/simulator/replay",
+            "description": "Dry-run a proposed policy YAML against a set of historical traces. Returns a diff showing which decisions would change (allow→deny, deny→allow, etc.).\n\nThe proposed_policy_yaml supports: version, rules[].id, rules[].principal (type, scope), rules[].action, rules[].resource, rules[].decision (allow|deny|review)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shadow Mode",
+      "item": [
+        {
+          "name": "Shadow Mode Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/shadow/summary?window_minutes=60",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "shadow", "summary"],
+              "query": [
+                { "key": "window_minutes", "value": "60" }
+              ]
+            },
+            "description": "Returns allow/review/deny counts for the shadow mode window. Only meaningful when LELU_MODE=shadow. In enforce mode returns empty buckets."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Behavioral Analytics",
+      "item": [
+        {
+          "name": "Get Agent Reputation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/analytics/reputation/gpt4-orchestrator",
+            "description": "Returns reputation score for a specific agent. Requires a database connection (Cloud SQL). Returns 503 in in-memory mode."
+          }
+        },
+        {
+          "name": "List Top Agents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/analytics/reputation?sort=top&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "analytics", "reputation"],
+              "query": [
+                { "key": "sort", "value": "top" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "Lists top-reputation agents. sort=top (highest reputation) or sort=problematic (below threshold)."
+          }
+        },
+        {
+          "name": "Get Agent Anomalies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/analytics/anomalies/gpt4-orchestrator",
+            "description": "Returns anomalies detected for a specific agent in the last 24 hours. Requires database."
+          }
+        },
+        {
+          "name": "Get Agent Baseline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/analytics/baseline/gpt4-orchestrator",
+            "description": "Returns behavioral baseline and drift analysis for an agent. Requires database."
+          }
+        },
+        {
+          "name": "Get Active Alerts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/v1/analytics/alerts",
+            "description": "Returns all active security alerts. Filter by agent_id query param. Requires database."
+          }
+        }
+      ]
+    }
+  ]
+}

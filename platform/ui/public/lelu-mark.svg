@@ -1,12 +1,7 @@
-<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="leluGrad" x1="40" y1="24" x2="216" y2="232" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8B5CF6"/>
-      <stop offset="0.5" stop-color="#3B82F6"/>
-      <stop offset="1" stop-color="#06B6D4"/>
-    </linearGradient>
-  </defs>
-  <rect x="16" y="16" width="224" height="224" rx="56" fill="#09090B"/>
-  <path d="M128 32L56 66V126C56 172 86 211 128 224C170 211 200 172 200 126V66L128 32Z" fill="url(#leluGrad)"/>
-  <path d="M93 92H132C154 92 170 107 170 128C170 149 154 164 132 164H113V196H93V92ZM132 146C143 146 150 139 150 128C150 117 143 110 132 110H113V146H132Z" fill="white"/>
+<svg width="64" height="70" viewBox="0 0 32 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Lelu abstract mark: three stacked capsule bars with progressive rightward stagger. -->
+  <!-- Use fill="#0A0A0A" on light, fill="#FAFAFA" on dark. -->
+  <rect x="0" y="0"  width="26" height="9" rx="4.5" fill="#0A0A0A"/>
+  <rect x="3" y="13" width="26" height="9" rx="4.5" fill="#0A0A0A"/>
+  <rect x="6" y="26" width="26" height="9" rx="4.5" fill="#0A0A0A"/>
 </svg>

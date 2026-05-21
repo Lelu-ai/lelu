@@ -2,36 +2,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { heroStats } from "@/data";
-
-const LeluMonogram = ({ flip = false }: { flip?: boolean }) => (
-  <svg
-    width="120"
-    height="140"
-    viewBox="0 0 120 140"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    style={flip ? { transform: "scaleX(-1) rotate(6deg)" } : { transform: "rotate(-6deg)" }}
-    aria-hidden="true"
-  >
-    {/* Back face */}
-    <rect x="28" y="8" width="52" height="10" rx="2" fill="#3A3A3C" />
-    <rect x="70" y="8" width="10" height="88" rx="2" fill="#2A2A2C" />
-    {/* Side face — depth illusion */}
-    <polygon points="28,18 80,18 90,8 38,8" fill="#222224" />
-    <polygon points="80,18 80,96 90,86 90,8" fill="#1A1A1C" />
-    {/* Front vertical bar */}
-    <rect x="18" y="18" width="14" height="88" rx="2" fill="#E8B339" />
-    {/* Front horizontal bar (foot of L) */}
-    <rect x="18" y="92" width="62" height="14" rx="2" fill="#E8B339" />
-    {/* Bottom depth */}
-    <polygon points="18,106 80,106 90,96 28,96" fill="#C49A30" />
-    {/* Highlight edge */}
-    <rect x="18" y="18" width="3" height="88" rx="1" fill="#F5D070" opacity="0.6" />
-    <rect x="18" y="92" width="62" height="3" rx="1" fill="#F5D070" opacity="0.4" />
-    {/* Ground shadow */}
-    <ellipse cx="54" cy="128" rx="38" ry="6" fill="#000" opacity="0.18" />
-  </svg>
-);
+import { LeluMark } from "@/components/ui/LeluMark";
 
 const LeluHero = () => {
   return (
@@ -65,7 +36,7 @@ const LeluHero = () => {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="hidden md:block flex-shrink-0"
           >
-            <LeluMonogram />
+            <LeluMark size={96} className="opacity-80" />
           </motion.div>
 
           <motion.h1
@@ -83,7 +54,7 @@ const LeluHero = () => {
             transition={{ duration: 0.7, delay: 0.1 }}
             className="hidden md:block flex-shrink-0"
           >
-            <LeluMonogram flip />
+            <LeluMark size={96} flip className="opacity-80" />
           </motion.div>
         </div>
 

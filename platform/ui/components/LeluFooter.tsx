@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { FaGithub } from "react-icons/fa6";
+import { LeluMark } from "@/components/ui/LeluMark";
 
 const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
   const pathname = usePathname();
@@ -49,10 +50,8 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
       {/* Bottom bar */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-6 px-4">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded bg-[#0A0A0A] dark:bg-white flex items-center justify-center">
-            <span className="font-bold text-xs text-white dark:text-[#0A0A0A]">L</span>
-          </div>
-          <span className="text-sm font-semibold text-[#0A0A0A] dark:text-white">lelu</span>
+          <LeluMark size={20} />
+          <span className="text-sm font-semibold text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>lelu</span>
           <span className="text-sm text-zinc-400 dark:text-zinc-500 ml-2">
             © {new Date().getFullYear()} Lelu Security
           </span>

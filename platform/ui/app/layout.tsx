@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { FloatingNav } from "@/components/ui/FloatingNavbar";
 import { navItems } from "@/data";
 import LeluFooter from "@/components/LeluFooter";
+import { LeluMark } from "@/components/ui/LeluMark";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -18,9 +19,12 @@ export const metadata: Metadata = {
     "Authorization and security platform for AI agents. Control what your agents can do with confidence-aware gating, human oversight, and complete audit trails.",
   applicationName: "Lelu",
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: [
+      { url: "/lelu-mark.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
 };
 
@@ -36,12 +40,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <div className="fixed top-6 left-6 md:left-10 z-[5001] pointer-events-none">
             <a href="/" className="pointer-events-auto flex items-center gap-2.5 group">
-              <div className="h-7 w-7 rounded-md bg-[#0A0A0A] dark:bg-white flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
-                <span className="font-bold text-sm text-white dark:text-[#0A0A0A] leading-none tracking-tight">
-                  L
-                </span>
-              </div>
-              <span className="font-semibold text-[15px] tracking-tight text-[#0A0A0A] dark:text-white">
+              <LeluMark
+                size={24}
+                className="transition-transform duration-300 group-hover:scale-105"
+              />
+              <span className="font-semibold text-[15px] tracking-tight text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
                 lelu
               </span>
             </a>

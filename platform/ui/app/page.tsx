@@ -59,7 +59,7 @@ const RIGHT_TABS = ["README", "DOCS", "SDK", "ENTERPRISE", "CHANGELOG"];
 /* ── Dot-mesh decoration for left panel ───────────────────────────── */
 function DotMesh() {
   return (
-    <div className="relative w-48 h-48 mx-auto mb-8 select-none pointer-events-none">
+    <div className="relative w-36 h-36 mx-auto mb-6 select-none pointer-events-none">
       {/* Faint grid dots */}
       <div
         className="absolute inset-0 opacity-20"
@@ -72,7 +72,7 @@ function DotMesh() {
       />
       {/* LeluMark centered, large */}
       <div className="absolute inset-0 flex items-center justify-center">
-        <LeluMark size={96} className="opacity-60" />
+        <LeluMark size={72} className="opacity-60" />
       </div>
       {/* Outer glow ring */}
       <div className="absolute inset-8 rounded-full border border-white/10" />
@@ -95,10 +95,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row h-auto lg:h-[calc(100vh-56px)]">
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
 
       {/* ── LEFT PANEL ───────────────────────────────────────────────── */}
-      <div className="lg:w-[420px] xl:w-[480px] shrink-0 bg-[#0A0A0A] flex flex-col px-8 py-10 lg:py-12 lg:overflow-y-auto">
+      <div className="lg:w-[420px] xl:w-[480px] shrink-0 bg-[#0A0A0A] flex flex-col px-8 py-10 lg:py-12 overflow-hidden">
 
         {/* Wordmark */}
         <div className="flex items-center gap-2.5 mb-auto lg:mb-0">
@@ -109,7 +109,7 @@ export default function HomePage() {
         </div>
 
         {/* Dot-mesh visual */}
-        <div className="my-10 lg:my-auto">
+        <div className="my-6 lg:my-auto">
           <DotMesh />
 
           {/* Announcement badge */}
@@ -129,7 +129,7 @@ export default function HomePage() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-white text-[2rem] sm:text-[2.4rem] xl:text-[2.6rem] font-bold leading-[1.1] tracking-tight mb-8 text-center lg:text-left">
+          <h1 className="text-white text-[1.45rem] sm:text-[1.65rem] xl:text-[1.8rem] font-bold leading-[1.15] tracking-tight mb-8 text-center lg:text-left">
             The authorization layer for autonomous AI agents
           </h1>
 
@@ -172,7 +172,7 @@ export default function HomePage() {
       </div>
 
       {/* ── RIGHT PANEL ──────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col border-t lg:border-t-0 lg:border-l border-[#E7E5E4] dark:border-[#27272A] bg-white dark:bg-[#0B0B0C] lg:overflow-y-auto">
+      <div className="flex-1 min-w-0 flex flex-col border-t lg:border-t-0 lg:border-l border-[#E7E5E4] dark:border-[#27272A] bg-white dark:bg-[#0B0B0C] overflow-y-auto">
 
         {/* Right panel tab bar */}
         <div className="sticky top-0 z-10 flex items-center border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/90 dark:bg-[#0B0B0C]/90 backdrop-blur-sm px-6 shrink-0">

@@ -59,6 +59,9 @@ export function SiteNav() {
     router.refresh();
   }
 
+  // Home page has its own full-screen layout with built-in nav
+  if (pathname === "/") return null;
+
   // Minimal header for auth pages — just logo, centered
   if (AUTH_ROUTES.includes(pathname)) {
     return (

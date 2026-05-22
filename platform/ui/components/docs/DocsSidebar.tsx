@@ -40,7 +40,6 @@ const sections: NavSection[] = [
     icon: <Ico d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />,
     items: [
       { href: "/docs", label: "Introduction" },
-      { href: "/docs/comparison", label: "Comparison" },
       { href: "/docs/installation", label: "Installation" },
       { href: "/docs/quickstart", label: "Quickstart" },
     ],

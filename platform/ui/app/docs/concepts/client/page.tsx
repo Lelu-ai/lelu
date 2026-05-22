@@ -68,7 +68,7 @@ export default function DocsConceptClient() {
               <span className="text-xs text-zinc-500 font-mono">Installation</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
-              {`npm install @lelu-auth/lelu`}
+              {`npm install lelu-agent-auth`}
             </pre>
           </div>
 
@@ -77,10 +77,10 @@ export default function DocsConceptClient() {
               <span className="text-xs text-zinc-500 font-mono">Usage</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-              {`import { LeluClient } from "@lelu-auth/lelu";
+              {`import { createClient } from "lelu-agent-auth";
 
-const lelu = new LeluClient({
-  baseUrl: "http://localhost:8082",
+const lelu = createClient({
+  baseUrl: "http://lelu-engine-666101080696.us-central1.run.app",
   apiKey: process.env.LELU_API_KEY,
 });
 
@@ -118,7 +118,7 @@ if (decision.allowed) {
               {`from lelu import LeluClient
 
 lelu = LeluClient(
-    base_url="http://localhost:8082",
+    base_url="http://lelu-engine-666101080696.us-central1.run.app",
     api_key="YOUR_API_KEY"
 )
 
@@ -165,7 +165,7 @@ import (
 
 func main() {
   client := lelu.NewClient(lelu.ClientConfig{
-    BaseURL: "http://localhost:8082",
+    BaseURL: "http://lelu-engine-666101080696.us-central1.run.app",
     APIKey:  "your-api-key",
   })
 

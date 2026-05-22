@@ -200,7 +200,7 @@ export default function BetaPage() {
               <h3 className="text-base font-semibold text-[#0A0A0A] dark:text-white mb-4">Quick Start</h3>
               <div className="space-y-4">
                 {[
-                  { step: "1. Install the SDK", code: "npm install @lelu/sdk" },
+                  { step: "1. Install the SDK", code: "npm install lelu-agent-auth" },
                   { step: "2. Add to your .env", code: `LELU_API_KEY=${apiKey}` },
                 ].map((item) => (
                   <div key={item.step}>
@@ -213,9 +213,9 @@ export default function BetaPage() {
                 <div>
                   <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">3. Use in your code</div>
                   <div className="bg-[#0A0A0A] dark:bg-[#141416] border border-[#222224] rounded-lg p-3 overflow-x-auto">
-                    <pre className="text-green-400 font-mono text-xs">{`import { LeluClient } from "@lelu/sdk";
+                    <pre className="text-green-400 font-mono text-xs">{`import { createClient } from "lelu-agent-auth";
 
-const lelu = new LeluClient({ apiKey: process.env.LELU_API_KEY });
+const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
 const decision = await lelu.agentAuthorize({
   actor: "invoice_bot",

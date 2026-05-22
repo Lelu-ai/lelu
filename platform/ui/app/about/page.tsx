@@ -113,7 +113,7 @@ export default function AboutPage() {
                     {
                       name: "npm Package",
                       icon: <FaNpm />,
-                      link: "https://www.npmjs.com/package/@lelu-auth/lelu",
+                      link: "https://www.npmjs.com/package/lelu-agent-auth",
                     },
                     {
                       name: "PyPI Package",

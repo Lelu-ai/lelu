@@ -277,10 +277,10 @@ deny {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-relaxed">
               {sdkTab === "TypeScript" &&
-                `import { LeluClient } from "lelu-agent-auth";
+                `import { createClient } from "lelu-agent-auth";
 
-export const lelu = new LeluClient({
-  baseUrl: process.env.LELU_ENGINE_URL!,
+export const lelu = createClient({
+  apiKey: process.env.LELU_API_KEY!,
   apiKey: process.env.LELU_API_KEY!,
 });`}
               {sdkTab === "Python" &&
@@ -288,7 +288,7 @@ export const lelu = new LeluClient({
 import os
 
 lelu = LeluClient(
-    base_url=os.environ["LELU_ENGINE_URL"],
+    api_key=os.environ["LELU_API_KEY"],
     api_key=os.environ["LELU_API_KEY"]
 )`}
               {sdkTab === "Go" &&
@@ -301,7 +301,7 @@ import (
 
 func main() {
     client := lelu.NewClient(
-        os.Getenv("LELU_ENGINE_URL"),
+        os.Getenv("LELU_API_KEY"),
         os.Getenv("LELU_API_KEY"),
     )
 }`}

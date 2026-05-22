@@ -40,17 +40,17 @@ export default function DocsIntegrationsBackend() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
               <span className="text-xs text-zinc-500 font-mono">npm</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300">{`npm install @lelu-auth/lelu`}</pre>
+            <pre className="p-4 font-mono text-sm text-zinc-300">{`npm install lelu-agent-auth`}</pre>
           </div>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">middleware/lelu.ts</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { LeluClient } from "@lelu-auth/lelu";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
 import type { Request, Response, NextFunction } from "express";
 
-const lelu = new LeluClient({
+const lelu = createClient({
   baseUrl: process.env.LELU_URL!,
   apiKey: process.env.LELU_API_KEY!,
 });

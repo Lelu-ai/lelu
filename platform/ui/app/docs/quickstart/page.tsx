@@ -1,73 +1,51 @@
+const CLOUD_URL = "https://lelu-engine-666101080696.us-central1.run.app";
+
 export default function DocsQuickStart() {
   return (
-    <div className="max-w-3xl">
-      <div className="mb-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 text-sm font-medium mb-6">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-          </svg>
+    <div className="w-full">
+      {/* Title block */}
+      <div className="mb-8">
+        <h1
+          id="quickstart"
+          className="text-[34px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white leading-tight mb-3"
+        >
           Quickstart
-        </div>
-        <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 tracking-tight">
-          Get Started with Lelu
         </h1>
-        <p className="text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          Send your first confidence-aware authorization request and see the decision in seconds.
-          This guide will walk you through starting the engine, making an API call, and using the
-          SDK.
+        <p className="text-[15px] text-[#737373] leading-relaxed">
+          Authorize your first agent action in under 2 minutes — no Docker, no server setup.
         </p>
       </div>
 
-      <div className="space-y-12">
-        {/* Step 1 */}
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
+      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+
+      <div className="space-y-14">
+        {/* Step 1 — API key */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               1
             </div>
-            <div className="flex-1 pb-8">
-              <h2
-                id="install-and-start"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
+            <h2
+              id="get-api-key"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Get an API key
+            </h2>
+          </div>
+          <div className="pl-13 ml-13">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
+              Visit{" "}
+              <a
+                href="/api-key"
+                className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
-                Install and start Lelu
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                The fastest way to get Lelu running is with our one-command setup. This installs the
-                SDK and automatically starts all services with Docker.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">terminal</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`# Install SDK and start all services
-npm install lelu-agent-auth
-npx lelu-agent-auth init`}</code>
-                  </pre>
-                </div>
-                <div className="p-4 font-mono text-xs text-blue-400 border-t border-zinc-800">
-                  <div>✨ This command will:</div>
-                  <div>• Check if Docker is installed</div>
-                  <div>• Download docker-compose.yml</div>
-                  <div>• Start all services (engine, platform, UI, database)</div>
-                  <div>
-                    • Open browser to <b>http://localhost:3002</b>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg p-3 flex gap-2">
+                lelu-ai.com/api-key
+              </a>{" "}
+              and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Generate Key</strong>. No signup, no email — instant anonymous key with 500
+              requests/day free.
+            </p>
+            <div className="ml-[52px]">
+              <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500">
                 <svg
                   width="16"
                   height="16"
@@ -75,331 +53,249 @@ npx lelu-agent-auth init`}</code>
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
-                  className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-emerald-500 shrink-0 mt-0.5"
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                <div className="text-xs text-blue-800 dark:text-blue-300">
-                  <p className="mb-1">
-                    💡 New:{" "}
-                    <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded font-medium">
-                      lelu studio
-                    </code>{" "}
-                    now works like Prisma Studio!
-                  </p>
-                  <p>
-                    Just run{" "}
-                    <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">
-                      npx lelu studio
-                    </code>{" "}
-                    and the UI opens immediately - no Docker required! The UI is bundled in the npm
-                    package.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2 */}
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
-              2
-            </div>
-            <div className="flex-1 pb-8">
-              <h2
-                id="generate-api-key"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
-              >
-                Generate an API Key
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                Create an API key to authenticate your requests to the engine. The key is stored
-                securely in Redis.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">powershell</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`# Generate and store API key
-./generate-api-key.ps1
-
-# Or try anonymous API key access (no registration needed)
-# Visit http://localhost:3002/api-key`}</code>
-                  </pre>
-                </div>
-                <div className="p-4 font-mono text-xs text-green-400 border-t border-zinc-800">
-                  <div>✓ Your API key will be:</div>
-                  <div>• Generated with secure random bytes</div>
-                  <div>• Stored in Redis automatically</div>
-                  <div>• Added to your .env file</div>
-                  <div>• Ready to use immediately</div>
-                </div>
-              </div>
-              <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg p-3 flex gap-2">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
-                >
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-                <div className="text-xs text-amber-800 dark:text-amber-300">
-                  <p className="font-semibold mb-1">Security Note</p>
-                  <p>
-                    Never commit API keys to version control. The script automatically adds your key
-                    to .env which is gitignored.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4">
-                <a
-                  href="/docs/api-keys"
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Learn more about API key management
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3 */}
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
-              3
-            </div>
-            <div className="flex-1 pb-8">
-              <h2
-                id="call-the-api"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
-              >
-                Call the API
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                Use the agent authorization endpoint with your API key. In this example, the agent
-                is 85% confident it should delete an S3 object.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">bash</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`curl -X POST http://localhost:8083/v1/agent/authorize \\
-  -H "Content-Type: application/json" \\
-  -H "X-API-Key: lelu_test_YOUR_KEY_HERE" \\
-  -d '{
-    "actor": "agent-123",
-    "action": "s3:DeleteObject",
-    "resource": { "bucket": "prod-data" },
-    "confidence": 0.85,
-    "acting_for": "user-42",
-    "scope": "storage:write"
-  }'`}</code>
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 4 */}
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
-              4
-            </div>
-            <div className="flex-1 pb-8">
-              <h2
-                id="inspect-the-decision"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
-              >
-                Inspect the decision
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                The engine evaluates the request against your Rego policies. If the confidence meets
-                the threshold, it's allowed. Otherwise, it might require human review.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">json</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`{
-  "allowed": true,
-  "reason": "Confidence threshold met",
-  "trace_id": "tr_7f30c2...",
-  "requires_human_review": false,
-  "confidence_used": 0.85
-}`}</code>
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 5 */}
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800 ml-4"></div>
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
-              5
-            </div>
-            <div className="flex-1 pb-8">
-              <h2
-                id="view-audit-logs"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
-              >
-                View audit logs and manage policies
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                Use the built-in CLI to view audit logs and manage policies directly from your
-                terminal. The SDK was already installed in step 1.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">terminal</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`# View audit logs
-npx lelu-agent-auth audit-log
-
-# Manage policies
-npx lelu-agent-auth policies list
-npx lelu-agent-auth policies get auth
-npx lelu-agent-auth policies set auth ./auth.rego`}</code>
-                  </pre>
-                </div>
-              </div>
-              <div className="mt-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg p-3 flex gap-2">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-                <p className="text-xs text-blue-800 dark:text-blue-300">
-                  You can also view audit logs and manage policies in the Web UI at
-                  http://localhost:3002
+                <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
+                  Copy the key and store it as{" "}
+                  <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+                    LELU_API_KEY
+                  </code>{" "}
+                  in your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file. Never commit it to version control.
                 </p>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Step 5 */}
-        <div className="relative">
-          <div className="relative flex gap-6">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0 z-10 ring-4 ring-white dark:ring-black">
-              5
+        {/* Step 2 — Install */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              2
             </div>
-            <div className="flex-1">
-              <h2
-                id="use-the-sdk"
-                className="text-xl font-semibold text-zinc-900 dark:text-white mb-3"
-              >
-                Use the SDK
-              </h2>
-              <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                For production applications, use our official SDKs to integrate Lelu directly into
-                your codebase.
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 font-mono">typescript</span>
-                </div>
-                <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                  <pre>
-                    <code>{`import { LeluClient } from "lelu-agent-auth";
-
-const client = new LeluClient({
-  baseUrl: "http://localhost:8083",
-});
-
-const decision = await client.agentAuthorize({
-  actor: "agent-123",
-  action: "s3:DeleteObject",
-  resource: { bucket: "prod-data" },
-  confidence: 0.85,
-});`}</code>
-                  </pre>
-                </div>
+            <h2
+              id="install"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Install the SDK
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+{`npm install lelu-agent-auth
+# or: pnpm add lelu-agent-auth  |  yarn add lelu-agent-auth`}
+              </pre>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* Step 3 — Connect */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              3
+            </div>
+            <h2
+              id="connect"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Connect and authorize
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Pass your API key to <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">createClient</code>. The SDK routes to the live cloud engine automatically — no server to start.
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`import { createClient } from "lelu-agent-auth";
+
+const lelu = createClient({
+  apiKey: process.env.LELU_API_KEY,  // routes to cloud automatically
+});
+
+const decision = await lelu.agentAuthorize({
+  actor: "billing-agent",
+  action: "refund:process",
+  resource: { orderId: "ord_123" },
+  context: { confidence: 0.85 },
+});
+
+if (decision.allowed) {
+  // proceed with the action
+} else if (decision.requiresHumanReview) {
+  // queued — agent pauses, awaiting human approval
+} else {
+  throw new Error(\`Denied: \${decision.reason}\`);
+}`}
+              </pre>
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
+              Or call the REST API directly:
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">bash</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`curl -X POST ${CLOUD_URL}/v1/agent/authorize \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $LELU_API_KEY" \\
+  -d '{
+    "actor":      "billing-agent",
+    "action":     "refund:process",
+    "resource":   { "orderId": "ord_123" },
+    "confidence": 0.85
+  }'`}
+              </pre>
+            </div>
+          </div>
+        </section>
+
+        {/* Step 4 — Response */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              4
+            </div>
+            <h2
+              id="response"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Read the response
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              The engine evaluates the request against your policy and returns one of three outcomes:
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">json</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`{
+  "allowed":              true,
+  "requires_human_review": false,
+  "confidence_used":       0.85,
+  "reason":               "Confidence threshold met",
+  "trace_id":             "tr_7f30c2a4e1b8"
+}`}
+              </pre>
+            </div>
+            <dl className="space-y-3 text-[14px]">
+              {[
+                { field: "allowed: true", desc: "Action is permitted — proceed immediately." },
+                {
+                  field: "requires_human_review: true",
+                  desc: "Confidence too low — action queued. Agent should poll /v1/queue/pending until approved or denied.",
+                },
+                {
+                  field: "allowed: false",
+                  desc: "Blocked by policy — do not proceed. Inspect reason for details.",
+                },
+              ].map((r) => (
+                <div key={r.field} className="flex gap-3">
+                  <code className="font-mono text-[12px] px-2 py-1 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded shrink-0 h-fit">
+                    {r.field}
+                  </code>
+                  <span className="text-[#737373] leading-relaxed">{r.desc}</span>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+
+        {/* Step 5 — Framework integrations */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              5
+            </div>
+            <h2
+              id="framework"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Add to your AI framework
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Lelu ships framework wrappers so you can gate tool calls with one line:
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5">
+              <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373]">Vercel AI SDK</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`import { secureTool } from "lelu-agent-auth/vercel";
+import { tool } from "ai";
+import { z } from "zod";
+
+const processRefund = secureTool(lelu, "billing-agent", {
+  tool: tool({
+    description: "Process a customer refund",
+    parameters: z.object({ orderId: z.string(), amount: z.number() }),
+    execute: async ({ orderId, amount }) => ({ success: true }),
+  }),
+  action: "refund:process",
+  confidence: 0.9,
+});`}
+              </pre>
+            </div>
+            <ul className="space-y-2 text-[14px]">
+              {[
+                { href: "/docs/integrations/langchain", label: "LangChain integration →" },
+                { href: "/docs/integrations/vercel-ai", label: "Vercel AI SDK integration →" },
+                { href: "/docs/integrations/mcp", label: "MCP server →" },
+              ].map((l) => (
+                <li key={l.href}>
+                  <a
+                    href={l.href}
+                    className="text-[#0A0A0A] dark:text-white font-medium hover:underline underline-offset-2"
+                  >
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       </div>
 
-      <div className="flex justify-between items-center pt-12 mt-12 border-t border-zinc-200 dark:border-white/10">
+      {/* Prev / Next */}
+      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#27272A]">
         <a
           href="/docs"
-          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+          className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          Previous: Introduction
+          Introduction
         </a>
         <a
           href="/docs/installation"
-          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"
         >
-          Next: Installation
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          Installation
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
         </a>

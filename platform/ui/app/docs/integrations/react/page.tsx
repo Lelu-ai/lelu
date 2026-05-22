@@ -57,7 +57,7 @@ export default function DocsIntegrationsReact() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">terminal</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300">{`npm install @lelu-auth/lelu`}</pre>
+            <pre className="p-4 font-mono text-sm text-zinc-300">{`npm install lelu-agent-auth`}</pre>
           </div>
         </section>
 
@@ -80,7 +80,7 @@ export default function DocsIntegrationsReact() {
 export function ApprovalDashboard() {
   return (
     <LeluApprovalUI
-      engineUrl="http://localhost:8082"
+      engineUrl="http://lelu-engine-666101080696.us-central1.run.app"
       apiKey={import.meta.env.VITE_LELU_KEY}
       onApprove={(requestId) => console.log("Approved:", requestId)}
       onDeny={(requestId) => console.log("Denied:", requestId)}

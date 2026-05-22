@@ -56,7 +56,7 @@ export default function DashboardPage() {
       // Mock data for premium preview
       setApiKeys([
         {
-          key: "lelu_test_5g2x...kf9s",
+          key: "9b3a7c2e1f4d8a0b...",
           keyId: "abc123",
           name: "Staging Pipeline",
           env: "test",
@@ -64,7 +64,7 @@ export default function DashboardPage() {
           revoked: false,
         },
         {
-          key: "lelu_live_8p4n...q2w1",
+          key: "f2e6d9c4a8b1e7f0...",
           keyId: "def456",
           name: "Main Production",
           env: "live",
@@ -310,9 +310,8 @@ export default function DashboardPage() {
                 Use your live keys to enforce Lelu policies across your entire agent swarm.
               </p>
               <div className="bg-black/50 rounded-xl p-4 font-mono text-xs border border-white/5">
-                <span className="text-emerald-400">const</span> lelu ={" "}
-                <span className="text-emerald-400">new</span> LeluClient({"{"} baseUrl:{" "}
-                <span className="text-amber-400">"https://api.lelu.auth"</span> {"}"});
+                <span className="text-emerald-400">const</span> lelu = createClient({"{"} apiKey:{" "}
+                <span className="text-amber-400">process.env.LELU_API_KEY</span> {"}"});
               </div>
             </div>
           </div>

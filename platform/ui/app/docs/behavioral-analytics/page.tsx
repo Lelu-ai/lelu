@@ -124,9 +124,9 @@ export default function DocsBehavioralAnalytics() {
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`import { LeluClient } from '@lelu-auth/lelu';
+                <code>{`import { createClient } from 'lelu-agent-auth';
 
-const lelu = new LeluClient({ baseUrl: 'http://localhost:8080' });
+const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
 // Get agent reputation
 const reputation = await lelu.getAgentReputation('support-agent');

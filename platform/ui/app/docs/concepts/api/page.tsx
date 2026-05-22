@@ -45,7 +45,7 @@ export default function DocsConceptApi() {
               <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
                 <span className="text-xs font-bold text-purple-400">Engine API</span>
                 <span className="text-xs text-zinc-500 font-mono">
-                  Default: http://localhost:8082
+                  Default: http://lelu-engine-666101080696.us-central1.run.app
                 </span>
               </div>
               <div className="p-4 text-sm text-zinc-300">
@@ -87,7 +87,7 @@ export default function DocsConceptApi() {
               <span className="text-xs text-zinc-500 font-mono">Engine authorize example</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-              {`curl -X POST http://localhost:8082/v1/authorize \
+              {`curl -X POST http://lelu-engine-666101080696.us-central1.run.app/v1/authorize \
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{

@@ -15,7 +15,7 @@ export default function DocsConceptCli() {
     "Claude Code": "npx @lelu/mcp add --claude",
     "Open Code": "npx @lelu/mcp add --open-code",
     Manual:
-      "npx @lelu/mcp start --transport stdio --engine-url http://localhost:8083 --api-key YOUR_API_KEY",
+      "npx @lelu/mcp start --transport stdio --engine-url http://lelu-engine-666101080696.us-central1.run.app --api-key YOUR_API_KEY",
   };
 
   const configSnippets: Record<typeof configTab, string> = {
@@ -32,7 +32,7 @@ export default function DocsConceptCli() {
       "command": "npx",
       "args": ["@lelu/mcp", "start", "--transport", "stdio"],
       "env": {
-        "LELU_ENGINE_URL": "http://localhost:8083",
+        "LELU_API_KEY": "your_key_here",
         "LELU_API_KEY": "YOUR_API_KEY"
       }
     }
@@ -100,10 +100,10 @@ export default function DocsConceptCli() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">
               {`# Install globally
-npm install -g @lelu-auth/lelu
+npm install -g lelu-agent-auth
 
 # Or run directly
-npx @lelu-auth/lelu help`}
+npx lelu-agent-auth help`}
             </pre>
           </div>
 
@@ -346,7 +346,7 @@ curl http://localhost:3003/healthz
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               {`npx @lelu/mcp start --transport stdio \\
-  --engine-url http://localhost:8083 \\
+  --engine-url http://lelu-engine-666101080696.us-central1.run.app \\
   --api-key YOUR_API_KEY`}
             </pre>
           </div>

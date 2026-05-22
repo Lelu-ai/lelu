@@ -91,10 +91,10 @@ test_medium_review {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">tests/integration.test.ts</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { LeluClient } from "@lelu-auth/lelu";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
 
-const lelu = new LeluClient({
-  baseUrl: "http://localhost:8082",
+const lelu = createClient({
+  baseUrl: "http://lelu-engine-666101080696.us-central1.run.app",
   apiKey: "test-key",
 });
 

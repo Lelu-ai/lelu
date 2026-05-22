@@ -186,10 +186,10 @@ OTEL_TRACES_SAMPLER_ARG=1.0`}</code>
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`import { LeluClient } from '@lelu-auth/lelu';
+                <code>{`import { createClient } from 'lelu-agent-auth';
 
-const lelu = new LeluClient({
-  baseUrl: 'http://localhost:8080',
+const lelu = createClient({
+  apiKey: process.env.LELU_API_KEY,
 });
 
 // Tracing is automatic - spans are created for each request

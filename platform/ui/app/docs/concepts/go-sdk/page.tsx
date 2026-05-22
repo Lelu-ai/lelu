@@ -63,7 +63,7 @@ import (
 
 func main() {
   client := lelu.NewClient(lelu.ClientConfig{
-    BaseURL: "http://localhost:8082",
+    BaseURL: "http://lelu-engine-666101080696.us-central1.run.app",
     APIKey:  "your-api-key",
   })
 

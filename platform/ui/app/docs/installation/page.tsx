@@ -3,865 +3,416 @@
 import { useState } from "react";
 
 export default function DocsInstallation() {
-  const [packageTab, setPackageTab] = useState<"npm" | "pnpm" | "yarn" | "bun">("npm");
+  const [pkgTab, setPkgTab] = useState<"npm" | "pnpm" | "yarn" | "bun">("npm");
+  const [copied, setCopied] = useState<string | null>(null);
 
-  const steps = [
-    { num: 1, title: "Choose Installation Method" },
-    { num: 2, title: "Install the Package" },
-    { num: 3, title: "CLI Commands" },
-    { num: 4, title: "Set Environment Variables" },
-    { num: 5, title: "Configure Lelu Client" },
-    { num: 6, title: "That's it!" },
-  ];
-
-  const packageCommands: Record<typeof packageTab, string> = {
+  const pkgCmd: Record<typeof pkgTab, string> = {
     npm: "npm install lelu-agent-auth",
     pnpm: "pnpm add lelu-agent-auth",
     yarn: "yarn add lelu-agent-auth",
     bun: "bun add lelu-agent-auth",
   };
 
+  function copy(text: string, key: string) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    });
+  }
+
+  const CopyBtn = ({ text, id }: { text: string; id: string }) => (
+    <button
+      onClick={() => copy(text, id)}
+      className="absolute top-3 right-3 p-1.5 rounded bg-[#F5F5F4] dark:bg-[#222224] border border-[#E7E5E4] dark:border-[#27272A] hover:bg-[#E7E5E4] dark:hover:bg-[#27272A] transition-colors"
+      title="Copy"
+    >
+      {copied === id ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#737373]">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  );
+
   return (
-    <div className="max-w-3xl">
-      {/* Header */}
-      <div className="mb-12">
-        <h1 className="text-4xl font-bold text-zinc-900 dark:text-white mb-4 tracking-tight">
+    <div className="w-full">
+      {/* Title block */}
+      <div className="mb-8">
+        <h1
+          id="installation"
+          className="text-[34px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white leading-tight mb-3"
+        >
           Installation
         </h1>
-        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl">
-          Install an official Lelu SDK, configure environment variables, and initialize the client
-          in your app.
+        <p className="text-[15px] text-[#737373] leading-relaxed">
+          Install the SDK, get an API key, and start authorizing agent actions — no Docker, no server setup.
         </p>
       </div>
 
-      {/* On-page step nav */}
-      <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 mb-12">
-        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
-          On this page
-        </p>
-        <ol className="space-y-1.5">
-          {steps.map((s) => (
-            <li key={s.num}>
-              <a
-                href={`#step-${s.num}`}
-                className="inline-flex items-center gap-2.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-              >
-                {s.title}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </div>
+      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
 
-      <div className="space-y-16">
-        {/* Step 1 - Choose Installation Method */}
-        <section id="step-1">
-          <h2
-            id="choose-installation-method"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
+      <div className="space-y-14">
+        {/* Step 1 — Install */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               1
-            </span>
-            Choose Installation Method
-          </h2>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            Lelu can be installed in two ways: using Docker (recommended for quick start) or by
-            installing SDKs directly.
-          </p>
-
-          {/* Featured: One-Command Setup */}
-          <div className="mb-6 relative overflow-hidden rounded-2xl border-2 border-indigo-500/50 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-6">
-            <div className="absolute top-3 right-3">
-              <span className="inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-xs font-medium text-white">
-                ⚡ Recommended
-              </span>
             </div>
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0">
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-white"
-                >
-                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
-                  One-Command Setup
-                </h3>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                  Install SDK and automatically start all services with Docker. Includes engine,
-                  platform, UI, and database. Perfect for getting started quickly.
-                </p>
-                <div className="bg-zinc-900 dark:bg-black rounded-lg border border-zinc-800 dark:border-white/10 overflow-hidden">
-                  <div className="px-3 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                    <span className="text-xs text-zinc-500 font-mono">terminal</span>
-                  </div>
-                  <pre className="p-3 font-mono text-sm text-zinc-300">
-                    {`npm install lelu-agent-auth
-npx lelu-agent-auth init`}
-                  </pre>
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-300">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
+            <h2
+              id="install-sdk"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Install the SDK
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
+            </p>
+
+            {/* Tabbed package manager */}
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4 relative">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                {(["npm", "pnpm", "yarn", "bun"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setPkgTab(t)}
+                    className={`px-2.5 py-1 text-[12px] rounded transition-colors ${
+                      pkgTab === t
+                        ? "bg-white dark:bg-[#0B0B0C] text-[#0A0A0A] dark:text-white font-medium border border-[#E7E5E4] dark:border-[#27272A]"
+                        : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white"
+                    }`}
                   >
-                    <path d="M9 12l2 2 4-4" />
-                    <circle cx="12" cy="12" r="10" />
-                  </svg>
-                  <span>Opens browser to http://localhost:3002 when ready</span>
-                </div>
+                    {t}
+                  </button>
+                ))}
               </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+                {pkgCmd[pkgTab]}
+              </pre>
+              <CopyBtn text={pkgCmd[pkgTab]} id="pkg" />
+            </div>
+
+            <p className="text-[14px] text-[#737373]">
+              Supports Node.js 18+. TypeScript types are included — no separate <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">@types</code> package needed.
+            </p>
+          </div>
+        </section>
+
+        {/* Step 2 — API key */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              2
+            </div>
+            <h2
+              id="get-api-key"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Get an API key
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
+              Visit{" "}
+              <a
+                href="/api-key"
+                className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
+              >
+                lelu-ai.com/api-key
+              </a>{" "}
+              and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Generate Key</strong>. No signup, no email — instant anonymous key with 500 requests/day free.
+            </p>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">.env</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+                LELU_API_KEY=your_key_here
+              </pre>
+              <CopyBtn text="LELU_API_KEY=your_key_here" id="env" />
+            </div>
+
+            <div className="flex gap-3 p-4 rounded-md bg-amber-50 dark:bg-amber-900/10 border-l-[3px] border-amber-500">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500 shrink-0 mt-0.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
+                Never commit your API key to version control. Add <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> to <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.gitignore</code>.
+              </p>
             </div>
           </div>
+        </section>
 
-          <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            Alternative Installation Methods
-          </p>
+        {/* Step 3 — Configure client */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              3
+            </div>
+            <h2
+              id="configure-client"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Configure the client
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Create a shared client instance and import it wherever you need to authorize actions:
+            </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Docker Option */}
-            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-white"
-                  >
-                    <path d="M20 7h-9" />
-                    <path d="M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9" />
-                    <path d="M15 7v10" />
-                    <path d="M20 7v10a2 2 0 0 1-2 2h-2" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
-                  Manual Docker Setup
-                </h3>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">lib/lelu.ts</span>
               </div>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                Pull and run Docker images manually. For users who prefer more control over the
-                setup process.
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`import { createClient } from "lelu-agent-auth";
+
+export const lelu = createClient({
+  apiKey: process.env.LELU_API_KEY,
+});`}
+              </pre>
+              <CopyBtn text={`import { createClient } from "lelu-agent-auth";\n\nexport const lelu = createClient({\n  apiKey: process.env.LELU_API_KEY,\n});`} id="client" />
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              That&apos;s all the configuration needed. The SDK routes to the live cloud engine automatically when an API key is present.
+            </p>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Then use it anywhere in your app:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`import { lelu } from "@/lib/lelu";
+
+const decision = await lelu.agentAuthorize({
+  actor: "billing-agent",
+  action: "refund:process",
+  resource: { orderId: "ord_123" },
+  context: { confidence: 0.85 },
+});
+
+if (decision.allowed) {
+  // proceed
+} else if (decision.requiresHumanReview) {
+  // queued for human approval
+} else {
+  throw new Error(\`Denied: \${decision.reason}\`);
+}`}
+              </pre>
+              <CopyBtn text={`import { lelu } from "@/lib/lelu";\n\nconst decision = await lelu.agentAuthorize({\n  actor: "billing-agent",\n  action: "refund:process",\n  resource: { orderId: "ord_123" },\n  context: { confidence: 0.85 },\n});\n\nif (decision.allowed) {\n  // proceed\n} else if (decision.requiresHumanReview) {\n  // queued for human approval\n} else {\n  throw new Error(\`Denied: \${decision.reason}\`);\n}`} id="usage" />
+            </div>
+          </div>
+        </section>
+
+        {/* Step 4 — Done */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+              4
+            </div>
+            <h2
+              id="done"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Done
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500 mb-6">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500 shrink-0 mt-0.5">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
+                Your agent is connected to the Lelu cloud engine. No Docker, no local server, no infrastructure to manage.
               </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-lg border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-3 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                  <span className="text-xs text-zinc-500 font-mono">terminal</span>
-                </div>
-                <pre className="p-3 font-mono text-xs text-zinc-300">
-                  {`# Clone and run all services locally
-git clone https://github.com/lelu-auth/lelu.git
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">Where to go next:</p>
+            <ul className="space-y-2 text-[14px]">
+              {[
+                { href: "/docs/quickstart", label: "Quickstart — authorize your first action →" },
+                { href: "/docs/integrations/vercel-ai", label: "Vercel AI SDK integration →" },
+                { href: "/docs/integrations/langchain", label: "LangChain integration →" },
+                { href: "/docs/policies", label: "Write authorization policies →" },
+              ].map((l) => (
+                <li key={l.href}>
+                  <a
+                    href={l.href}
+                    className="text-[#0A0A0A] dark:text-white font-medium hover:underline underline-offset-2"
+                  >
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* Self-hosting (advanced) */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center shrink-0 mt-0.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#737373]">
+                <path d="M20 7h-9" />
+                <path d="M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9" />
+                <path d="M15 7v10" />
+                <path d="M20 7v10a2 2 0 0 1-2 2h-2" />
+              </svg>
+            </div>
+            <h2
+              id="self-hosting"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              Self-hosting (advanced)
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              If you need to run the engine on your own infrastructure, pass a <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> to the client or set the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_BASE_URL</code> environment variable:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`const lelu = createClient({
+  baseUrl: "https://your-engine.example.com",
+  apiKey: process.env.LELU_API_KEY,
+});`}
+              </pre>
+              <CopyBtn text={`const lelu = createClient({\n  baseUrl: "https://your-engine.example.com",\n  apiKey: process.env.LELU_API_KEY,\n});`} id="selfhost" />
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Or without any code change:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">.env</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+{`LELU_BASE_URL=https://your-engine.example.com
+LELU_API_KEY=your_key_here`}
+              </pre>
+              <CopyBtn text={`LELU_BASE_URL=https://your-engine.example.com\nLELU_API_KEY=your_key_here`} id="selfhost-env" />
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              To run the engine locally with Docker:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">terminal</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+{`git clone https://github.com/lelu-auth/lelu.git
 cd lelu
 docker-compose up -d`}
-                </pre>
-              </div>
-            </div>
-
-            {/* SDK Option */}
-            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-zinc-600 flex items-center justify-center">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-white"
-                  >
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14,2 14,8 20,8" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">SDK Only</h3>
-              </div>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                Install the lightweight SDK with CLI tools for audit logs and policy management.
-                Uses local SQLite storage by default (like Prisma).
-              </p>
-              <div className="bg-zinc-900 dark:bg-black rounded-lg border border-zinc-800 dark:border-white/10 overflow-hidden">
-                <div className="px-3 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                  <span className="text-xs text-zinc-500 font-mono">terminal</span>
-                </div>
-                <pre className="p-3 font-mono text-xs text-zinc-300">
-                  {`# TypeScript/JavaScript
-npm install lelu-agent-auth
-npx lelu audit-log
-
-# Python
-pip install lelu-agent-auth-sdk
-lelu audit-log`}
-                </pre>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4 flex gap-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <div className="text-sm text-blue-800 dark:text-blue-300">
-              <p className="mb-2">
-                <strong>New to Lelu?</strong> We recommend starting with the one-command setup for
-                the quickest start.
-              </p>
-              <p>
-                The SDK includes CLI tools for audit logs and policy management with local SQLite
-                storage. For a visual UI, use Docker or visit{" "}
-                <a href="https://lelu-ai.com" className="underline">
-                  lelu-ai.com
-                </a>
-                .
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Step 2 */}
-        <section id="step-2">
-          <h2
-            id="install-package"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              2
-            </span>
-            Install the Package
-          </h2>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            Let&apos;s start by adding Lelu to your project:
-          </p>
-
-          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-            <div className="flex items-center px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPackageTab("npm")}
-                  className={`px-3 py-1 text-xs rounded transition-colors ${packageTab === "npm" ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"}`}
-                >
-                  npm
-                </button>
-                <button
-                  onClick={() => setPackageTab("pnpm")}
-                  className={`px-3 py-1 text-xs rounded transition-colors ${packageTab === "pnpm" ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"}`}
-                >
-                  pnpm
-                </button>
-                <button
-                  onClick={() => setPackageTab("yarn")}
-                  className={`px-3 py-1 text-xs rounded transition-colors ${packageTab === "yarn" ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"}`}
-                >
-                  yarn
-                </button>
-                <button
-                  onClick={() => setPackageTab("bun")}
-                  className={`px-3 py-1 text-xs rounded transition-colors ${packageTab === "bun" ? "bg-zinc-800 text-white font-medium" : "text-zinc-400 hover:text-white hover:bg-zinc-800"}`}
-                >
-                  bun
-                </button>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M4 17l6-6-6-6M12 19h8" />
-                </svg>
-                <span>terminal</span>
-              </div>
-              <pre className="font-mono text-sm text-zinc-300 overflow-x-auto">
-                {packageCommands[packageTab]}
               </pre>
-            </div>
-            <button
-              className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-all"
-              title="Copy to clipboard"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-zinc-400 hover:text-zinc-200"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4 flex gap-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              If your frontend and backend are in separate repositories, install the Lelu SDK in
-              each service that calls the Lelu Engine.
-            </p>
-          </div>
-        </section>
-
-        {/* Step 3 */}
-        <section id="step-3">
-          <h2
-            id="cli-commands"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              3
-            </span>
-            CLI Commands
-          </h2>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            After installing, you can use the built-in CLI commands to view audit logs, manage
-            policies, and launch the visual UI directly from your terminal:
-          </p>
-
-          {/* Visual UI via Docker - Featured */}
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-500/5 dark:to-purple-500/5 border border-blue-200 dark:border-blue-500/20 rounded-xl p-4 mb-4">
-              <div className="flex items-start gap-3">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-blue-600 dark:text-blue-400 mt-0.5 shrink-0"
-                >
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M3 9h18M9 21V9" />
-                </svg>
-                <div>
-                  <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
-                    Visual UI (Docker)
-                  </h4>
-                  <p className="text-sm text-blue-700 dark:text-blue-400 mb-2">
-                    Launch the visual dashboard for managing policies and viewing audit logs. The UI
-                    runs as a separate Docker container (like Prisma Studio).
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-              <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                <span className="text-xs text-zinc-500 font-mono">terminal</span>
-              </div>
-              <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# Visit the hosted version
-# https://lelu-ai.com/
-
-# Or run locally with Docker
-docker-compose up -d`}
-              </pre>
-            </div>
-          </div>
-
-          {/* TypeScript/Node.js */}
-          <div className="mb-8">
-            <h3
-              id="typescript-cli"
-              className="text-lg font-semibold text-zinc-900 dark:text-white mb-3"
-            >
-              TypeScript/Node.js
-            </h3>
-            <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-              <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                <span className="text-xs text-zinc-500 font-mono">terminal</span>
-              </div>
-              <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# View audit logs
-npx @lelu-auth/lelu audit-log
-
-# Manage policies
-npx @lelu-auth/lelu policies list
-npx @lelu-auth/lelu policies get auth
-npx @lelu-auth/lelu policies set auth ./auth.rego`}
-              </pre>
-            </div>
-          </div>
-
-          {/* Python */}
-          <div className="mb-8">
-            <h3
-              id="python-cli"
-              className="text-lg font-semibold text-zinc-900 dark:text-white mb-3"
-            >
-              Python
-            </h3>
-            <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-              <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                <span className="text-xs text-zinc-500 font-mono">terminal</span>
-              </div>
-              <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# After installing: pip install lelu-agent-auth-sdk
-lelu audit-log
-lelu policies list
-lelu policies get auth
-lelu policies set auth ./auth.rego`}
-              </pre>
-            </div>
-          </div>
-
-          {/* Go */}
-          <div className="mb-8">
-            <h3 id="go-cli" className="text-lg font-semibold text-zinc-900 dark:text-white mb-3">
-              Go
-            </h3>
-            <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-              <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                <span className="text-xs text-zinc-500 font-mono">terminal</span>
-              </div>
-              <pre className="p-4 font-mono text-sm text-blue-300">
-                {`# Build and run CLI
-cd sdk/go/cmd/lelu
-go build -o lelu
-./lelu audit-log
-./lelu policies list`}
-              </pre>
-            </div>
-          </div>
-
-          <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-4 flex gap-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <div className="text-sm text-blue-800 dark:text-blue-300">
-              <p className="mb-2">
-                <strong>Note:</strong> CLI commands use local SQLite storage by default (
-                <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">
-                  ~/.lelu/lelu.db
-                </code>
-                ).
-              </p>
-              <p className="text-xs">
-                To use a remote platform, set{" "}
-                <code className="bg-blue-100 dark:bg-blue-900/50 px-1 rounded font-mono">
-                  LELU_PLATFORM_URL
-                </code>{" "}
-                environment variable.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Step 4 */}
-        <section id="step-4">
-          <h2
-            id="environment-variables"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              4
-            </span>
-            Generate API Key & Set Environment Variables
-          </h2>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            First, generate an API key to authenticate with the Lelu engine. Then create a{" "}
-            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
-              .env
-            </code>{" "}
-            file with your configuration.
-          </p>
-
-          <div className="space-y-6">
-            {/* API Key Generation */}
-            <div>
-              <h3
-                id="generate-api-key"
-                className="text-lg font-semibold text-zinc-900 dark:text-white mb-3 flex items-center gap-2"
-              >
-                <span className="flex items-center justify-center w-6 h-6 rounded bg-blue-600 text-white text-xs font-bold">
-                  1
-                </span>
-                Generate API Key
-              </h3>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                API keys authenticate your requests and identify your tenant. Choose one of the
-                following methods:
-              </p>
-
-              {/* Method 1: PowerShell Script */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-                  Method 1: PowerShell Script (Recommended for Self-Hosted)
-                </h4>
-                <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-                  <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                    <span className="text-xs text-zinc-500 font-mono">powershell</span>
-                  </div>
-                  <pre className="p-4 font-mono text-sm text-zinc-300">
-                    {`# Generate and store API key automatically
-./generate-api-key.ps1
-
-# Your key will be:
-# - Generated with secure random bytes
-# - Stored in Redis
-# - Added to your .env file automatically`}
-                  </pre>
-                  <button
-                    className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-all"
-                    title="Copy to clipboard"
-                  >
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="text-zinc-400 hover:text-zinc-200"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <CopyBtn text={`git clone https://github.com/lelu-auth/lelu.git\ncd lelu\ndocker-compose up -d`} id="docker" />
             </div>
 
-            {/* API Key */}
-            <div>
-              <h3
-                id="api-key"
-                className="text-lg font-semibold text-zinc-900 dark:text-white mb-3 flex items-center gap-2"
-              >
-                <span className="flex items-center justify-center w-6 h-6 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-bold">
-                  2
-                </span>
-                API Key
-              </h3>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                Your Lelu API key for authenticating requests to the engine. Generate a secure key
-                using{" "}
-                <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
-                  openssl rand -base64 32
-                </code>
-                .
-              </p>
-
-              <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-                <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                  <span className="text-xs text-zinc-500 font-mono">.env</span>
-                </div>
-                <pre className="p-4 font-mono text-sm text-zinc-300">
-                  LELU_API_KEY=your_secure_api_key_here
-                </pre>
-                <button
-                  className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-all"
-                  title="Copy to clipboard"
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-zinc-400 hover:text-zinc-200"
-                  >
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl p-4 flex gap-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
-            >
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <div className="text-sm text-amber-800 dark:text-amber-300">
-              <strong>Security notice:</strong> Never commit your API keys to version control. Add{" "}
-              <code className="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">.env</code>{" "}
-              to your{" "}
-              <code className="bg-amber-100 dark:bg-amber-900/50 px-1 rounded font-mono">
-                .gitignore
-              </code>{" "}
-              file.
-            </div>
-          </div>
-        </section>
-
-        {/* Step 5 */}
-        <section id="step-5">
-          <h2
-            id="configure-client"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-black text-sm font-bold">
-              5
-            </span>
-            Configure Lelu Client
-          </h2>
-          <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            Initialize the Lelu client in your application to start authorizing agent actions:
-          </p>
-
-          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-              <span className="text-xs text-zinc-500 font-mono">lib/lelu.ts</span>
-            </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 leading-loose overflow-x-auto">
-              {`import { LeluClient } from "@lelu-auth/lelu";
-
-export const lelu = new LeluClient({
-  baseUrl: process.env.LELU_ENGINE_URL!,
-  apiKey: process.env.LELU_API_KEY!,
-});
-
-// Example: Authorize an agent action
-const decision = await lelu.agentAuthorize({
-  actor: "support_agent",
-  action: "issue_refund",
-  context: { confidence: 0.85 }
-});
-
-if (decision.requiresHumanReview) {
-  console.log("Action queued for human approval");
-} else if (decision.allowed) {
-  console.log("Action approved autonomously");
-}`}
-            </pre>
-            <button
-              className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-all"
-              title="Copy to clipboard"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-zinc-400 hover:text-zinc-200"
-              >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              For Python applications:
-            </p>
-            <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden group relative">
-              <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
-                <span className="text-xs text-zinc-500 font-mono">lelu_client.py</span>
-              </div>
-              <pre className="p-4 font-mono text-sm text-zinc-300 leading-loose overflow-x-auto">
-                {`from lelu import LeluClient
-import os
-
-lelu = LeluClient(
-    base_url=os.environ["LELU_ENGINE_URL"],
-    api_key=os.environ["LELU_API_KEY"]
-)
-
-# Example: Authorize an agent action
-decision = lelu.agent_authorize(
-    actor="support_agent",
-    action="issue_refund",
-    confidence=0.85
-)
-
-if decision.requires_human_review:
-    print("Action queued for human approval")
-elif decision.allowed:
-    print("Action approved autonomously")`}
-              </pre>
-              <button
-                className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 p-2 bg-zinc-800 hover:bg-zinc-700 rounded transition-all"
-                title="Copy to clipboard"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-zinc-400 hover:text-zinc-200"
-                >
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Step 6 */}
-        <section id="step-6">
-          <h2
-            id="complete"
-            className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-3"
-          >
-            <span className="flex items-center justify-center w-7 h-7 rounded-full bg-green-600 text-white text-sm font-bold">
-              ✓
-            </span>
-            That&apos;s it!
-          </h2>
-
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800/50 rounded-xl p-6">
-            <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-              You&apos;re all set! Lelu is now configured and ready to use. Check out the following
-              resources to learn more:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mt-4">
+              See the{" "}
               <a
-                href="/docs/concepts/architecture"
-                className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group"
+                href="/docs/guides/production"
+                className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
-                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-blue-600 dark:text-blue-400"
-                  >
-                    <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
-                    <path d="M12 2v10l8.66 5" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-medium text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                    Architecture
-                  </div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-500">
-                    Learn how Lelu works
-                  </div>
-                </div>
-              </a>
-              <a
-                href="/docs/integrations/nextjs"
-                className="flex items-center gap-3 p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-300 dark:hover:border-zinc-700 transition-all group"
-              >
-                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center shrink-0">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-purple-600 dark:text-purple-400"
-                  >
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  </svg>
-                </div>
-                <div>
-                  <div className="font-medium text-zinc-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                    Integrations
-                  </div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-500">Framework guides</div>
-                </div>
-              </a>
+                production self-hosting guide
+              </a>{" "}
+              for Docker Compose and Kubernetes manifests.
+            </p>
+          </div>
+        </section>
+
+        {/* URL resolution table */}
+        <section>
+          <div className="flex gap-5 mb-5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center shrink-0 mt-0.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#737373]">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <h2
+              id="url-resolution"
+              className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white pt-0.5"
+            >
+              How URL resolution works
+            </h2>
+          </div>
+          <div className="ml-[52px]">
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              The SDK picks the engine URL automatically:
+            </p>
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-[13px]">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                    <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Situation</th>
+                    <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Engine used</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
+                  {[
+                    { sit: "apiKey provided, no baseUrl", eng: "Lelu cloud (GCP)" },
+                    { sit: "LELU_BASE_URL env var set", eng: "That URL" },
+                    { sit: "baseUrl passed to createClient", eng: "That URL" },
+                    { sit: "No apiKey, no env var, no baseUrl", eng: "http://localhost:8080 (self-hosted dev)" },
+                  ].map((row) => (
+                    <tr key={row.sit} className="bg-white dark:bg-[#0B0B0C]">
+                      <td className="px-4 py-2.5 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{row.sit}</td>
+                      <td className="px-4 py-2.5 text-[#737373]">{row.eng}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
       </div>
 
       {/* Prev / Next */}
-      <div className="flex justify-between items-center pt-12 mt-12 border-t border-zinc-200 dark:border-white/10">
+      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#27272A]">
         <a
-          href="/docs"
-          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
+          href="/docs/quickstart"
+          className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          Previous: Introduction
+          Quickstart
         </a>
         <a
           href="/docs/concepts/architecture"
-          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"
         >
-          Next: Architecture
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          Architecture
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
         </a>

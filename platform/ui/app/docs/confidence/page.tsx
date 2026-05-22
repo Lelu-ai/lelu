@@ -136,9 +136,9 @@ requires_approval {
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`import { LeluClient } from '@lelu/sdk';
+                <code>{`import { createClient } from 'lelu-agent-auth';
 
-const lelu = new LeluClient({ apiKey: 'your-api-key' });
+const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
 // The AI agent determines it is 85% confident in this action
 const response = await lelu.authorize({

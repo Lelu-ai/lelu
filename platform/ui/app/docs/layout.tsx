@@ -2,7 +2,6 @@ import { DocsEnhancements } from "@/components/docs/DocsEnhancements";
 import { DocsSidebar } from "@/components/docs/DocsSidebar";
 import { OnThisPage } from "@/components/docs/OnThisPage";
 import { DocsNav } from "@/components/docs/DocsNav";
-import { AskAIPill } from "@/components/docs/AskAIPill";
 import type { ReactNode } from "react";
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
@@ -20,7 +19,6 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         <OnThisPage />
         <DocsEnhancements />
       </div>
-      <AskAIPill />
     </div>
   );
 }

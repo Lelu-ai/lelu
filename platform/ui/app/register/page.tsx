@@ -3,7 +3,6 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LeluMark } from "@/components/ui/LeluMark";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -57,16 +56,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-[calc(100vh-56px)] flex items-center justify-center px-4 bg-[#FAFAFA] dark:bg-[#0B0B0C]">
       <div className="w-full max-w-[400px]">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2.5 mb-8">
-          <LeluMark size={24} />
-          <span className="font-semibold text-[15px] tracking-tight text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
-            lelu
-          </span>
-        </div>
-
         {/* Card */}
         <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#27272A] rounded-xl p-8 shadow-sm">
           <div className="mb-6">

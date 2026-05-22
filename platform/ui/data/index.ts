@@ -1,9 +1,7 @@
 export const navItems = [
-  { name: "About", link: "/about" },
   { name: "Docs", link: "/docs" },
   { name: "Audit Log", link: "/audit" },
   { name: "Policies", link: "/policies" },
-  { name: "Safety", link: "/policies/safety" },
 ];
 
 export const heroStats = [

@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { FloatingNav } from "@/components/ui/FloatingNavbar";
-import { navItems } from "@/data";
+import { SiteNav } from "@/components/SiteNav";
 import LeluFooter from "@/components/LeluFooter";
-import { LeluMark } from "@/components/ui/LeluMark";
-import { UserMenu } from "@/components/UserMenu";
 import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -39,21 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           disableTransitionOnChange
         >
-          <div className="fixed top-6 left-6 md:left-10 right-6 md:right-10 z-[5001] pointer-events-none flex items-center justify-between">
-            <a href="/" className="pointer-events-auto flex items-center gap-2.5 group">
-              <LeluMark
-                size={24}
-                className="transition-transform duration-300 group-hover:scale-105"
-              />
-              <span className="font-semibold text-[15px] tracking-tight text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
-                lelu
-              </span>
-            </a>
-            <div className="pointer-events-auto">
-              <UserMenu />
-            </div>
-          </div>
-          <FloatingNav navItems={navItems} />
+          <SiteNav />
           <main className="flex-1">{children}</main>
           <div className="flex flex-col items-center w-full px-5 sm:px-10">
             <div className="max-w-7xl w-full">

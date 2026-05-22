@@ -59,22 +59,8 @@ export function SiteNav() {
     router.refresh();
   }
 
-  // Home page has its own full-screen layout with built-in nav
-  if (pathname === "/") return null;
-
-  // Minimal header for auth pages — just logo, centered
-  if (AUTH_ROUTES.includes(pathname)) {
-    return (
-      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 flex items-center justify-center border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/80 dark:bg-[#0B0B0C]/90 backdrop-blur-md">
-        <Link href="/" className="flex items-center gap-2 group">
-          <LeluMark size={22} className="transition-transform group-hover:scale-105" />
-          <span className="font-semibold text-[15px] text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
-            lelu
-          </span>
-        </Link>
-      </header>
-    );
-  }
+  // Home and auth pages manage their own nav/logo
+  if (pathname === "/" || AUTH_ROUTES.includes(pathname)) return null;
 
   const initials = typeof user === "object" && user
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()

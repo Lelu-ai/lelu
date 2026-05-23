@@ -1,219 +1,468 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
 
-export default function BetaPage() {
-  const [apiKey, setApiKey] = useState<string | null>(null);
+interface ApiKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revoked: boolean;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "Never";
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function KeyRow({
+  k,
+  onRevoke,
+}: {
+  k: ApiKey;
+  onRevoke: (id: string, name: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-4 py-4 border-b border-[#E7E5E4] dark:border-[#222224] last:border-0">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[14px] font-medium text-[#0A0A0A] dark:text-white truncate">
+            {k.name}
+          </span>
+          {k.revoked && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200/60 dark:border-red-800/40">
+              Revoked
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <code className="text-[12px] font-mono text-[#737373]">
+            lelu_sk_{k.keyPrefix}••••••••••••••
+          </code>
+          <span className="text-[12px] text-[#A3A3A3]">
+            Created {formatDate(k.createdAt)}
+          </span>
+          <span className="text-[12px] text-[#A3A3A3]">
+            Last used {formatDate(k.lastUsedAt)}
+          </span>
+        </div>
+      </div>
+      {!k.revoked && (
+        <button
+          onClick={() => onRevoke(k.id, k.name)}
+          className="shrink-0 text-[12px] text-[#737373] hover:text-red-600 dark:hover:text-red-400 transition-colors"
+        >
+          Revoke
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Create Modal ──────────────────────────────────────────────────────────────
+
+function CreateModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (key: ApiKey, fullKey: string) => void;
+}) {
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [usage, setUsage] = useState<{
-    requests: number;
-    dailyLimit: number;
-    minuteLimit: number;
-    requestsThisMinute: number;
-  } | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const savedKey = localStorage.getItem("lelu_beta_key");
-    if (savedKey) {
-      setApiKey(savedKey);
-      loadUsageStats(savedKey);
-    }
-  }, []);
-
-  const generateKey = async () => {
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
     setLoading(true);
     try {
-      const response = await fetch("/api/beta/generate", {
+      const res = await fetch("/api/dashboard/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
       });
-      if (!response.ok) {
-        const error = await response.json();
-        alert(error.error || "Failed to generate key");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to create key");
         return;
       }
-      const data = await response.json();
-      setApiKey(data.apiKey);
-      localStorage.setItem("lelu_beta_key", data.apiKey);
-      await loadUsageStats(data.apiKey);
+      onCreated(data.key, data.fullKey);
     } catch {
-      alert("Failed to generate key. Please try again.");
+      setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadUsageStats = async (key: string) => {
-    try {
-      const response = await fetch(`/api/beta/usage?key=${encodeURIComponent(key)}`);
-      if (response.ok) setUsage(await response.json());
-    } catch {}
-  };
-
-  const copyToClipboard = () => {
-    if (!apiKey) return;
-    navigator.clipboard.writeText(apiKey);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const deleteKey = () => {
-    if (!confirm("Delete your beta key? This cannot be undone.")) return;
-    localStorage.removeItem("lelu_beta_key");
-    setApiKey(null);
-    setUsage(null);
-  };
+  }
 
   return (
-    <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C] pt-24 md:pt-32 pb-20 px-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-[420px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+        <h2 className="text-[18px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-1">
+          Create API key
+        </h2>
+        <p className="text-[13px] text-[#737373] mb-6">
+          Give your key a name so you can identify it later.
+        </p>
 
-        {/* Page title */}
-        <div className="mb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#141416] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-6">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#0A0A0A] dark:bg-white" />
-            Beta Access
+        <form onSubmit={submit} className="space-y-4">
+          {error && (
+            <div className="px-3.5 py-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200/70 dark:border-red-800/40 text-[13px] text-red-700 dark:text-red-400">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="key-name"
+              className="block text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]"
+            >
+              Key name
+            </label>
+            <input
+              id="key-name"
+              type="text"
+              autoFocus
+              required
+              maxLength={64}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Production, Local dev, CI"
+              className="w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all"
+            />
           </div>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#0A0A0A] dark:text-white lowercase mb-3">
-            get your free api key.
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed">
-            No signup required. Generate an anonymous key and start building AI agent authorization in seconds.
-          </p>
+
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading || !name.trim()}
+              className="flex-1 h-11 rounded-lg bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[14px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? "Creating…" : "Create key"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Reveal Modal ──────────────────────────────────────────────────────────────
+
+function RevealModal({
+  keyName,
+  fullKey,
+  onClose,
+}: {
+  keyName: string;
+  fullKey: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    navigator.clipboard.writeText(fullKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative w-full max-w-[480px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-[17px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white">
+              Key created
+            </h2>
+            <p className="text-[13px] text-[#737373]">{keyName}</p>
+          </div>
         </div>
 
-        {!apiKey ? (
-          /* ── Generate Key ── */
-          <div className="space-y-4">
-            <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-8 bg-white dark:bg-[#141416]">
-              <h2 className="text-lg font-semibold text-[#0A0A0A] dark:text-white mb-1">
-                Get Your Free Beta Key
-              </h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-                Zero registration. Zero friction. Just click and code.
-              </p>
+        {/* Warning */}
+        <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200/70 dark:border-amber-800/40 text-[13px] text-amber-700 dark:text-amber-400 mb-4">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 mt-0.5">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>
+            <strong>Copy this key now.</strong> It won&apos;t be shown again — we only store a hash.
+          </span>
+        </div>
 
-              <button
-                onClick={generateKey}
-                disabled={loading}
-                className="w-full py-3 bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {loading ? "Generating..." : "Generate Anonymous Key"}
-              </button>
+        {/* Key block */}
+        <div className="bg-[#0A0A0A] rounded-xl p-4 mb-4">
+          <code className="block text-[12px] font-mono text-emerald-400 break-all leading-relaxed">
+            {fullKey}
+          </code>
+        </div>
 
-              <div className="mt-6 grid grid-cols-3 gap-4 pt-6 border-t border-[#E7E5E4] dark:border-[#222224]">
-                {[
-                  { label: "Instant Access", sub: "No email required" },
-                  { label: "Privacy First", sub: "Completely anonymous" },
-                  { label: "500 req/day", sub: "Perfect for testing" },
-                ].map((item) => (
-                  <div key={item.label} className="text-center">
-                    <div className="text-sm font-medium text-[#0A0A0A] dark:text-white">{item.label}</div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">{item.sub}</div>
-                  </div>
-                ))}
+        <div className="flex gap-3">
+          <button
+            onClick={copy}
+            className="flex-1 h-11 rounded-lg bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[14px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors flex items-center justify-center gap-2"
+          >
+            {copied ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                Copied
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                Copy key
+              </>
+            )}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Revoke Confirm Modal ──────────────────────────────────────────────────────
+
+function RevokeModal({
+  keyName,
+  onConfirm,
+  onClose,
+  loading,
+}: {
+  keyName: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-[400px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+        <h2 className="text-[17px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-2">
+          Revoke key?
+        </h2>
+        <p className="text-[14px] text-[#737373] mb-6 leading-relaxed">
+          <strong className="text-[#0A0A0A] dark:text-white">{keyName}</strong> will
+          stop working immediately. Any application using it will lose access.
+          This cannot be undone.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 h-11 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[14px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? "Revoking…" : "Yes, revoke"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function ApiKeyPage() {
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [revealData, setRevealData] = useState<{ key: ApiKey; fullKey: string } | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null);
+  const [revoking, setRevoking] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/dashboard/keys")
+      .then((r) => r.json())
+      .then((d) => setKeys(d.keys ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleCreated(key: ApiKey, fullKey: string) {
+    setShowCreate(false);
+    setKeys((prev) => [key, ...prev]);
+    setRevealData({ key, fullKey });
+  }
+
+  async function handleRevoke() {
+    if (!revokeTarget) return;
+    setRevoking(true);
+    try {
+      await fetch(`/api/dashboard/keys/${revokeTarget.id}`, { method: "DELETE" });
+      setKeys((prev) =>
+        prev.map((k) =>
+          k.id === revokeTarget.id ? { ...k, revoked: true } : k
+        )
+      );
+    } finally {
+      setRevoking(false);
+      setRevokeTarget(null);
+    }
+  }
+
+  const activeKeys = keys.filter((k) => !k.revoked);
+  const revokedKeys = keys.filter((k) => k.revoked);
+
+  return (
+    <>
+      {showCreate && (
+        <CreateModal
+          onClose={() => setShowCreate(false)}
+          onCreated={handleCreated}
+        />
+      )}
+      {revealData && (
+        <RevealModal
+          keyName={revealData.key.name}
+          fullKey={revealData.fullKey}
+          onClose={() => setRevealData(null)}
+        />
+      )}
+      {revokeTarget && (
+        <RevokeModal
+          keyName={revokeTarget.name}
+          onConfirm={handleRevoke}
+          onClose={() => setRevokeTarget(null)}
+          loading={revoking}
+        />
+      )}
+
+      <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C] pt-24 md:pt-32 pb-20 px-4">
+        <div className="max-w-2xl mx-auto">
+
+          {/* Header */}
+          <div className="flex items-start justify-between mb-10 gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#141416] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#0A0A0A] dark:bg-white" />
+                API Keys
               </div>
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#0A0A0A] dark:text-white lowercase mb-2">
+                your api keys.
+              </h1>
+              <p className="text-zinc-500 dark:text-zinc-400 text-[15px] leading-relaxed">
+                Keys authenticate your application with the Lelu engine. Each key is shown only once at creation.
+              </p>
             </div>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="shrink-0 h-10 px-4 rounded-lg bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[13px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors flex items-center gap-2 mt-1"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New key
+            </button>
+          </div>
 
-            {/* Cold start notice */}
-            <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-4 bg-white dark:bg-[#141416] flex gap-3">
-              <span className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                <span className="font-medium text-[#0A0A0A] dark:text-white">First request may take 30–60s.</span>{" "}
-                The engine warms up on cold start. Subsequent requests are &lt;100ms.
+          {/* Active Keys */}
+          <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl overflow-hidden mb-4">
+            <div className="px-6 py-4 border-b border-[#E7E5E4] dark:border-[#222224] flex items-center justify-between">
+              <h2 className="text-[14px] font-semibold text-[#0A0A0A] dark:text-white">
+                Active keys
+              </h2>
+              <span className="text-[12px] text-[#A3A3A3]">
+                {activeKeys.length} {activeKeys.length === 1 ? "key" : "keys"}
               </span>
             </div>
 
-            {/* Discord */}
-            <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-4 bg-white dark:bg-[#141416] flex gap-3 items-start">
-              <svg className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-              </svg>
-              <div className="flex-1 text-sm">
-                <span className="font-medium text-[#0A0A0A] dark:text-white">Need Help? </span>
-                <a href="https://discord.gg/lelu" target="_blank" rel="noopener noreferrer" className="text-zinc-500 dark:text-zinc-400 hover:text-[#0A0A0A] dark:hover:text-white transition-colors">
-                  Join our Discord →
-                </a>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* ── Key Display ── */
-          <div className="space-y-4">
-            <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-6 bg-white dark:bg-[#141416]">
-              <div className="flex justify-between items-start mb-5">
-                <div>
-                  <h2 className="text-lg font-semibold text-[#0A0A0A] dark:text-white mb-0.5">Your Beta Key</h2>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Save this — you won't see it again.</p>
+            <div className="px-6">
+              {loading ? (
+                <div className="py-12 text-center text-[14px] text-[#A3A3A3]">
+                  Loading…
                 </div>
-                <button onClick={deleteKey} className="text-xs text-red-500 hover:text-red-600 transition-colors">
-                  Delete Key
-                </button>
-              </div>
-
-              {/* Warning */}
-              <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-lg p-3 mb-4 flex gap-3 items-start text-sm">
-                <span className="text-zinc-400">⚠</span>
-                <span className="text-zinc-600 dark:text-zinc-400">
-                  <span className="font-medium text-[#0A0A0A] dark:text-white">Copy this to your .env now.</span>{" "}
-                  Stored only in your browser — closing this page won't delete it, but clearing localStorage will.
-                </span>
-              </div>
-
-              {/* Key block */}
-              <div className="bg-[#0A0A0A] dark:bg-[#141416] border border-[#222224] rounded-lg p-4 mb-4 flex items-center gap-3">
-                <code className="text-green-400 font-mono text-xs break-all flex-1">{apiKey}</code>
-                <button
-                  onClick={copyToClipboard}
-                  className="px-3 py-1.5 bg-white dark:bg-[#222224] text-[#0A0A0A] dark:text-white rounded text-xs font-medium hover:opacity-80 transition-opacity whitespace-nowrap shrink-0"
-                >
-                  {copied ? "Copied ✓" : "Copy"}
-                </button>
-              </div>
-
-              {usage && (
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: "Requests Today", value: usage.requests, limit: usage.dailyLimit },
-                    { label: "This Minute", value: usage.requestsThisMinute, limit: usage.minuteLimit },
-                  ].map((stat) => (
-                    <div key={stat.label} className="border border-[#E7E5E4] dark:border-[#222224] rounded-lg p-3">
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">{stat.label}</div>
-                      <div className="text-lg font-semibold text-[#0A0A0A] dark:text-white">
-                        {stat.value} <span className="text-sm font-normal text-zinc-400">/ {stat.limit}</span>
-                      </div>
-                      <div className="mt-2 w-full bg-zinc-100 dark:bg-[#222224] rounded-full h-1.5">
-                        <div
-                          className="bg-[#0A0A0A] dark:bg-white h-1.5 rounded-full transition-all"
-                          style={{ width: `${Math.min((stat.value / stat.limit) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+              ) : activeKeys.length === 0 ? (
+                <div className="py-12 text-center">
+                  <div className="w-10 h-10 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] flex items-center justify-center mx-auto mb-3">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A3A3A3" strokeWidth="1.5">
+                      <path d="m21 2-1 1M3.5 20.5l1-1M9 3.5l.7.7M14.3 20.3l.7.7M3.5 3.5l1 1M20.3 20.3l.7-.7M20.5 9h-1M4.5 15H3M17 7l-10 10M9 7l8 8" />
+                      <circle cx="17" cy="7" r="3" />
+                    </svg>
+                  </div>
+                  <p className="text-[14px] text-[#737373] mb-1">No active keys</p>
+                  <p className="text-[13px] text-[#A3A3A3]">
+                    Create your first key to start making API requests.
+                  </p>
                 </div>
+              ) : (
+                activeKeys.map((k) => (
+                  <KeyRow
+                    key={k.id}
+                    k={k}
+                    onRevoke={(id, name) => setRevokeTarget({ id, name })}
+                  />
+                ))
               )}
             </div>
+          </div>
 
-            {/* Quick Start */}
-            <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-6 bg-white dark:bg-[#141416]">
-              <h3 className="text-base font-semibold text-[#0A0A0A] dark:text-white mb-4">Quick Start</h3>
-              <div className="space-y-4">
+          {/* Quick Start (visible only when there are active keys) */}
+          {activeKeys.length > 0 && (
+            <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-6 mb-4">
+              <h3 className="text-[14px] font-semibold text-[#0A0A0A] dark:text-white mb-4">
+                Quick start
+              </h3>
+              <div className="space-y-3">
                 {[
-                  { step: "1. Install the SDK", code: "npm install lelu-agent-auth" },
-                  { step: "2. Add to your .env", code: `LELU_API_KEY=${apiKey}` },
+                  { label: "1. Install the SDK", code: "npm install lelu-agent-auth" },
+                  { label: "2. Add to your .env", code: "LELU_API_KEY=lelu_sk_••••••••••••••" },
                 ].map((item) => (
-                  <div key={item.step}>
-                    <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">{item.step}</div>
-                    <div className="bg-[#0A0A0A] dark:bg-[#141416] border border-[#222224] rounded-lg p-3">
-                      <code className="text-green-400 font-mono text-xs">{item.code}</code>
+                  <div key={item.label}>
+                    <p className="text-[12px] font-medium text-[#A3A3A3] mb-1.5">{item.label}</p>
+                    <div className="bg-[#0A0A0A] rounded-lg px-4 py-3">
+                      <code className="text-[12px] font-mono text-emerald-400">{item.code}</code>
                     </div>
                   </div>
                 ))}
                 <div>
-                  <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">3. Use in your code</div>
-                  <div className="bg-[#0A0A0A] dark:bg-[#141416] border border-[#222224] rounded-lg p-3 overflow-x-auto">
-                    <pre className="text-green-400 font-mono text-xs">{`import { createClient } from "lelu-agent-auth";
+                  <p className="text-[12px] font-medium text-[#A3A3A3] mb-1.5">3. Authorize an agent action</p>
+                  <div className="bg-[#0A0A0A] rounded-lg px-4 py-3 overflow-x-auto">
+                    <pre className="text-[12px] font-mono text-emerald-400">{`import { createClient } from "lelu-agent-auth";
 
 const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
@@ -221,75 +470,62 @@ const decision = await lelu.agentAuthorize({
   actor: "invoice_bot",
   action: "approve_refunds",
   resource: { amount: "500" },
-  confidence_signal: { provider: "openai", token_logprobs: [-0.05] }
 });
 
-if (!decision.allowed) console.log("Denied:", decision.reason);`}</pre>
+if (!decision.allowed) throw new Error(decision.reason);`}</pre>
                   </div>
                 </div>
               </div>
-
-              <div className="mt-5 flex gap-3">
-                <Link href="/docs/quickstart" className="flex-1 py-2.5 bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg text-center text-sm font-medium hover:opacity-90 transition-opacity">
-                  Full Documentation
+              <div className="mt-4 flex gap-3">
+                <Link
+                  href="/docs/quickstart"
+                  className="flex-1 py-2.5 bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg text-center text-[13px] font-semibold hover:opacity-90 transition-opacity"
+                >
+                  Full documentation
                 </Link>
-                <Link href="/docs" className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-sm font-medium hover:bg-zinc-50 dark:hover:bg-[#141416] transition-colors">
-                  View Examples
+                <Link
+                  href="/docs"
+                  className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-[13px] font-medium hover:bg-zinc-50 dark:hover:bg-[#141416] transition-colors"
+                >
+                  View examples
                 </Link>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Beta limits + upgrade */}
-        <div className="mt-6 grid md:grid-cols-2 gap-4">
-          <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-5 bg-white dark:bg-[#141416]">
-            <h3 className="text-sm font-semibold text-[#0A0A0A] dark:text-white mb-3">Beta Limits</h3>
-            <ul className="space-y-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-              {["500 authorization requests per day", "10 requests per minute", "50 token mints per day", "30-day key expiration (with activity)"].map((l) => (
-                <li key={l} className="flex items-start gap-2">
-                  <span className="text-[#0A0A0A] dark:text-white mt-0.5">✓</span>
-                  <span>{l}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-5 bg-white dark:bg-[#141416]">
-            <h3 className="text-sm font-semibold text-[#0A0A0A] dark:text-white mb-1">Need More?</h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">Create an account for higher limits and advanced features.</p>
-            <ul className="space-y-1.5 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-              {["10,000 requests per month", "Persistent data storage", "Team collaboration", "Priority support"].map((l) => (
-                <li key={l} className="flex items-start gap-2">
-                  <span className="text-zinc-400">→</span>
-                  <span>{l}</span>
-                </li>
-              ))}
-            </ul>
-            <Link href="/dashboard" className="block w-full py-2.5 bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg text-center text-sm font-medium hover:opacity-90 transition-opacity">
-              Create Account
-            </Link>
-          </div>
-        </div>
-
-        {/* FAQ */}
-        <div className="mt-6 border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-6 bg-white dark:bg-[#141416]">
-          <h3 className="text-base font-semibold text-[#0A0A0A] dark:text-white mb-5">FAQ</h3>
-          <div className="space-y-4 text-sm">
-            {[
-              { q: "Do I need to create an account?", a: "No. During beta, anonymous keys require no registration — perfect for testing and evaluation." },
-              { q: "How long does my key last?", a: "30 days from last use. As long as you keep using it, it won't expire." },
-              { q: "What happens when I hit the limit?", a: "You'll receive a 429 error. Limits reset daily at midnight UTC." },
-              { q: "Is my data safe?", a: "We don't collect personal info with anonymous keys. Your key is stored only in your browser's localStorage." },
-            ].map((item) => (
-              <div key={item.q} className="border-t border-[#E7E5E4] dark:border-[#222224] pt-4 first:border-0 first:pt-0">
-                <div className="font-medium text-[#0A0A0A] dark:text-white mb-1">{item.q}</div>
-                <div className="text-zinc-500 dark:text-zinc-400">{item.a}</div>
+          {/* Revoked Keys (collapsed section) */}
+          {revokedKeys.length > 0 && (
+            <details className="group bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl overflow-hidden">
+              <summary className="px-6 py-4 cursor-pointer list-none flex items-center justify-between select-none">
+                <span className="text-[14px] font-semibold text-[#737373]">
+                  Revoked keys ({revokedKeys.length})
+                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#A3A3A3"
+                  strokeWidth="2"
+                  className="transition-transform group-open:rotate-180"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <div className="px-6 border-t border-[#E7E5E4] dark:border-[#222224]">
+                {revokedKeys.map((k) => (
+                  <KeyRow
+                    key={k.id}
+                    k={k}
+                    onRevoke={() => {}}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </details>
+          )}
 
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }

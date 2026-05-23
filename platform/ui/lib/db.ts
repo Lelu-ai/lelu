@@ -39,4 +39,27 @@ export async function ensureSchema() {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_lelu_users_email ON lelu_users (email)
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_api_keys (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      name         TEXT NOT NULL,
+      key_prefix   TEXT NOT NULL,
+      key_hash     TEXT NOT NULL UNIQUE,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ,
+      expires_at   TIMESTAMPTZ,
+      revoked      BOOLEAN NOT NULL DEFAULT FALSE,
+      revoked_at   TIMESTAMPTZ
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_api_keys_user ON lelu_api_keys (user_id, revoked)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_api_keys_hash ON lelu_api_keys (key_hash)
+  `;
 }

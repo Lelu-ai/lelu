@@ -1,70 +1,94 @@
-# Contributing to Lelu (Auth Permission Engine)
+# Contributing to Lelu
 
-First off, thank you for considering contributing to Lelu! It's people like you that make Lelu such a great tool for securing the Agentic Web.
+Thank you for helping build the open source authorization standard for AI agents.
 
-## 🚀 Getting Started
+## Stack
 
-Lelu is built with a Go-based evaluation engine, a Next.js platform UI, and SDKs for Python and TypeScript.
+| Layer | Technology |
+|---|---|
+| Authorization engine | Go 1.21+ |
+| Platform UI | Next.js 14, TypeScript |
+| TypeScript SDK | Node.js 18+ |
+| Policy engine | OPA / Rego |
+| Storage | Redis, PostgreSQL |
 
-### Prerequisites
-
-- [Go](https://golang.org/doc/install) 1.21+
-- [Node.js](https://nodejs.org/en/download/) 18+
-- [Docker](https://docs.docker.com/get-docker/) & Docker Compose
-- [Python](https://www.python.org/downloads/) 3.9+ (for Python SDK)
-
-### Local Development Environment
-
-The easiest way to get started is using Docker Compose, which spins up the Engine, Platform UI, and Redis.
+## Local setup
 
 ```bash
-# Build the binaries and Docker images
-make build
+# Clone
+git clone https://github.com/lelu-auth/lelu.git
+cd lelu
 
-# Start the local environment
-docker-compose up -d
+# Start all services (engine + UI + Redis + Postgres)
+docker compose up -d
+
+# Services
+# Engine API:   http://localhost:8080
+# Platform UI:  http://localhost:3000
 ```
 
-The services will be available at:
-- **Engine API:** `http://localhost:8083`
-- **Platform UI:** `http://localhost:3002`
+For SDK development without Docker:
 
-## 🧩 How to Contribute
+```bash
+cd platform/ui
+npm install
+npm run dev
+```
 
-We welcome contributions of all kinds! Here are some areas where we'd love your help:
+## Where to contribute
 
-### 1. SDK Integrations (High Priority)
-We want Lelu to work seamlessly with every major AI agent framework. If you use a framework that isn't supported yet, consider building an integration!
+### High priority — framework integrations
 
-**Python SDK (`sdk/python/auth_pe/`)**
-- Subclass the `AgentMiddleware` base class to intercept tool calls and extract confidence scores.
-- **Help Wanted:** LlamaIndex, CrewAI, Semantic Kernel, AutoGen.
+Lelu needs first-class integrations with every major agent framework. If you use one of these, this is the best place to start:
 
-**TypeScript SDK (`sdk/typescript/src/`)**
-- **Help Wanted:** Vercel AI SDK, LangChain.js (expand existing), Model Context Protocol (MCP).
+- **LangChain** (Python + JS) — wrap tool calls with `agent_authorize`
+- **OpenAI Agents SDK** — decorator / middleware pattern
+- **Anthropic tool-use** — intercept between `tool_use` block and execution
+- **CrewAI / LlamaIndex / AutoGen** — middleware hooks
+- **MCP (Model Context Protocol)** — server-side authorization middleware
 
-### 2. Custom Rego Evaluators (Plugins)
-Lelu's Go engine supports loading custom Rego policies from a directory. You can write custom Rego modules to extend the evaluation logic without modifying the core engine.
-- Drop your `.rego` files into a directory and set `REGO_POLICY_PATH=/path/to/dir`.
-- We'd love to see community-contributed Rego templates for common compliance standards (SOC2, HIPAA, GDPR).
+Each integration lives in `sdk/` and gets its own docs page at `lelu-ai.com/docs/integrations/`.
 
-### 3. Core Engine Improvements
-The core engine is written in Go (`engine/`).
-- **Human-in-the-Loop (HITL):** Help us build out the Redis-backed review queue for actions that require human approval.
-- **Performance:** Optimize the in-memory evaluation latency.
+### Rego policy templates
 
-## 🛠️ Submitting a Pull Request
+Community-contributed policies for common compliance patterns are highly valuable:
 
-1. **Fork** the repository and create your branch from `main`.
-2. **Write tests** for your new feature or bug fix.
-3. **Run tests** locally to ensure everything passes.
-4. **Update documentation** if you are adding a new feature or integration.
-5. **Submit a PR** with a clear description of the problem and your solution.
+- SOC 2 — audit every sensitive action, require human review above risk threshold
+- HIPAA — restrict PHI access by actor type and confidence
+- GDPR — block cross-border data actions without explicit consent context
 
-## 🏷️ Good First Issues
+Drop `.rego` files in `config/policies/` with a `README.md` explaining the use case.
 
-If you're new to the project, look for issues tagged with `good first issue` or `help wanted` on our GitHub issue tracker. These are specifically scoped to be approachable for new contributors.
+### Core engine (Go)
 
-## 💬 Community
+- Performance — reduce decision latency (target: p99 < 5ms)
+- Human-review queue — improve the Redis-backed pause/resume flow
+- Streaming decisions — support long-running agent tasks
 
-Join our Discord server (link coming soon) to discuss ideas, ask questions, and collaborate with other contributors!
+### Docs and examples
+
+- Add working examples to `examples/` for any framework
+- Improve any doc page at `platform/ui/app/docs/`
+
+## Submitting a PR
+
+1. Fork the repo and create a branch from `main`
+2. Write tests for new behavior
+3. Run `go test ./...` (engine) or `npm test` (UI/SDK)
+4. Open a PR with a clear description — what problem, what changed, how to test
+
+## Issues
+
+- [`good first issue`](https://github.com/lelu-auth/lelu/labels/good%20first%20issue) — scoped and well-defined, good starting point
+- [`help wanted`](https://github.com/lelu-auth/lelu/labels/help%20wanted) — higher complexity, maintainer guidance available
+- [`integration`](https://github.com/lelu-auth/lelu/labels/integration) — framework integration work
+
+## Community
+
+- [GitHub Discussions](https://github.com/lelu-auth/lelu/discussions) — design questions, ideas, show and tell
+- [GitHub Issues](https://github.com/lelu-auth/lelu/issues) — bug reports and feature requests
+- Email: support@lelu-ai.com
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). Be excellent to each other.

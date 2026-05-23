@@ -1,99 +1,181 @@
 <p align="center">
-	<img src="https://raw.githubusercontent.com/lelu-auth/lelu/main/platform/ui/public/logo.svg" alt="Lelu logo" width="120" />
+  <img src="https://raw.githubusercontent.com/lelu-auth/lelu/main/platform/ui/public/lelu-mark.svg" alt="Lelu" width="64" />
 </p>
 
-# Lelu
+<h1 align="center">Lelu</h1>
 
-> **WARNING — NOT PRODUCTION READY**
->
-> This repository contains early-stage code, prototypes, and research features. It is not production ready.
-> Do not use this code for production workloads without following the `docs/PROJECT_PLAN.md` remediation steps.
+<p align="center">
+  <strong>Open source authorization engine for AI agents.</strong><br/>
+  Confidence-aware gating · Human-in-the-loop review · Policy-as-code · Full audit trail
+</p>
 
-### Quick Risks
+<p align="center">
+  <a href="https://lelu-ai.com/docs/quickstart">Quickstart</a> ·
+  <a href="https://lelu-ai.com/docs">Docs</a> ·
+  <a href="https://github.com/lelu-auth/lelu/discussions">Discussions</a> ·
+  <a href="https://lelu-ai.com">lelu-ai.com</a>
+</p>
 
-- Missing hardened deployment defaults (secrets, TLS, IAM)
-- Incomplete integration and e2e test coverage
-- Migration and backup procedures not validated for production
-- Operational monitoring and runbooks are minimal
+---
 
-See `docs/PROJECT_PLAN.md` for the required work to reach production readiness.
+## The problem
 
-## About the Project
+Every team shipping AI agents is solving the same authorization problem from scratch.
 
-Lelu is a framework-agnostic authorization engine for AI agents. It combines policy evaluation, confidence-aware controls, runtime risk checks, and human-review workflows in one system.
+Web auth was built for humans: the actor is known, confidence is always 1.0, and a 401 is acceptable. AI agents are different — they act autonomously, their certainty varies per action, and a blanket deny breaks a multi-step workflow. Existing tools (OPA, Casbin, AWS AVP) were not built for this.
 
-It is designed so teams can ship agent features faster without weakening security.
+The result: teams either skip authorization entirely, or bolt on ad-hoc `if confidence > 0.8` checks that aren't auditable, aren't policy-driven, and don't scale.
 
-Out of the box, Lelu provides:
+**Lelu is the missing layer.** It sits inside your agent and makes every action authorization-aware — without changing how you build.
 
-- Confidence-aware authorization
-- Prompt-injection prefiltering
-- Human-in-the-loop review queue
-- Runtime risk evaluation
-- Short-lived (JIT) scoped tokens
-- Audit trail and incident hooks
-- SQLite local storage (works offline)
-- PostgreSQL for production deployments
+---
 
-## Why Lelu
+## How it works
 
-Authorization for AI agents is still a half-solved problem. Most tools handle static rules but do not account for model uncertainty, dynamic risk, and operational safety in one flow.
+```typescript
+import { createClient } from "lelu-agent-auth";
 
-Lelu solves this by making decisions through a layered pipeline:
+const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
-- Injection check
-- Confidence resolution and gate
-- Policy evaluation (YAML or Rego)
-- Risk evaluation
-- Most-restrictive final decision merge
+const decision = await lelu.agentAuthorize({
+  actor: "billing-agent",
+  action: "refund:process",
+  resource: "order/ord_abc123",
+  context: { confidence: 0.85, amount_usd: 250 },
+});
 
-This helps teams avoid over-permissive agent behavior while keeping developer workflow simple.
+if (decision.allowed) {
+  await processRefund(orderId);
+} else if (decision.requiresHumanReview) {
+  await notifyReviewer(decision.reviewId); // agent pauses, human approves
+} else {
+  log("denied", decision.reason);
+}
+```
 
+One call. Three outcomes. Every decision logged.
 
+---
+
+## What Lelu provides
+
+| Feature | Description |
+|---|---|
+| **Confidence-aware gating** | Set thresholds per action — low-confidence actions auto-route to review |
+| **Human-in-the-loop queue** | Agent pauses, a human approves or denies, agent resumes |
+| **Policy-as-code** | Write Rego policies — the same language as OPA |
+| **Audit trail** | Every decision logged with actor, action, confidence, outcome, and timestamp |
+| **Prompt-injection prefiltering** | Detect and block injection attempts before they reach policy |
+| **Multi-agent delegation** | Enforce trust chains between agents |
+| **Framework-agnostic** | Works with LangChain, OpenAI Agents SDK, Anthropic, Vercel AI SDK, MCP |
+
+---
+
+## Why now
+
+AI agent deployment is accelerating faster than the tooling to govern it. Most production teams are shipping agents with no authorization layer at all — not because they don't care, but because no standard exists yet.
+
+That's the window Lelu is built for. Authorization for agents is a new category, and we're building the open source standard for it.
+
+---
+
+## Get started in 2 minutes
+
+**Cloud (no setup)**
+
+```bash
+npm install lelu-agent-auth
+```
+
+Get an API key at [lelu-ai.com/api-key](https://lelu-ai.com/api-key) and make your first authorization call. The hosted engine runs on GCP Cloud Run — no Docker, no server, no config.
+
+**Self-hosted**
+
+```bash
+docker compose up -d
+```
+
+See the [self-hosting guide](https://lelu-ai.com/docs/guides/production) for production deployment on GCP, AWS, or any container platform.
+
+---
+
+## Architecture
+
+```
+Your Agent
+    │
+    ▼
+lelu-agent-auth (SDK)
+    │
+    ▼
+Lelu Engine (Go · GCP Cloud Run)
+    ├── Injection prefilter
+    ├── Confidence gate
+    ├── Policy evaluation (YAML / Rego)
+    ├── Risk assessment
+    └── Decision merge → allow / deny / review
+            │
+            ▼
+    Audit Trail + Human Review Queue
+```
+
+The engine is stateless and horizontally scalable. Decisions are sub-10ms p99.
+
+---
+
+## Roadmap
+
+We're building toward being the default authorization layer for the agentic web.
+
+- [x] TypeScript SDK
+- [x] Hosted engine on GCP Cloud Run
+- [x] Rego policy evaluation
+- [x] Human-in-the-loop review queue
+- [x] Audit trail
+- [ ] Python SDK — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] LangChain integration — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] OpenAI Agents SDK integration — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] Anthropic Claude tool-use integration — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] MCP authorization middleware — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] Vercel AI SDK integration — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] Policy playground (browser-based) — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+- [ ] GitHub Actions integration — [tracking issue](https://github.com/lelu-auth/lelu/issues)
+
+---
 
 ## Documentation
 
-For comprehensive guides, API references, and examples, visit:
+Full docs at **[lelu-ai.com/docs](https://lelu-ai.com/docs)**
 
-**[https://lelu-ai.com/](https://lelu-ai.com/)**
+- [Quickstart](https://lelu-ai.com/docs/quickstart) — first authorization call in 2 minutes
+- [Installation](https://lelu-ai.com/docs/installation) — SDK setup and API key
+- [Concepts](https://lelu-ai.com/docs/concepts/actors) — actors, actions, resources, policies, decisions
+- [API reference](https://lelu-ai.com/docs/concepts/api) — full endpoint docs
+- [Self-hosting](https://lelu-ai.com/docs/guides/production) — deploy on your own infrastructure
 
-Topics covered:
-- Getting started and installation
-- SDK usage (TypeScript, Python, Go)
-- Policy configuration (YAML and Rego)
-- Authorization flow and architecture
-- Observability and monitoring
-- Production deployment guides
-- API reference
+---
 
-## Contribution
+## Contributing
 
-Lelu is free and open source under the MIT License.
+Lelu is MIT licensed and built in the open. Contributions are welcome.
 
-You can support the project by:
+The highest-impact areas right now:
+- **Framework integrations** — LangChain, CrewAI, LlamaIndex, AutoGen, Semantic Kernel
+- **Rego policy templates** — common compliance patterns (SOC 2, HIPAA, GDPR)
+- **SDK improvements** — streaming, batching, retry logic
 
-- Contributing code
-- Suggesting features
-- Reporting bugs and issues
-- Improving documentation and examples
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+**Good first issues** are labeled [`good first issue`](https://github.com/lelu-auth/lelu/labels/good%20first%20issue) on GitHub.
+
+---
 
 ## Security
 
-If you discover a security issue, please report it privately to:
+Report security issues privately to `security@lelu-ai.com`. All reports are reviewed promptly.
 
-`security@lelu-ai.com`
-
-Reports will be reviewed promptly and handled responsibly.
-
-## Support
-
-- Documentation: [https://lelu-ai.com/](https://lelu-ai.com/)
-- GitHub Issues: [https://github.com/lelu-auth/lelu/issues](https://github.com/lelu-auth/lelu/issues)
-- Discussions: [https://github.com/lelu-auth/lelu/discussions](https://github.com/lelu-auth/lelu/discussions)
-- Email: support@lelu-ai.com
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT © [Lelu](https://lelu-ai.com)

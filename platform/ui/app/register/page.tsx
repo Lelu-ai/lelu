@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LeluMark } from "@/components/ui/LeluMark";
 
 export default function RegisterPage() {
+  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -12,7 +14,6 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
-  const [sent, setSent] = useState(false);
 
   const strength = (() => {
     if (password.length === 0) return 0;
@@ -52,7 +53,8 @@ export default function RegisterPage() {
         setError(data.error || "Registration failed");
         return;
       }
-      setSent(true);
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -62,58 +64,6 @@ export default function RegisterPage() {
 
   const inputCls =
     "w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all";
-
-  if (sent) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAFAFA] dark:bg-[#0B0B0C] px-4">
-        <div
-          className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"
-          style={{
-            backgroundImage:
-              "linear-gradient(#000 1px, transparent 1px), linear-gradient(90deg, #000 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="relative w-full max-w-[400px] text-center">
-          <Link href="/" className="inline-flex items-center gap-2 mb-10 group">
-            <LeluMark size={22} />
-            <span className="font-bold text-[16px] text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
-              lelu
-            </span>
-          </Link>
-
-          <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-10 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] dark:shadow-none">
-            <div className="w-12 h-12 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] flex items-center justify-center mx-auto mb-6">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="2" className="dark:stroke-white">
-                <rect x="2" y="4" width="20" height="16" rx="2" />
-                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-              </svg>
-            </div>
-
-            <h1 className="text-[22px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white mb-3">
-              Check your email
-            </h1>
-            <p className="text-[14px] text-[#737373] leading-relaxed mb-2">
-              We sent a verification link to
-            </p>
-            <p className="text-[14px] font-semibold text-[#0A0A0A] dark:text-white mb-6 break-all">
-              {email}
-            </p>
-            <p className="text-[13px] text-[#A3A3A3] leading-relaxed">
-              Click the link in the email to activate your account. The link expires in 24 hours.
-            </p>
-          </div>
-
-          <p className="mt-5 text-[13px] text-[#737373]">
-            Already verified?{" "}
-            <Link href="/login" className="text-[#0A0A0A] dark:text-white font-semibold hover:underline underline-offset-2">
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0B0B0C]">

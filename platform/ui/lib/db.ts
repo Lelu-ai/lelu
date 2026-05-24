@@ -1,20 +1,27 @@
-import { neon } from "@neondatabase/serverless";
+import postgres from "postgres";
 
-function getSql() {
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
-  if (!url) throw new Error("DATABASE_URL is not set. Add it in Vercel → Settings → Environment Variables.");
-  return neon(url);
+// Cached across hot-reloads in dev, one pool per serverless instance in prod.
+// Works with any standard Postgres URL:
+//   Neon:          postgresql://user:pass@ep-xyz.neon.tech/dbname?sslmode=require
+//   GCP Cloud SQL: postgresql://user:pass@34.x.x.x/dbname?sslmode=require
+//   Local:         postgresql://postgres@localhost/dbname
+let _sql: ReturnType<typeof postgres> | undefined;
+
+export function db(): ReturnType<typeof postgres> {
+  if (!_sql) {
+    const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+    if (!url) throw new Error("DATABASE_URL is not set. Add it in Vercel → Settings → Environment Variables.");
+    _sql = postgres(url, {
+      max: 5,           // max connections per serverless instance
+      idle_timeout: 20, // release idle connections after 20s
+      connect_timeout: 10,
+    });
+  }
+  return _sql;
 }
 
-// Tagged-template SQL query helper — safe against SQL injection via parameterization
-export function db() {
-  return getSql();
-}
-
-// Run once at cold-start to ensure tables exist.
-// Neon is serverless so CREATE TABLE IF NOT EXISTS is cheap.
-export async function ensureSchema() {
-  const sql = getSql();
+export async function ensureSchema(): Promise<void> {
+  const sql = db();
 
   await sql`
     CREATE TABLE IF NOT EXISTS lelu_users (

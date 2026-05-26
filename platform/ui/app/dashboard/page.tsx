@@ -13,8 +13,6 @@ import {
   ArrowUpRight,
   Lock,
   Globe,
-  Rocket,
-  ExternalLink,
 } from "lucide-react";
 import FlowBackground from "@/components/modern/FlowBackground";
 
@@ -277,7 +275,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Start */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-12">
           <div className="p-8 rounded-[2rem] bg-zinc-900 text-white flex flex-col gap-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-8 opacity-10">
               <Globe className="w-24 h-24" />
@@ -292,21 +290,6 @@ export default function DashboardPage() {
                 <span className="text-amber-400">process.env.LELU_API_KEY</span> {"}"});
               </div>
             </div>
-          </div>
-          <div className="p-8 rounded-[2rem] bg-zinc-50 dark:bg-zinc-900/20 text-zinc-900 dark:text-white flex flex-col gap-6 border border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-[#0A0A0A] dark:bg-white flex items-center justify-center">
-                <Rocket className="w-5 h-5 text-white dark:text-[#0A0A0A]" />
-              </div>
-              <h3 className="text-xl font-bold">Explore Automation</h3>
-            </div>
-            <p className="text-sm opacity-80 leading-relaxed">
-              Download the Lelu CLI to manage your policies from your local terminal.
-            </p>
-            <button className="flex items-center gap-2 text-sm font-bold mt-auto hover:gap-4 transition-all uppercase tracking-widest">
-              Get the Auth CLI
-              <ExternalLink className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </main>

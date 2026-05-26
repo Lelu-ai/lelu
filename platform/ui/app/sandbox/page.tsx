@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { LeluMark } from "@/components/ui/LeluMark";
 
 type Decision = "allow" | "deny" | "human_review";
 
@@ -215,38 +214,15 @@ export default function SandboxPage() {
         }}
       />
 
-      {/* Nav */}
-      <nav className="relative z-10 border-b border-[#E7E5E4] dark:border-[#222224] bg-white/80 dark:bg-[#0B0B0C]/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <LeluMark size={18} />
-            <span className="font-bold text-[15px] text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>
-              lelu
-            </span>
-            <span className="text-[#A3A3A3] text-[13px] ml-1">/ sandbox</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Link href="/docs" className="text-[13px] text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors">
-              Docs
-            </Link>
-            <Link
-              href="/register"
-              className="px-3.5 py-1.5 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
-            >
-              Get started
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-10">
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {/* Header */}
         <div className="mb-8">
+          <p className="text-[12px] text-[#A3A3A3] mb-3">Sandbox</p>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] text-[11px] font-semibold text-[#737373] uppercase tracking-widest mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Live sandbox — no account required
+            Live — no account required
           </div>
-          <h1 className="text-[32px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white mb-2">
+          <h1 className="text-[24px] sm:text-[32px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white mb-2">
             Authorization Playground
           </h1>
           <p className="text-[14px] text-[#737373] max-w-xl">
@@ -256,22 +232,22 @@ export default function SandboxPage() {
         </div>
 
         {/* Sandbox API key banner */}
-        <div className="mb-8 bg-[#0A0A0A] dark:bg-[#111113] rounded-xl px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
+        <div className="mb-8 bg-[#0A0A0A] dark:bg-[#111113] rounded-xl px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[11px] text-[#737373] uppercase tracking-widest font-semibold mb-0.5">Sandbox API Key</p>
-              <code className="text-[13px] font-mono text-white">{SANDBOX_KEY}</code>
+              <code className="text-[11px] sm:text-[13px] font-mono text-white break-all">{SANDBOX_KEY}</code>
             </div>
           </div>
           <button
             onClick={() => copyText(SANDBOX_KEY, setCopiedKey)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12px] font-medium transition-colors shrink-0"
+            className="flex items-center gap-2 px-3 sm:px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[12px] font-medium transition-colors shrink-0"
           >
             {copiedKey ? (
               <>

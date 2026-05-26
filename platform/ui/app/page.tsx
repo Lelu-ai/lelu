@@ -153,10 +153,10 @@ export default function HomePage() {
               Get Started
             </Link>
             <Link
-              href="/login"
+              href="/sandbox"
               className="px-5 py-2.5 border border-white/20 text-white text-[14px] font-medium rounded-md hover:bg-white/5 transition-colors"
             >
-              Sign In
+              Try Sandbox
             </Link>
           </div>
         </div>

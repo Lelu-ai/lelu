@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createUser, signJWT, SESSION_COOKIE, cookieOptions } from "@/lib/auth";
+import { createUser, createVerificationToken } from "@/lib/auth";
+import { sendVerificationEmail } from "@/lib/email";
 
 const NAME_RE = /^[a-zA-Z\s'\-.]{2,80}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -32,20 +33,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const user = await createUser(name.trim(), email.trim(), password);
+    const token = await createVerificationToken(user.id);
+    await sendVerificationEmail(user.email, user.name, token);
 
-    const jwt = signJWT({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      emailVerified: true,
-    });
-
-    const res = NextResponse.json(
-      { ok: true, user: { id: user.id, name: user.name, email: user.email } },
+    return NextResponse.json(
+      { ok: true, needsVerification: true },
       { status: 201 }
     );
-    res.cookies.set(SESSION_COOKIE, jwt, cookieOptions(60 * 60 * 24 * 7));
-    return res;
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "EMAIL_TAKEN") {
       return NextResponse.json(

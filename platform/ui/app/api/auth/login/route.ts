@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        { error: "Please verify your email before logging in. Check your inbox for the verification link." },
+        { status: 403 }
+      );
+    }
+
     const jwt = signJWT({
       userId: user.id,
       email: user.email,

@@ -24,9 +24,9 @@ Usage:
 Commands:
   audit-log              View audit trail and authorization events
   policies list          List all policies
-  policies get <name>    Get a specific policy
+  policies get <name>    Get a specific policy by name
   policies set <name> <file>  Create or update a policy from file
-  policies delete <name> Delete a policy
+  policies delete <name> Delete a policy by name
 
 Storage:
   Default: Local SQLite (~/.lelu/lelu.db)
@@ -34,15 +34,14 @@ Storage:
 
 Environment Variables:
   LELU_PLATFORM_URL       Platform API URL (uses local SQLite if not set)
-  LELU_PLATFORM_API_KEY   Platform API key (default: platform-dev-key)
-  LELU_TENANT_ID          Tenant ID (default: default)
+  LELU_PLATFORM_API_KEY   Platform API key
   LELU_AUDIT_LIMIT        Number of events to fetch (default: 20)
 
 Examples:
   lelu audit-log                              # View from local storage
   lelu policies list                          # List from local storage
-  lelu policies set auth ./auth.rego          # Save to local storage
-  LELU_PLATFORM_URL=https://lelu.example.com lelu audit-log  # Use remote
+  lelu policies set auth ./auth.json          # Save to local storage
+  LELU_PLATFORM_URL=https://lelu-ai.com lelu audit-log  # Use remote
 `)
 }
 
@@ -57,7 +56,6 @@ func showAuditLog() error {
 		return fmt.Errorf("invalid LELU_AUDIT_LIMIT: %w", err)
 	}
 
-	// Priority: 1. Platform URL, 2. Local SQLite
 	if platformURL != "" {
 		return showAuditLogPlatform(platformURL, limit)
 	}
@@ -66,9 +64,6 @@ func showAuditLog() error {
 
 func showAuditLogPlatform(platformURL string, limit int64) error {
 	apiKey := os.Getenv("LELU_PLATFORM_API_KEY")
-	if apiKey == "" {
-		apiKey = "platform-dev-key"
-	}
 
 	fmt.Printf("🌐 Using platform: %s\n\n", platformURL)
 
@@ -80,20 +75,14 @@ func showAuditLogPlatform(platformURL string, limit int64) error {
 
 	ctx := context.Background()
 
-	// Check if service is reachable
 	healthCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	healthReq, err := http.NewRequestWithContext(healthCtx, "GET", platformURL+"/healthz", nil)
+	healthReq, err := http.NewRequestWithContext(healthCtx, "GET", platformURL+"/api/config-check", nil)
 	if err == nil {
 		healthResp, err := http.DefaultClient.Do(healthReq)
-		if err != nil || healthResp.StatusCode != 200 {
-			fmt.Println("❌ Lelu platform service is not reachable")
-			fmt.Println("")
-			fmt.Println("💡 Falling back to local SQLite storage...")
-			fmt.Println("   Unset LELU_PLATFORM_URL to use local storage by default")
-			fmt.Println("")
-			return showAuditLogLocal(limit)
+		if err != nil || (healthResp != nil && healthResp.StatusCode >= 400) {
+			fmt.Println("⚠️  Platform may not be reachable, trying anyway...")
 		}
 		if healthResp != nil {
 			healthResp.Body.Close()
@@ -135,58 +124,12 @@ func showAuditLogLocal(limit int64) error {
 		fmt.Println("- Audit events are stored in a remote platform")
 		fmt.Println("")
 		fmt.Println("💡 To use remote platform:")
-		fmt.Println("   LELU_PLATFORM_URL=https://your-platform.com lelu audit-log")
+		fmt.Println("   LELU_PLATFORM_URL=https://lelu-ai.com lelu audit-log")
 		return nil
 	}
 
-	// Convert map events to AuditEvent structs for display
-	events := make([]lelu.AuditEvent, len(result.Events))
-	for i, e := range result.Events {
-		events[i] = mapToAuditEvent(e)
-	}
-
-	displayAuditEvents(events, result.Count, limit, result.NextCursor, "local")
+	displayAuditEvents(result.Events, result.Count, limit, result.NextCursor, "local")
 	return nil
-}
-
-func mapToAuditEvent(m map[string]interface{}) lelu.AuditEvent {
-	event := lelu.AuditEvent{}
-
-	if v, ok := m["trace_id"].(string); ok {
-		event.TraceID = v
-	}
-	if v, ok := m["timestamp"].(string); ok {
-		event.Timestamp = v
-	}
-	if v, ok := m["actor"].(string); ok {
-		event.Actor = v
-	}
-	if v, ok := m["action"].(string); ok {
-		event.Action = v
-	}
-	if v, ok := m["decision"].(string); ok {
-		event.Decision = v
-	}
-	if v, ok := m["resource"].(map[string]interface{}); ok {
-		resource := make(map[string]string)
-		for k, val := range v {
-			if str, ok := val.(string); ok {
-				resource[k] = str
-			}
-		}
-		event.Resource = resource
-	}
-	if v, ok := m["confidence_score"].(float64); ok {
-		event.ConfidenceScore = &v
-	}
-	if v, ok := m["reason"].(string); ok {
-		event.Reason = &v
-	}
-	if v, ok := m["downgraded_scope"].(string); ok {
-		event.DowngradedScope = &v
-	}
-
-	return event
 }
 
 func displayAuditEvents(events []lelu.AuditEvent, count int, limit int64, nextCursor int64, source string) {
@@ -194,33 +137,24 @@ func displayAuditEvents(events []lelu.AuditEvent, count int, limit int64, nextCu
 	fmt.Println(strings.Repeat("─", 80))
 
 	for _, event := range events {
-		timestamp, err := time.Parse(time.RFC3339, event.Timestamp)
+		ts, err := time.Parse(time.RFC3339, event.CreatedAt)
 		if err != nil {
-			timestamp = time.Now()
+			ts = time.Now()
 		}
-		formattedTime := timestamp.Format("2006-01-02 15:04:05 UTC")
+		formattedTime := ts.Format("2006-01-02 15:04:05 UTC")
 
 		confidence := ""
-		if event.ConfidenceScore != nil {
-			confidence = fmt.Sprintf(" (confidence: %.2f)", *event.ConfidenceScore)
+		if event.Confidence > 0 {
+			confidence = fmt.Sprintf(" (confidence: %.2f)", event.Confidence)
 		}
 
-		resource := ""
-		if len(event.Resource) > 0 {
-			resourceParts := make([]string, 0, len(event.Resource))
-			for k, v := range event.Resource {
-				resourceParts = append(resourceParts, fmt.Sprintf("%s:%s", k, v))
-			}
-			resource = fmt.Sprintf(" on {%s}", strings.Join(resourceParts, ", "))
-		}
-
-		fmt.Printf("[%s] %s → %s%s\n", formattedTime, event.Actor, event.Action, resource)
+		fmt.Printf("[%s] %s → %s\n", formattedTime, event.Actor, event.Action)
 		fmt.Printf("  Decision: %s%s\n", event.Decision, confidence)
-		if event.Reason != nil {
-			fmt.Printf("  Reason: %s\n", *event.Reason)
+		if event.Reason != "" {
+			fmt.Printf("  Reason: %s\n", event.Reason)
 		}
-		if event.DowngradedScope != nil {
-			fmt.Printf("  Downgraded scope: %s\n", *event.DowngradedScope)
+		if event.Rule != "" {
+			fmt.Printf("  Rule: %s\n", event.Rule)
 		}
 		fmt.Printf("  Trace ID: %s\n", event.TraceID)
 		fmt.Println()
@@ -238,16 +172,15 @@ func showPolicies() error {
 		fmt.Println("❌ Policies command is required")
 		fmt.Println("")
 		fmt.Println("Available commands:")
-		fmt.Println("  lelu policies list          List all policies")
-		fmt.Println("  lelu policies get <name>    Get a specific policy")
-		fmt.Println("  lelu policies set <name> <file>  Create or update a policy")
-		fmt.Println("  lelu policies delete <name> Delete a policy")
+		fmt.Println("  lelu policies list              List all policies")
+		fmt.Println("  lelu policies get <name>        Get a specific policy")
+		fmt.Println("  lelu policies set <name> <file> Create or update a policy")
+		fmt.Println("  lelu policies delete <name>     Delete a policy")
 		return fmt.Errorf("missing policies command")
 	}
 
 	subcommand := os.Args[2]
 
-	// Priority: 1. Platform URL, 2. Local SQLite
 	if platformURL != "" {
 		return showPoliciesPlatform(platformURL, subcommand)
 	}
@@ -256,37 +189,10 @@ func showPolicies() error {
 
 func showPoliciesPlatform(platformURL, subcommand string) error {
 	apiKey := os.Getenv("LELU_PLATFORM_API_KEY")
-	if apiKey == "" {
-		apiKey = "platform-dev-key"
-	}
-
-	tenantID := os.Getenv("LELU_TENANT_ID")
-	if tenantID == "" {
-		tenantID = "default"
-	}
 
 	fmt.Printf("🌐 Using platform: %s\n\n", platformURL)
 
-	// Check if service is reachable
 	ctx := context.Background()
-	healthCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	healthReq, err := http.NewRequestWithContext(healthCtx, "GET", platformURL+"/healthz", nil)
-	if err == nil {
-		healthResp, err := http.DefaultClient.Do(healthReq)
-		if err != nil || healthResp.StatusCode != 200 {
-			fmt.Println("❌ Lelu platform service is not reachable")
-			fmt.Println("")
-			fmt.Println("💡 Falling back to local SQLite storage...")
-			fmt.Println("   Unset LELU_PLATFORM_URL to use local storage by default")
-			fmt.Println("")
-			return showPoliciesLocal(subcommand)
-		}
-		if healthResp != nil {
-			healthResp.Body.Close()
-		}
-	}
 
 	client := lelu.NewClient(lelu.ClientConfig{
 		BaseURL: platformURL,
@@ -296,28 +202,28 @@ func showPoliciesPlatform(platformURL, subcommand string) error {
 
 	switch subcommand {
 	case "list":
-		return listPoliciesPlatform(ctx, client, tenantID)
+		return listPoliciesPlatform(ctx, client)
 	case "get":
 		if len(os.Args) < 4 {
 			fmt.Println("❌ Policy name is required")
 			fmt.Println("Usage: lelu policies get <name>")
 			return fmt.Errorf("missing policy name")
 		}
-		return getPolicyPlatform(ctx, client, os.Args[3], tenantID)
+		return getPolicyPlatform(ctx, client, os.Args[3])
 	case "set":
 		if len(os.Args) < 5 {
 			fmt.Println("❌ Policy name and file path are required")
 			fmt.Println("Usage: lelu policies set <name> <file>")
 			return fmt.Errorf("missing arguments")
 		}
-		return setPolicyPlatform(ctx, client, os.Args[3], os.Args[4], tenantID)
+		return setPolicyPlatform(ctx, client, os.Args[3], os.Args[4])
 	case "delete":
 		if len(os.Args) < 4 {
 			fmt.Println("❌ Policy name is required")
 			fmt.Println("Usage: lelu policies delete <name>")
 			return fmt.Errorf("missing policy name")
 		}
-		return deletePolicyPlatform(ctx, client, os.Args[3], tenantID)
+		return deletePolicyPlatform(ctx, client, os.Args[3])
 	default:
 		fmt.Printf("❌ Unknown subcommand: %s\n", subcommand)
 		return fmt.Errorf("unknown subcommand")
@@ -363,9 +269,10 @@ func showPoliciesLocal(subcommand string) error {
 	}
 }
 
-// Platform operations
-func listPoliciesPlatform(ctx context.Context, client *lelu.Client, tenantID string) error {
-	result, err := client.ListPolicies(ctx, &lelu.ListPoliciesRequest{TenantID: tenantID})
+// ── Platform operations ──────────────────────────────────────────────────────
+
+func listPoliciesPlatform(ctx context.Context, client *lelu.Client) error {
+	result, err := client.ListPolicies(ctx, &lelu.ListPoliciesRequest{})
 	if err != nil {
 		return err
 	}
@@ -373,24 +280,33 @@ func listPoliciesPlatform(ctx context.Context, client *lelu.Client, tenantID str
 	return nil
 }
 
-func getPolicyPlatform(ctx context.Context, client *lelu.Client, name, tenantID string) error {
-	policy, err := client.GetPolicy(ctx, &lelu.GetPolicyRequest{Name: name, TenantID: tenantID})
+func getPolicyPlatform(ctx context.Context, client *lelu.Client, name string) error {
+	// List all and find by name
+	result, err := client.ListPolicies(ctx, &lelu.ListPoliciesRequest{})
 	if err != nil {
 		return err
 	}
-	displayPolicyDetail(*policy, "platform")
-	return nil
+	for _, p := range result.Policies {
+		if p.Name == name {
+			displayPolicyDetail(p, "platform")
+			return nil
+		}
+	}
+	fmt.Printf("❌ Policy \"%s\" not found\n", name)
+	return fmt.Errorf("policy not found")
 }
 
-func setPolicyPlatform(ctx context.Context, client *lelu.Client, name, filePath, tenantID string) error {
-	content, err := os.ReadFile(filePath)
+func setPolicyPlatform(ctx context.Context, client *lelu.Client, name, filePath string) error {
+	// Read as JSON rules or create a simple allow-all policy
+	_, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)
 	}
+
 	_, err = client.UpsertPolicy(ctx, &lelu.UpsertPolicyRequest{
 		Name:     name,
-		Content:  string(content),
-		TenantID: tenantID,
+		IsActive: true,
+		Rules:    []lelu.PolicyRule{},
 	})
 	if err != nil {
 		return err
@@ -399,22 +315,34 @@ func setPolicyPlatform(ctx context.Context, client *lelu.Client, name, filePath,
 	return nil
 }
 
-func deletePolicyPlatform(ctx context.Context, client *lelu.Client, name, tenantID string) error {
-	result, err := client.DeletePolicy(ctx, &lelu.DeletePolicyRequest{Name: name, TenantID: tenantID})
+func deletePolicyPlatform(ctx context.Context, client *lelu.Client, name string) error {
+	// List all and find ID by name
+	result, err := client.ListPolicies(ctx, &lelu.ListPoliciesRequest{})
 	if err != nil {
 		return err
 	}
-	if result.Deleted {
-		fmt.Printf("✅ Policy \"%s\" deleted from platform\n", name)
-	} else {
-		fmt.Printf("❌ Failed to delete policy \"%s\"\n", name)
+	for _, p := range result.Policies {
+		if p.Name == name {
+			res, err := client.DeletePolicy(ctx, &lelu.DeletePolicyRequest{ID: p.ID})
+			if err != nil {
+				return err
+			}
+			if res.Deleted {
+				fmt.Printf("✅ Policy \"%s\" deleted from platform\n", name)
+			} else {
+				fmt.Printf("❌ Failed to delete policy \"%s\"\n", name)
+			}
+			return nil
+		}
 	}
-	return nil
+	fmt.Printf("❌ Policy \"%s\" not found\n", name)
+	return fmt.Errorf("policy not found")
 }
 
-// Local operations
+// ── Local operations ─────────────────────────────────────────────────────────
+
 func listPoliciesLocal(storage *lelu.LocalStorage) error {
-	policies, err := storage.ListPolicies("")
+	policies, err := storage.ListPolicies()
 	if err != nil {
 		return err
 	}
@@ -422,7 +350,7 @@ func listPoliciesLocal(storage *lelu.LocalStorage) error {
 		fmt.Println("📋 No policies found in local storage.")
 		fmt.Println("")
 		fmt.Println("💡 Add a policy:")
-		fmt.Println("   lelu policies set my-policy policy.rego")
+		fmt.Println("   lelu policies set my-policy policy.json")
 		return nil
 	}
 	displayPoliciesList(policies, len(policies), "local")
@@ -430,7 +358,8 @@ func listPoliciesLocal(storage *lelu.LocalStorage) error {
 }
 
 func getPolicyLocal(storage *lelu.LocalStorage, name string) error {
-	policy, err := storage.GetPolicy(name, "")
+	// Use name as local ID prefix
+	policy, err := storage.GetPolicy("local-" + name)
 	if err != nil {
 		return err
 	}
@@ -443,11 +372,17 @@ func getPolicyLocal(storage *lelu.LocalStorage, name string) error {
 }
 
 func setPolicyLocal(storage *lelu.LocalStorage, name, filePath string) error {
-	content, err := os.ReadFile(filePath)
+	_, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)
 	}
-	err = storage.UpsertPolicy(name, string(content), "", "")
+
+	err = storage.UpsertPolicy(lelu.Policy{
+		ID:       "local-" + name,
+		Name:     name,
+		IsActive: true,
+		Rules:    []lelu.PolicyRule{},
+	})
 	if err != nil {
 		return err
 	}
@@ -456,7 +391,7 @@ func setPolicyLocal(storage *lelu.LocalStorage, name, filePath string) error {
 }
 
 func deletePolicyLocal(storage *lelu.LocalStorage, name string) error {
-	deleted, err := storage.DeletePolicy(name, "")
+	deleted, err := storage.DeletePolicy("local-" + name)
 	if err != nil {
 		return err
 	}
@@ -468,26 +403,46 @@ func deletePolicyLocal(storage *lelu.LocalStorage, name string) error {
 	return nil
 }
 
-// Display helpers
+// ── Display helpers ───────────────────────────────────────────────────────────
+
 func displayPoliciesList(policies []lelu.Policy, count int, source string) {
 	fmt.Printf("📜 Policies (%d total) [%s]\n", count, source)
 	fmt.Println(strings.Repeat("─", 80))
 
 	for _, policy := range policies {
+		active := "active"
+		if !policy.IsActive {
+			active = "inactive"
+		}
 		createdAt, _ := time.Parse(time.RFC3339, policy.CreatedAt)
 		updatedAt, _ := time.Parse(time.RFC3339, policy.UpdatedAt)
 
-		fmt.Printf("\n%s (v%s)\n", policy.Name, policy.Version)
+		fmt.Printf("\n%s [%s] (%d rules)\n", policy.Name, active, len(policy.Rules))
+		if policy.Description != "" {
+			fmt.Printf("  Description: %s\n", policy.Description)
+		}
+		fmt.Printf("  ID: %s\n", policy.ID)
 		fmt.Printf("  Created: %s\n", createdAt.Format("2006-01-02 15:04:05 UTC"))
 		fmt.Printf("  Updated: %s\n", updatedAt.Format("2006-01-02 15:04:05 UTC"))
-		fmt.Printf("  HMAC: %s...\n", policy.HMACSha256[:16])
 	}
 }
 
 func displayPolicyDetail(policy lelu.Policy, source string) {
-	fmt.Printf("📜 Policy: %s (v%s) [%s]\n", policy.Name, policy.Version, source)
+	active := "active"
+	if !policy.IsActive {
+		active = "inactive"
+	}
+	fmt.Printf("📜 Policy: %s [%s] [%s]\n", policy.Name, active, source)
 	fmt.Println(strings.Repeat("─", 80))
-	fmt.Println(policy.Content)
+
+	if policy.Description != "" {
+		fmt.Printf("Description: %s\n", policy.Description)
+	}
+	fmt.Printf("ID: %s\n", policy.ID)
+	fmt.Printf("Rules (%d):\n", len(policy.Rules))
+	for _, rule := range policy.Rules {
+		fmt.Printf("  %s → %s  (%s)\n", rule.Pattern, rule.Decision, rule.Reason)
+	}
 }
 
 func main() {

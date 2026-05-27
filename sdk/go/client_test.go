@@ -9,42 +9,116 @@ import (
 	"time"
 )
 
+func authorizeResponse() map[string]any {
+	return map[string]any{
+		"requestId": "req-123",
+		"tool":      "view",
+		"decision":  "allow",
+		"reason":    "ok",
+		"rule":      "default-allow",
+		"latencyMs": 1.5,
+		"mode":      "live",
+		"timestamp": "2024-01-01T00:00:00Z",
+	}
+}
+
 func TestAuthorize(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/authorize" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/authorize" {
 			t.Fatalf("unexpected route: %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(authorizeResponse())
+	}))
+	defer ts.Close()
+
+	c := NewClient(ClientConfig{BaseURL: ts.URL})
+	res, err := c.Authorize(context.Background(), AuthorizeRequest{Tool: "view"})
+	if err != nil {
+		t.Fatalf("authorize failed: %v", err)
+	}
+	if !res.Allowed() {
+		t.Fatalf("expected allowed, got decision=%s", res.Decision)
+	}
+	if res.RequestID != "req-123" {
+		t.Fatalf("unexpected request id: %s", res.RequestID)
+	}
+}
+
+func TestAuthorize_Deny(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"allowed":  true,
-			"reason":   "ok",
-			"trace_id": "trace-123",
+			"requestId": "req-456",
+			"tool":      "delete_db",
+			"decision":  "deny",
+			"reason":    "not permitted",
+			"rule":      "deny-all",
+			"latencyMs": 0.5,
+			"mode":      "live",
+			"timestamp": "2024-01-01T00:00:00Z",
 		})
 	}))
 	defer ts.Close()
 
 	c := NewClient(ClientConfig{BaseURL: ts.URL})
-	res, err := c.Authorize(context.Background(), AuthRequest{UserID: "u1", Action: "view"})
+	res, err := c.Authorize(context.Background(), AuthorizeRequest{Tool: "delete_db"})
 	if err != nil {
 		t.Fatalf("authorize failed: %v", err)
 	}
-	if !res.Allowed || res.TraceID != "trace-123" {
-		t.Fatalf("unexpected response: %#v", res)
+	if res.Allowed() {
+		t.Fatalf("expected denied")
+	}
+	if res.RequiresHumanReview() {
+		t.Fatalf("expected not human review")
+	}
+}
+
+func TestAuthorize_HumanReview(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"requestId": "req-789",
+			"tool":      "wire_transfer",
+			"decision":  "human_review",
+			"reason":    "high risk action",
+			"rule":      "require-review",
+			"latencyMs": 1.0,
+			"mode":      "live",
+			"timestamp": "2024-01-01T00:00:00Z",
+		})
+	}))
+	defer ts.Close()
+
+	c := NewClient(ClientConfig{BaseURL: ts.URL})
+	res, err := c.Authorize(context.Background(), AuthorizeRequest{Tool: "wire_transfer"})
+	if err != nil {
+		t.Fatalf("authorize failed: %v", err)
+	}
+	if res.Allowed() {
+		t.Fatalf("expected not allowed")
+	}
+	if !res.RequiresHumanReview() {
+		t.Fatalf("expected human review")
 	}
 }
 
 func TestAgentAuthorize(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/agent/authorize" {
+		// AgentAuthorize now internally calls POST /api/v1/authorize
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/authorize" {
 			t.Fatalf("unexpected route: %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"allowed":               true,
-			"reason":                "allowed",
-			"trace_id":              "trace-456",
-			"requires_human_review": false,
-			"confidence_used":       0.95,
+			"requestId": "req-456",
+			"tool":      "approve_refunds",
+			"decision":  "allow",
+			"reason":    "allowed",
+			"rule":      "agent-policy",
+			"latencyMs": 2.0,
+			"mode":      "live",
+			"timestamp": "2024-01-01T00:00:00Z",
 		})
 	}))
 	defer ts.Close()
@@ -58,8 +132,14 @@ func TestAgentAuthorize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("agent authorize failed: %v", err)
 	}
-	if !res.Allowed || res.ConfidenceUsed != 0.95 {
-		t.Fatalf("unexpected response: %#v", res)
+	if !res.Allowed() {
+		t.Fatalf("expected allowed, got decision=%s", res.Decision)
+	}
+	if res.ConfidenceUsed != 0.95 {
+		t.Fatalf("unexpected confidence_used: %v", res.ConfidenceUsed)
+	}
+	if res.TraceID != "req-456" {
+		t.Fatalf("unexpected trace id: %s", res.TraceID)
 	}
 }
 
@@ -105,7 +185,7 @@ func TestMintAndRevokeToken(t *testing.T) {
 
 func TestIsHealthy(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/healthz" {
+		if r.Method != http.MethodGet || r.URL.Path != "/api/config-check" {
 			t.Fatalf("unexpected route: %s %s", r.Method, r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -116,6 +196,13 @@ func TestIsHealthy(t *testing.T) {
 	c := NewClient(ClientConfig{BaseURL: ts.URL, Timeout: 2 * time.Second})
 	if !c.IsHealthy(context.Background()) {
 		t.Fatalf("expected healthy=true")
+	}
+}
+
+func TestIsHealthy_Unreachable(t *testing.T) {
+	c := NewClient(ClientConfig{BaseURL: "http://127.0.0.1:1", Timeout: 200 * time.Millisecond})
+	if c.IsHealthy(context.Background()) {
+		t.Fatalf("expected healthy=false for unreachable server")
 	}
 }
 
@@ -185,14 +272,14 @@ func TestDelegateScope_Validation(t *testing.T) {
 
 func TestEngineError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]any{"error": "unauthorized"})
 	}))
 	defer ts.Close()
 
 	c := NewClient(ClientConfig{BaseURL: ts.URL})
-	_, err := c.Authorize(context.Background(), AuthRequest{UserID: "u1", Action: "view"})
+	_, err := c.Authorize(context.Background(), AuthorizeRequest{Tool: "view"})
 	if err == nil {
 		t.Fatalf("expected an error")
 	}
@@ -202,5 +289,25 @@ func TestEngineError(t *testing.T) {
 	}
 	if engErr.Status != http.StatusUnauthorized {
 		t.Fatalf("unexpected status: %d", engErr.Status)
+	}
+}
+
+func TestNewClient_DefaultURL(t *testing.T) {
+	// No API key → localhost
+	c := NewClient(ClientConfig{})
+	if c.baseURL != "http://localhost:8080" {
+		t.Fatalf("expected localhost, got %s", c.baseURL)
+	}
+
+	// With API key → cloud URL
+	c2 := NewClient(ClientConfig{APIKey: "lelu_sk_test_123"})
+	if c2.baseURL != LeluCloudURL {
+		t.Fatalf("expected cloud URL %s, got %s", LeluCloudURL, c2.baseURL)
+	}
+
+	// Explicit base URL overrides default
+	c3 := NewClient(ClientConfig{APIKey: "lelu_sk_test", BaseURL: "http://custom:9090"})
+	if c3.baseURL != "http://custom:9090" {
+		t.Fatalf("expected custom URL, got %s", c3.baseURL)
 	}
 }

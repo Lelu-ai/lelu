@@ -7,11 +7,20 @@ import { LeluClient } from "../client.js";
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-function mockAgentAuthorize(body: unknown) {
+function mockAuthorize(decision: "allow" | "deny" | "human_review", confidence = 0.95) {
     mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => body,
+        json: async () => ({
+            requestId: "req-test",
+            tool: "test_action",
+            decision,
+            reason: decision === "allow" ? "action authorized" : decision === "human_review" ? "requires human approval" : "hard deny",
+            rule: "default",
+            latencyMs: 1.5,
+            mode: "live",
+            timestamp: "2024-01-01T00:00:00Z",
+        }),
     });
 }
 
@@ -34,13 +43,7 @@ describe("secureTool()", () => {
     });
 
     it("calls the original execute when allowed", async () => {
-        mockAgentAuthorize({
-            allowed: true,
-            reason: "action authorized",
-            trace_id: "t1",
-            requires_human_review: false,
-            confidence_used: 0.95,
-        });
+        mockAuthorize("allow", 0.95);
 
         const secured = secureTool({
             client,
@@ -56,13 +59,7 @@ describe("secureTool()", () => {
     });
 
     it("returns LeluDeniedResult when denied", async () => {
-        mockAgentAuthorize({
-            allowed: false,
-            reason: "hard deny — confidence too low",
-            trace_id: "t2",
-            requires_human_review: false,
-            confidence_used: 0.40,
-        });
+        mockAuthorize("deny", 0.40);
 
         const secured = secureTool({
             client,
@@ -82,13 +79,7 @@ describe("secureTool()", () => {
     });
 
     it("returns LeluDeniedResult with requiresHumanReview when review needed", async () => {
-        mockAgentAuthorize({
-            allowed: false,
-            reason: "requires human approval",
-            trace_id: "t3",
-            requires_human_review: true,
-            confidence_used: 0.80,
-        });
+        mockAuthorize("human_review", 0.80);
 
         const secured = secureTool({
             client,
@@ -108,13 +99,7 @@ describe("secureTool()", () => {
     });
 
     it("supports dynamic confidence function", async () => {
-        mockAgentAuthorize({
-            allowed: true,
-            reason: "action authorized",
-            trace_id: "t4",
-            requires_human_review: false,
-            confidence_used: 0.88,
-        });
+        mockAuthorize("allow", 0.95);
 
         const secured = secureTool({
             client,

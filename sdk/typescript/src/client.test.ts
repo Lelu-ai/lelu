@@ -22,6 +22,19 @@ function mockError(status: number, errorMsg: string) {
   });
 }
 
+function authorizeResponse(decision: "allow" | "deny" | "human_review", reqId = "req-1") {
+  return {
+    requestId: reqId,
+    tool: "test_tool",
+    decision,
+    reason: decision === "allow" ? "action allowed" : "action denied",
+    rule: "default",
+    latencyMs: 1.5,
+    mode: "live",
+    timestamp: "2024-01-01T00:00:00Z",
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("LeluClient", () => {
@@ -36,26 +49,33 @@ describe("LeluClient", () => {
 
   describe("authorize()", () => {
     it("returns allowed decision", async () => {
-      mockOK({ allowed: true, reason: "action allowed by role", trace_id: "t1" });
-      const dec = await client.authorize({ userId: "u1", action: "approve_refunds" });
+      mockOK(authorizeResponse("allow", "t1"));
+      const dec = await client.authorize({ tool: "approve_refunds" });
       expect(dec.allowed).toBe(true);
-      expect(dec.traceId).toBe("t1");
+      expect(dec.requestId).toBe("t1");
     });
 
     it("returns denied decision", async () => {
-      mockOK({ allowed: false, reason: "denied", trace_id: "t2" });
-      const dec = await client.authorize({ userId: "u1", action: "delete_invoices" });
+      mockOK(authorizeResponse("deny", "t2"));
+      const dec = await client.authorize({ tool: "delete_invoices" });
       expect(dec.allowed).toBe(false);
+    });
+
+    it("returns human_review decision", async () => {
+      mockOK(authorizeResponse("human_review", "t3"));
+      const dec = await client.authorize({ tool: "wire_transfer" });
+      expect(dec.allowed).toBe(false);
+      expect(dec.decision).toBe("human_review");
     });
 
     it("throws AuthEngineError on HTTP error", async () => {
       mockError(500, "internal error");
       await expect(
-        client.authorize({ userId: "u1", action: "approve_refunds" })
+        client.authorize({ tool: "approve_refunds" })
       ).rejects.toBeInstanceOf(AuthEngineError);
     });
 
-    it("throws Zod validation error on missing userId", async () => {
+    it("throws Zod validation error on missing tool", async () => {
       await expect(
         // @ts-expect-error – intentional bad input
         client.authorize({ action: "approve_refunds" })
@@ -67,13 +87,7 @@ describe("LeluClient", () => {
 
   describe("agentAuthorize()", () => {
     it("returns allowed with full confidence", async () => {
-      mockOK({
-        allowed: true,
-        reason: "action authorized",
-        trace_id: "t3",
-        requires_human_review: false,
-        confidence_used: 0.95,
-      });
+      mockOK(authorizeResponse("allow", "t4"));
       const dec = await client.agentAuthorize({
         actor: "invoice_bot",
         action: "approve_refunds",
@@ -85,36 +99,26 @@ describe("LeluClient", () => {
     });
 
     it("returns requires_human_review at 0.80 confidence", async () => {
-      mockOK({
-        allowed: false,
-        reason: "requires human approval",
-        trace_id: "t4",
-        requires_human_review: true,
-        confidence_used: 0.80,
-      });
+      mockOK(authorizeResponse("human_review", "t5"));
       const dec = await client.agentAuthorize({
         actor: "invoice_bot",
         action: "approve_refunds",
         context: { confidence: 0.80 },
       });
       expect(dec.requiresHumanReview).toBe(true);
+      expect(dec.allowed).toBe(false);
     });
 
-    it("returns downgraded scope at low confidence", async () => {
-      mockOK({
-        allowed: false,
-        reason: "downgraded",
-        trace_id: "t5",
-        downgraded_scope: "read_only",
-        requires_human_review: false,
-        confidence_used: 0.65,
-      });
+    it("returns denied decision at low confidence", async () => {
+      mockOK(authorizeResponse("deny", "t6"));
       const dec = await client.agentAuthorize({
         actor: "invoice_bot",
         action: "approve_refunds",
         context: { confidence: 0.65 },
       });
-      expect(dec.downgradedScope).toBe("read_only");
+      expect(dec.allowed).toBe(false);
+      expect(dec.requiresHumanReview).toBe(false);
+      expect(dec.traceId).toBe("t6");
     });
 
     it("validates confidence is between 0 and 1", async () => {
@@ -196,7 +200,7 @@ describe("LeluClient", () => {
 
   describe("isHealthy()", () => {
     it("returns true on ok status", async () => {
-      mockOK({ status: "ok", service: "lelu-engine" });
+      mockOK({ status: "ok" });
       expect(await client.isHealthy()).toBe(true);
     });
 

@@ -10,7 +10,7 @@ from lelu import (
     AgentAuthRequest,
     AgentContext,
     AuthEngineError,
-    AuthRequest,
+    AuthorizeRequest,
     DelegateScopeRequest,
     LeluClient,
     MintTokenRequest,
@@ -25,55 +25,75 @@ def client() -> LeluClient:
     return LeluClient(base_url="http://localhost:8080")
 
 
-# ─── /v1/authorize ────────────────────────────────────────────────────────────
+def _authorize_response(decision: str = "allow", reason: str = "ok", req_id: str = "req-1") -> dict:
+    return {
+        "requestId": req_id,
+        "tool": "test_tool",
+        "decision": decision,
+        "reason": reason,
+        "rule": "default",
+        "latencyMs": 1.5,
+        "mode": "live",
+        "timestamp": "2024-01-01T00:00:00Z",
+    }
+
+
+# ─── POST /api/v1/authorize ───────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_authorize_allowed(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         method="POST",
-        url="http://localhost:8080/v1/authorize",
-        json={"allowed": True, "reason": "action allowed by role", "trace_id": "t1"},
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="allow", req_id="t1"),
     )
-    dec = await client.authorize(AuthRequest(user_id="user_123", action="approve_refunds"))
+    dec = await client.authorize(AuthorizeRequest(tool="approve_refunds"))
     assert dec.allowed is True
-    assert dec.trace_id == "t1"
+    assert dec.request_id == "t1"
 
 
 @pytest.mark.asyncio
 async def test_authorize_denied(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         method="POST",
-        url="http://localhost:8080/v1/authorize",
-        json={"allowed": False, "reason": "denied", "trace_id": "t2"},
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="deny", reason="denied", req_id="t2"),
     )
-    dec = await client.authorize(AuthRequest(user_id="user_123", action="delete_invoices"))
+    dec = await client.authorize(AuthorizeRequest(tool="delete_invoices"))
     assert dec.allowed is False
+    assert dec.requires_human_review is False
+
+
+@pytest.mark.asyncio
+async def test_authorize_human_review(client: LeluClient, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="human_review", reason="needs approval", req_id="t3"),
+    )
+    dec = await client.authorize(AuthorizeRequest(tool="wire_transfer"))
+    assert dec.allowed is False
+    assert dec.requires_human_review is True
 
 
 @pytest.mark.asyncio
 async def test_authorize_http_error(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(status_code=500, json={"error": "internal server error"})
     with pytest.raises(AuthEngineError) as exc_info:
-        await client.authorize(AuthRequest(user_id="u", action="a"))
+        await client.authorize(AuthorizeRequest(tool="some_tool"))
     assert exc_info.value.status == 500
 
 
-# ─── /v1/agent/authorize ──────────────────────────────────────────────────────
+# ─── agent_authorize (wrapper around /api/v1/authorize) ───────────────────────
 
 
 @pytest.mark.asyncio
 async def test_agent_authorize_full_confidence(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         method="POST",
-        url="http://localhost:8080/v1/agent/authorize",
-        json={
-            "allowed": True,
-            "reason": "action authorized",
-            "trace_id": "t3",
-            "requires_human_review": False,
-            "confidence_used": 0.95,
-        },
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="allow", req_id="t4"),
     )
     dec = await client.agent_authorize(
         AgentAuthRequest(
@@ -91,14 +111,8 @@ async def test_agent_authorize_full_confidence(client: LeluClient, httpx_mock: H
 async def test_agent_authorize_human_review(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         method="POST",
-        url="http://localhost:8080/v1/agent/authorize",
-        json={
-            "allowed": False,
-            "reason": "requires human approval",
-            "trace_id": "t4",
-            "requires_human_review": True,
-            "confidence_used": 0.80,
-        },
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="human_review", reason="requires human approval", req_id="t5"),
     )
     dec = await client.agent_authorize(
         AgentAuthRequest(
@@ -108,21 +122,15 @@ async def test_agent_authorize_human_review(client: LeluClient, httpx_mock: HTTP
         )
     )
     assert dec.requires_human_review is True
+    assert dec.allowed is False
 
 
 @pytest.mark.asyncio
-async def test_agent_authorize_read_only_downgrade(client: LeluClient, httpx_mock: HTTPXMock) -> None:
+async def test_agent_authorize_denied(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
         method="POST",
-        url="http://localhost:8080/v1/agent/authorize",
-        json={
-            "allowed": False,
-            "reason": "downgraded",
-            "trace_id": "t5",
-            "downgraded_scope": "read_only",
-            "requires_human_review": False,
-            "confidence_used": 0.65,
-        },
+        url="http://localhost:8080/api/v1/authorize",
+        json=_authorize_response(decision="deny", reason="denied by policy", req_id="t6"),
     )
     dec = await client.agent_authorize(
         AgentAuthRequest(
@@ -131,7 +139,8 @@ async def test_agent_authorize_read_only_downgrade(client: LeluClient, httpx_moc
             context=AgentContext(confidence=0.65),
         )
     )
-    assert dec.downgraded_scope == "read_only"
+    assert dec.allowed is False
+    assert dec.requires_human_review is False
 
 
 def test_agent_context_validates_confidence_range() -> None:
@@ -139,7 +148,7 @@ def test_agent_context_validates_confidence_range() -> None:
         AgentContext(confidence=1.5)
 
 
-# ─── /v1/tokens/mint ──────────────────────────────────────────────────────────
+# ─── POST /v1/tokens/mint ─────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -156,7 +165,7 @@ async def test_mint_token(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     assert result.token_id == "tid1"
 
 
-# ─── /v1/tokens/{id} DELETE ───────────────────────────────────────────────────
+# ─── DELETE /v1/tokens/{id} ───────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -170,14 +179,14 @@ async def test_revoke_token(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     assert result.success is True
 
 
-# ─── /healthz ─────────────────────────────────────────────────────────────────
+# ─── GET /api/config-check ────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_is_healthy_true(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8080/healthz",
-        json={"status": "ok", "service": "lelu-engine"},
+        url="http://localhost:8080/api/config-check",
+        json={"status": "ok"},
     )
     assert await client.is_healthy() is True
 
@@ -194,14 +203,14 @@ async def test_is_healthy_false_on_error(client: LeluClient, httpx_mock: HTTPXMo
 @pytest.mark.asyncio
 async def test_context_manager(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8080/healthz",
+        url="http://localhost:8080/api/config-check",
         json={"status": "ok"},
     )
     async with LeluClient() as lelu:
         assert await lelu.is_healthy() is True
 
 
-# ─── /v1/agent/delegate ──────────────────────────────────────────────────────
+# ─── POST /v1/agent/delegate ─────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio

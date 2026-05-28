@@ -12,19 +12,28 @@ from auth_pe.langgraph import (
 from auth_pe.models import AgentAuthDecision
 
 
-def _mock_client(*, allowed: bool, requires_review: bool = False, reason: str = "ok") -> MagicMock:
-    """Return a mock LeluClient whose agent_authorize returns the given decision."""
-    decision = AgentAuthDecision(
-        allowed=allowed,
+def _make_decision(*, decision: str, reason: str = "ok") -> AgentAuthDecision:
+    """Build an AgentAuthDecision with the new required fields."""
+    return AgentAuthDecision(
+        request_id="req-test",
+        tool="test_action",
+        decision=decision,
         reason=reason,
-        trace_id="trace-test",
-        requires_human_review=requires_review,
+        rule="default",
+        latency_ms=1.0,
+        mode="live",
+        timestamp="2024-01-01T00:00:00Z",
         confidence_used=0.85,
+        trace_id="trace-test",
         downgraded_scope=None,
     )
+
+
+def _mock_client(*, decision: str, reason: str = "ok") -> MagicMock:
+    """Return a mock LeluClient whose agent_authorize returns the given decision."""
+    dec = _make_decision(decision=decision, reason=reason)
     client = MagicMock()
-    client.agent_authorize = AsyncMock(return_value=decision)
-    # Support async context manager usage
+    client.agent_authorize = AsyncMock(return_value=dec)
     client.__aenter__ = AsyncMock(return_value=client)
     client.__aexit__ = AsyncMock(return_value=None)
     return client
@@ -32,7 +41,7 @@ def _mock_client(*, allowed: bool, requires_review: bool = False, reason: str = 
 
 @pytest.mark.asyncio
 async def test_secure_node_allowed():
-    client = _mock_client(allowed=True)
+    client = _mock_client(decision="allow")
 
     @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
     async def my_node(state: dict) -> dict:
@@ -45,7 +54,7 @@ async def test_secure_node_allowed():
 
 @pytest.mark.asyncio
 async def test_secure_node_denied_silent():
-    client = _mock_client(allowed=False, reason="low confidence")
+    client = _mock_client(decision="deny", reason="low confidence")
 
     @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
     async def my_node(state: dict) -> dict:
@@ -59,7 +68,7 @@ async def test_secure_node_denied_silent():
 
 @pytest.mark.asyncio
 async def test_secure_node_denied_throw():
-    client = _mock_client(allowed=False, reason="policy violation")
+    client = _mock_client(decision="deny", reason="policy violation")
 
     @secure_node(client=client, actor="invoice_bot", action="invoice:approve", throw_on_deny=True)
     async def my_node(state: dict) -> dict:
@@ -72,7 +81,7 @@ async def test_secure_node_denied_throw():
 
 @pytest.mark.asyncio
 async def test_secure_node_requires_human_review():
-    client = _mock_client(allowed=False, requires_review=True, reason="needs approval")
+    client = _mock_client(decision="human_review", reason="needs approval")
 
     @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
     async def my_node(state: dict) -> dict:
@@ -87,7 +96,7 @@ async def test_secure_node_requires_human_review():
 @pytest.mark.asyncio
 async def test_secure_node_default_confidence():
     """When confidence_key is missing, default_confidence is used."""
-    client = _mock_client(allowed=True)
+    client = _mock_client(decision="allow")
 
     @secure_node(
         client=client,
@@ -100,6 +109,5 @@ async def test_secure_node_default_confidence():
 
     result = await my_node({})  # no "confidence" key
     assert not was_denied(result)
-    # Verify the call used 0.99
     call_args = client.agent_authorize.call_args[0][0]
     assert call_args.context.confidence == 0.99

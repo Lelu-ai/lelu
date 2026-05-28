@@ -1,4 +1,4 @@
-"""Lelu Python SDK public package alias."""
+"""Lelu Python SDK — public package alias."""
 
 from auth_pe import *  # noqa: F401,F403
 from auth_pe import __all__ as _auth_all

@@ -3,39 +3,55 @@ Lelu Python SDK.
 
 Quick start::
 
-    from lelu import LeluClient, AgentAuthRequest, AgentContext
+    import asyncio
+    from lelu import LeluClient, AuthorizeRequest
 
-    async with LeluClient(base_url="http://localhost:8080") as lelu:
-        decision = await lelu.agent_authorize(
-            AgentAuthRequest(
-                actor="invoice_bot",
-                action="approve_refunds",
-                context=AgentContext(confidence=0.92, acting_for="user_123"),
-            )
-        )
-        if not decision.allowed:
-            print(decision.reason)
+    async def main():
+        async with LeluClient(api_key="lelu_sk_...") as lelu:
+            result = await lelu.authorize(AuthorizeRequest(tool="delete_file"))
+            if result.decision == "deny":
+                print(f"Blocked: {result.reason}")
+
+    asyncio.run(main())
 """
 
-from .client import LeluClient
+from .client import LeluClient, LELU_CLOUD_URL
 from .autogpt_plugin import LeluAutoGPTPlugin
 from .middleware import AgentMiddleware
 from .storage import LocalStorage
 from .models import (
-    AgentAuthDecision,
+    # Primary request type
+    AuthorizeRequest,
+    # Legacy request types (backward compat)
+    AuthRequest,
     AgentAuthRequest,
     AgentContext,
-    AuthDecision,
-    AuthEngineError,
-    AuthRequest,
-    DelegateScopeRequest,
-    DelegateScopeResult,
     MintTokenRequest,
+    DelegateScopeRequest,
+    # Decision types
+    AuthDecision,
+    AgentAuthDecision,
     MintTokenResult,
+    DelegateScopeResult,
     RevokeTokenResult,
+    # Policy types
+    Policy,
+    PolicyRule,
+    ListPoliciesRequest,
+    ListPoliciesResult,
+    GetPolicyRequest,
+    UpsertPolicyRequest,
+    DeletePolicyRequest,
+    DeletePolicyResult,
+    # Audit types
+    AuditEvent,
+    ListAuditEventsRequest,
+    ListAuditEventsResult,
+    # Error
+    AuthEngineError,
 )
 
-# Enhanced Observability (Phase 1)
+# Enhanced Observability
 from .observability import (
     AgentTracer,
     agent_tracer,
@@ -51,17 +67,17 @@ from .observability import (
 try:
     from .crewai import LeluTool, PermissionDeniedError as CrewAIPermissionDeniedError  # noqa: F401
 except ImportError:
-    pass  # crewai not installed; LeluTool not available
+    pass
 
 __all__ = [
     "LeluClient",
+    "LELU_CLOUD_URL",
     "LeluAutoGPTPlugin",
     "AgentMiddleware",
     "LocalStorage",
-    # CrewAI
-    "LeluTool",
-    "CrewAIPermissionDeniedError",
-    # Requests
+    # Primary request
+    "AuthorizeRequest",
+    # Legacy requests
     "AuthRequest",
     "AgentAuthRequest",
     "AgentContext",
@@ -73,9 +89,22 @@ __all__ = [
     "MintTokenResult",
     "DelegateScopeResult",
     "RevokeTokenResult",
-    # Errors
+    # Policies
+    "Policy",
+    "PolicyRule",
+    "ListPoliciesRequest",
+    "ListPoliciesResult",
+    "GetPolicyRequest",
+    "UpsertPolicyRequest",
+    "DeletePolicyRequest",
+    "DeletePolicyResult",
+    # Audit
+    "AuditEvent",
+    "ListAuditEventsRequest",
+    "ListAuditEventsResult",
+    # Error
     "AuthEngineError",
-    # Enhanced Observability
+    # Observability
     "AgentTracer",
     "agent_tracer",
     "get_agent_tracer",
@@ -84,6 +113,9 @@ __all__ = [
     "DecisionTypes",
     "DecisionMetrics",
     "LatencyMetrics",
+    # CrewAI
+    "LeluTool",
+    "CrewAIPermissionDeniedError",
 ]
 
-__version__ = "0.0.1"
+__version__ = "0.3.61"

@@ -1,6 +1,6 @@
 {
   "name": "lelu-agent-auth",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer Getachew",
   "contributors": [
@@ -49,7 +49,7 @@
   ],
   "scripts": {
     "build": "npm run build:sdk",
-    "build:sdk": "tsup",
+    "build:sdk": "tsc --project tsconfig.json",
     "build:ui": "node scripts/build-ui.js",
     "build:all": "npm run build:sdk && npm run build:ui",
     "dev": "tsup --watch",
@@ -84,21 +84,33 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@ai-sdk/react": "^3.0.99",
-    "ai": "^6.0.97",
-    "better-sqlite3": "^11.0.0",
-    "openai": "^6.22.0",
     "zod": "^3.23.0"
   },
   "peerDependencies": {
+    "@ai-sdk/react": ">=3",
+    "ai": ">=4",
+    "better-sqlite3": ">=9",
     "express": ">=4",
+    "openai": ">=4",
     "react": ">=18"
   },
   "peerDependenciesMeta": {
-    "react": {
+    "@ai-sdk/react": {
+      "optional": true
+    },
+    "ai": {
+      "optional": true
+    },
+    "better-sqlite3": {
       "optional": true
     },
     "express": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    },
+    "react": {
       "optional": true
     }
   },

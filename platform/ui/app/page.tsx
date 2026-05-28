@@ -60,7 +60,7 @@ const FEATURES = [
 const RIGHT_TABS: { label: string; href?: string }[] = [
   { label: "README" },
   { label: "DOCS", href: "/docs" },
-  { label: "SDK", href: "/docs/installation" },
+  { label: "SDK", href: "/docs/quickstart" },
   { label: "AUDIT LOG", href: "/audit" },
   { label: "POLICIES", href: "/policies" },
 ];
@@ -257,7 +257,7 @@ export default function HomePage() {
                   ? "border-[#0A0A0A] dark:border-white text-[#0A0A0A] dark:text-white"
                   : "border-transparent text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white"
               }`;
-              const chevron = (tab.label === "SDK" || tab.label === "AUDIT LOG") && (
+              const chevron = tab.label === "AUDIT LOG" && (
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="inline ml-1 mb-0.5"><path d="M6 9l6 6 6-6" /></svg>
               );
               return tab.href ? (

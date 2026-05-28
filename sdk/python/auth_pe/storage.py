@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import sqlite3
 import time
 from pathlib import Path
 from typing import Any
 
-from .models import AuditEvent, Policy
+from .models import AuditEvent, Policy, PolicyRule
 
 
 class LocalStorage:
     """
-    LocalStorage provides SQLite-based local storage for audit logs and policies.
+    SQLite-backed local storage for audit logs and policies.
     Automatically creates ~/.lelu/lelu.db on first use.
     """
 
     def __init__(self, db_path: str | None = None):
-        """Initialize local storage with SQLite database."""
         if db_path is None:
             lelu_dir = Path.home() / ".lelu"
             lelu_dir.mkdir(parents=True, exist_ok=True)
@@ -31,44 +29,38 @@ class LocalStorage:
         self._initialize()
 
     def _initialize(self) -> None:
-        """Create tables if they don't exist."""
         self.conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS audit_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                tenant_id TEXT NOT NULL DEFAULT 'default',
                 trace_id TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
+                user_id TEXT,
+                key_id TEXT,
                 actor TEXT NOT NULL,
                 action TEXT NOT NULL,
-                resource TEXT,
-                confidence_score REAL,
                 decision TEXT NOT NULL,
-                reason TEXT,
-                downgraded_scope TEXT,
-                latency_ms REAL,
-                engine_version TEXT,
-                policy_version TEXT,
+                reason TEXT NOT NULL DEFAULT '',
+                rule TEXT NOT NULL DEFAULT '',
+                policy_name TEXT,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                latency_ms INTEGER NOT NULL DEFAULT 0,
+                mode TEXT NOT NULL DEFAULT 'live',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE INDEX IF NOT EXISTS idx_audit_tenant_trace 
-                ON audit_events(tenant_id, trace_id);
-            CREATE INDEX IF NOT EXISTS idx_audit_tenant_actor 
-                ON audit_events(tenant_id, actor, timestamp DESC);
-            CREATE INDEX IF NOT EXISTS idx_audit_tenant_ts 
-                ON audit_events(tenant_id, timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_trace ON audit_events(trace_id);
+            CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_events(actor, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_events(created_at DESC);
 
             CREATE TABLE IF NOT EXISTS policies (
                 id TEXT PRIMARY KEY,
-                tenant_id TEXT NOT NULL DEFAULT 'default',
-                name TEXT NOT NULL,
-                content TEXT NOT NULL,
-                version TEXT NOT NULL DEFAULT '1.0',
-                hmac_sha256 TEXT NOT NULL,
+                user_id TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL UNIQUE,
+                description TEXT NOT NULL DEFAULT '',
+                rules TEXT NOT NULL DEFAULT '[]',
+                is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(tenant_id, name)
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             """
         )
@@ -77,53 +69,45 @@ class LocalStorage:
     # ─── Audit Events ─────────────────────────────────────────────────────────
 
     def insert_audit_event(self, event: dict[str, Any]) -> None:
-        """Insert an audit event into local storage."""
         cursor = self.conn.cursor()
         cursor.execute(
             """
             INSERT INTO audit_events (
-                tenant_id, trace_id, timestamp, actor, action, resource,
-                confidence_score, decision, reason, downgraded_scope,
-                latency_ms, engine_version, policy_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                trace_id, user_id, key_id, actor, action, decision,
+                reason, rule, policy_name, confidence, latency_ms, mode
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                event.get("tenant_id", "default"),
                 event["trace_id"],
-                event["timestamp"],
+                event.get("user_id"),
+                event.get("key_id"),
                 event["actor"],
                 event["action"],
-                json.dumps(event["resource"]) if event.get("resource") else None,
-                event.get("confidence_score"),
                 event["decision"],
-                event.get("reason"),
-                event.get("downgraded_scope"),
-                event.get("latency_ms"),
-                event.get("engine_version"),
-                event.get("policy_version"),
+                event.get("reason", ""),
+                event.get("rule", ""),
+                event.get("policy_name"),
+                event.get("confidence", 1.0),
+                event.get("latency_ms", 0),
+                event.get("mode", "live"),
             ),
         )
         self.conn.commit()
 
     def list_audit_events(
         self,
-        tenant_id: str = "default",
         limit: int = 20,
         cursor: int = 0,
         actor: str | None = None,
     ) -> dict[str, Any]:
-        """List audit events from local storage."""
-        query = """
-            SELECT * FROM audit_events
-            WHERE tenant_id = ? AND id > ?
-        """
-        params: list[Any] = [tenant_id, cursor]
+        query = "SELECT * FROM audit_events WHERE id > ?"
+        params: list[Any] = [cursor]
 
         if actor:
             query += " AND actor = ?"
             params.append(actor)
 
-        query += " ORDER BY timestamp DESC LIMIT ?"
+        query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 
         db_cursor = self.conn.cursor()
@@ -132,135 +116,95 @@ class LocalStorage:
 
         events = []
         for row in rows:
-            event = {
+            events.append({
                 "id": row["id"],
-                "tenant_id": row["tenant_id"],
                 "trace_id": row["trace_id"],
-                "timestamp": row["timestamp"],
+                "user_id": row["user_id"],
+                "key_id": row["key_id"],
                 "actor": row["actor"],
                 "action": row["action"],
-                "resource": json.loads(row["resource"]) if row["resource"] else None,
-                "confidence_score": row["confidence_score"],
                 "decision": row["decision"],
                 "reason": row["reason"],
-                "downgraded_scope": row["downgraded_scope"],
+                "rule": row["rule"],
+                "policy_name": row["policy_name"],
+                "confidence": row["confidence"],
                 "latency_ms": row["latency_ms"],
-                "engine_version": row["engine_version"],
-                "policy_version": row["policy_version"],
-            }
-            events.append(event)
+                "mode": row["mode"],
+                "created_at": row["created_at"],
+            })
 
         next_cursor = events[-1]["id"] if events else cursor
-
-        db_cursor.execute(
-            "SELECT COUNT(*) as count FROM audit_events WHERE tenant_id = ?",
-            (tenant_id,),
-        )
-        count_result = db_cursor.fetchone()
-        count = count_result["count"] if count_result else 0
+        db_cursor.execute("SELECT COUNT(*) as count FROM audit_events")
+        count = (db_cursor.fetchone() or {})["count"] if True else 0
 
         return {"events": events, "count": count, "next_cursor": next_cursor}
 
     # ─── Policies ─────────────────────────────────────────────────────────────
 
-    def list_policies(self, tenant_id: str = "default") -> list[dict[str, Any]]:
-        """List all policies from local storage."""
+    def list_policies(self) -> list[dict[str, Any]]:
         cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT * FROM policies WHERE tenant_id = ? ORDER BY name", (tenant_id,)
-        )
-        rows = cursor.fetchall()
+        cursor.execute("SELECT * FROM policies ORDER BY name")
+        return [_row_to_policy_dict(row) for row in cursor.fetchall()]
 
-        policies = []
-        for row in rows:
-            policy = {
-                "id": row["id"],
-                "tenant_id": row["tenant_id"],
-                "name": row["name"],
-                "content": row["content"],
-                "version": row["version"],
-                "hmac_sha256": row["hmac_sha256"],
-                "created_at": row["created_at"],
-                "updated_at": row["updated_at"],
-            }
-            policies.append(policy)
-
-        return policies
-
-    def get_policy(
-        self, name: str, tenant_id: str = "default"
-    ) -> dict[str, Any] | None:
-        """Get a specific policy from local storage."""
+    def get_policy(self, policy_id: str) -> dict[str, Any] | None:
         cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT * FROM policies WHERE tenant_id = ? AND name = ?",
-            (tenant_id, name),
-        )
+        cursor.execute("SELECT * FROM policies WHERE id = ?", (policy_id,))
         row = cursor.fetchone()
-
-        if not row:
-            return None
-
-        return {
-            "id": row["id"],
-            "tenant_id": row["tenant_id"],
-            "name": row["name"],
-            "content": row["content"],
-            "version": row["version"],
-            "hmac_sha256": row["hmac_sha256"],
-            "created_at": row["created_at"],
-            "updated_at": row["updated_at"],
-        }
+        return _row_to_policy_dict(row) if row else None
 
     def upsert_policy(
         self,
         name: str,
-        content: str,
-        version: str = "1.0",
-        tenant_id: str = "default",
+        rules: list[dict[str, Any]],
+        description: str = "",
+        is_active: bool = True,
+        user_id: str = "",
     ) -> None:
-        """Create or update a policy in local storage."""
-        hmac_sha256 = hashlib.sha256(content.encode()).hexdigest()
-        policy_id = f"{int(time.time() * 1000)}-{hash(name) % 1000000}"
-
+        policy_id = f"{int(time.time() * 1000)}-{abs(hash(name)) % 1_000_000}"
         cursor = self.conn.cursor()
         cursor.execute(
             """
-            INSERT INTO policies (id, tenant_id, name, content, version, hmac_sha256, updated_at)
+            INSERT INTO policies (id, user_id, name, description, rules, is_active, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(tenant_id, name) DO UPDATE SET
-                content = excluded.content,
-                version = excluded.version,
-                hmac_sha256 = excluded.hmac_sha256,
+            ON CONFLICT(name) DO UPDATE SET
+                description = excluded.description,
+                rules = excluded.rules,
+                is_active = excluded.is_active,
                 updated_at = CURRENT_TIMESTAMP
             """,
-            (policy_id, tenant_id, name, content, version, hmac_sha256),
+            (policy_id, user_id, name, description, json.dumps(rules), 1 if is_active else 0),
         )
         self.conn.commit()
 
-    def delete_policy(self, name: str, tenant_id: str = "default") -> bool:
-        """Delete a policy from local storage."""
+    def delete_policy(self, policy_id: str) -> bool:
         cursor = self.conn.cursor()
-        cursor.execute(
-            "DELETE FROM policies WHERE tenant_id = ? AND name = ?", (tenant_id, name)
-        )
+        cursor.execute("DELETE FROM policies WHERE id = ?", (policy_id,))
         self.conn.commit()
         return cursor.rowcount > 0
 
     # ─── Utilities ────────────────────────────────────────────────────────────
 
     def close(self) -> None:
-        """Close the database connection."""
         self.conn.close()
 
     def get_db_path(self) -> str:
-        """Get the database file path."""
         return self.db_path
 
     def __enter__(self) -> "LocalStorage":
-        """Context manager entry."""
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Context manager exit."""
         self.close()
+
+
+def _row_to_policy_dict(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "user_id": row["user_id"],
+        "name": row["name"],
+        "description": row["description"],
+        "rules": json.loads(row["rules"]),
+        "is_active": bool(row["is_active"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }

@@ -2,21 +2,19 @@
 // Public API surface
 
 // ─── Vercel AI SDK integration ────────────────────────────────────────────────
-// Import via: import { secureTool } from 'lelu/vercel'
-// (tree-shakeable — does not add weight to non-Vercel users)
 export { secureTool } from "./vercel/index.js";
 export type { SecureToolOptions, LeluDeniedResult, VercelTool } from "./vercel/index.js";
 
-// ─── Enhanced Observability (Phase 1) ─────────────────────────────────────────
-// Import via: import { AgentTracer, agentTracer } from '@lelu-auth/lelu/observability'
+// ─── Enhanced Observability ───────────────────────────────────────────────────
 export { AgentTracer, agentTracer, AI_AGENT_ATTRIBUTES, AGENT_TYPES, DECISION_TYPES } from "./observability/tracer.js";
 export type { AgentSpanOptions, DecisionMetrics, LatencyMetrics } from "./observability/tracer.js";
 
 export { LeluClient } from "./client.js";
-export const LELU_CLOUD_URL = "https://lelu-engine-666101080696.us-central1.run.app";
+export const LELU_CLOUD_URL = "https://lelu-ai.com";
 export { LocalStorage } from "./storage.js";
 
 export type {
+  AuthorizeRequest,
   AuthRequest,
   AgentAuthRequest,
   AgentContext,
@@ -32,6 +30,7 @@ export type {
   ListAuditEventsRequest,
   ListAuditEventsResult,
   Policy,
+  PolicyRule,
   ListPoliciesRequest,
   ListPoliciesResult,
   GetPolicyRequest,
@@ -42,6 +41,7 @@ export type {
 
 export {
   AuthEngineError,
+  AuthorizeRequestSchema,
   AuthRequestSchema,
   AgentAuthRequestSchema,
   AgentContextSchema,
@@ -56,14 +56,13 @@ import type { ClientConfig } from "./types.js";
 
 /**
  * Creates a LeluClient with the given configuration.
- * Equivalent to `new LeluClient(config)`.
  *
  * @example
  * ```ts
- * import { createClient } from "@lelu-auth/lelu";
+ * import { createClient } from "lelu-agent-auth";
  *
- * const lelu = createClient({ baseUrl: "http://localhost:8080" });
- * const { allowed } = await lelu.agentAuthorize({ ... });
+ * const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+ * const { decision, reason } = await lelu.authorize({ tool: "delete_file" });
  * ```
  */
 export function createClient(config?: ClientConfig): LeluClient {

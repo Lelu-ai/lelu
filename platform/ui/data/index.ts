@@ -98,23 +98,6 @@ if result.decision == "allow":
     db.upsert(data)
 elif result.decision == "review":
     queue.enqueue(pending_action)   # routed to human`,
-  go: `import "github.com/lelu-auth/lelu/sdk/go"
-
-client := lelu.NewClient(os.Getenv("LELU_API_KEY"))
-
-result, err := client.AgentAuthorize(ctx, &lelu.AuthRequest{
-    AgentID:    "sales-agent-7f2a",
-    Action:     "database:write",
-    Resource:   "customers",
-    Confidence: 0.91,
-})
-
-switch result.Decision {
-case lelu.Allow:
-    db.Upsert(data)
-case lelu.Review:
-    queue.Enqueue(pendingAction) // routed to human
-}`,
   curl: `curl -X POST https://your-engine.run.app/v1/authorize \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
   -H "Content-Type: application/json" \\

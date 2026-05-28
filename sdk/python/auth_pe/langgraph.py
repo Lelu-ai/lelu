@@ -107,17 +107,18 @@ def secure_node(
             confidence: float = state.get(confidence_key, default_confidence)
             acting_for: str = state.get(acting_for_key, "") if acting_for_key else ""
 
-            async with client:
-                decision = await client.agent_authorize(
-                    AgentAuthRequest(
-                        actor=actor,
-                        action=action,
-                        context=AgentContext(
-                            confidence=confidence,
-                            acting_for=acting_for or None,
-                        ),
-                    )
+            # Do NOT use `async with client:` here — that would close the
+            # shared httpx client after the first call, breaking subsequent nodes.
+            decision = await client.agent_authorize(
+                AgentAuthRequest(
+                    actor=actor,
+                    action=action,
+                    context=AgentContext(
+                        confidence=confidence,
+                        acting_for=acting_for or None,
+                    ),
                 )
+            )
 
             # ── Human review required ──────────────────────────────────────────
             if decision.requires_human_review:

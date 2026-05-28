@@ -52,7 +52,7 @@ export async function DELETE(
 
   try {
     await deletePolicy(params.id, session.userId);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ deleted: true });
   } catch (err) {
     console.error("[policies/DELETE]", err);
     return NextResponse.json({ error: "Failed to delete policy" }, { status: 500 });

@@ -1,6 +1,6 @@
 import {
   AuthEngineError,
-  AuthRequestSchema,
+  AuthorizeRequestSchema,
   AgentAuthRequestSchema,
   MintTokenRequestSchema,
   DelegateScopeRequestSchema,
@@ -10,10 +10,10 @@ import {
   type DelegateScopeResult,
   type DelegateScopeRequest,
   type RevokeTokenResult,
-  type AuthRequest,
   type AgentAuthRequest,
   type MintTokenRequest,
   type ClientConfig,
+  type AuthorizeRequest,
   type AuditEvent,
   type ListAuditEventsRequest,
   type ListAuditEventsResult,
@@ -24,39 +24,28 @@ import {
   type UpsertPolicyRequest,
   type DeletePolicyRequest,
   type DeletePolicyResult,
-  // Phase 2: Behavioral Analytics Types
   type AgentReputation,
-  type AnomalyResult,
-  type BaselineHealth,
-  type DriftAnalysis,
-  type Alert,
-  type ReputationListResponse,
   type AnomaliesResponse,
   type BaselineResponse,
   type AlertsResponse,
+  type ReputationListResponse,
   type AcknowledgeAlertRequest,
 } from "./types.js";
-import { agentTracer, type DecisionMetrics, type LatencyMetrics } from "./observability/tracer.js";
+import { agentTracer } from "./observability/tracer.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 /**
- * LeluClient is the core SDK entry-point.
- *
- * When an `apiKey` is provided the client routes to the Lelu cloud engine
- * automatically — no Docker or local server required.
+ * LeluClient — authorization engine for AI agents.
  *
  * @example
  * ```ts
- * const lelu = new LeluClient({ apiKey: process.env.LELU_API_KEY });
+ * import { createClient } from "lelu-agent-auth";
  *
- * const decision = await lelu.agentAuthorize({
- *   actor: "invoice_bot",
- *   action: "approve_refunds",
- *   context: { confidence: 0.92, actingFor: "user_123" },
- * });
+ * const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
  *
- * if (!decision.allowed) throw new Error(decision.reason);
+ * const { decision, reason } = await lelu.authorize({ tool: "delete_file" });
+ * if (decision === "deny") throw new Error(reason);
  * ```
  */
 export class LeluClient {
@@ -64,8 +53,8 @@ export class LeluClient {
   private readonly timeoutMs: number;
   private readonly apiKey: string | undefined;
 
-  /** Lelu cloud engine — no self-hosting required. */
-  static readonly CLOUD_URL = "https://lelu-engine-666101080696.us-central1.run.app";
+  /** Lelu cloud — no self-hosting required. */
+  static readonly CLOUD_URL = "https://lelu-ai.com";
 
   constructor(cfg: ClientConfig = {}) {
     const envBaseUrl =
@@ -73,9 +62,6 @@ export class LeluClient {
         ? process.env["LELU_BASE_URL"]
         : undefined;
 
-    // When an API key is supplied, route to the Lelu cloud engine by default.
-    // For self-hosted / local development, pass `baseUrl` explicitly or set
-    // the LELU_BASE_URL environment variable.
     const defaultUrl = cfg.apiKey ? LeluClient.CLOUD_URL : "http://localhost:8080";
 
     this.baseUrl = (cfg.baseUrl ?? envBaseUrl ?? defaultUrl).replace(/\/$/, "");
@@ -83,45 +69,63 @@ export class LeluClient {
     this.apiKey = cfg.apiKey;
   }
 
-  // ── Human authorization ────────────────────────────────────────────────────
+  // ── Authorization ──────────────────────────────────────────────────────────
 
   /**
-   * Checks whether a human user is permitted to perform an action.
+   * Checks whether an AI agent is permitted to call a tool.
+   *
+   * @example
+   * ```ts
+   * const { decision, reason, requestId } = await lelu.authorize({ tool: "send_email" });
+   * if (decision === "deny") return `Blocked: ${reason}`;
+   * if (decision === "human_review") return `Awaiting approval (id: ${requestId})`;
+   * ```
    */
-  async authorize(req: AuthRequest): Promise<AuthDecision> {
-    const validated = AuthRequestSchema.parse(req);
-    const body = {
-      user_id: validated.userId,
-      action: validated.action,
-      resource: validated.resource,
-    };
+  async authorize(req: AuthorizeRequest): Promise<AuthDecision> {
+    const validated = AuthorizeRequestSchema.parse(req);
+    const body: Record<string, unknown> = { tool: validated.tool };
+    if (validated.context) body.context = validated.context;
+    if (validated.args) body.args = validated.args;
+
     const data = await this.post<{
-      allowed: boolean;
+      requestId: string;
+      tool: string;
+      decision: "allow" | "deny" | "human_review";
       reason: string;
-      trace_id: string;
-    }>("/v1/authorize", body);
+      rule: string;
+      policyName?: string;
+      latencyMs: number;
+      mode: string;
+      keyId?: string;
+      timestamp: string;
+    }>("/api/v1/authorize", body);
 
     return {
-      allowed: data.allowed,
+      requestId: data.requestId,
+      tool: data.tool,
+      decision: data.decision,
       reason: data.reason,
-      traceId: data.trace_id,
+      rule: data.rule,
+      ...(data.policyName !== undefined ? { policyName: data.policyName } : {}),
+      latencyMs: data.latencyMs,
+      mode: data.mode as "live" | "sandbox",
+      ...(data.keyId !== undefined ? { keyId: data.keyId } : {}),
+      timestamp: data.timestamp,
+      allowed: data.decision === "allow",
     };
   }
 
-  // ── Agent authorization ────────────────────────────────────────────────────
+  // ── Agent authorization (backward compat) ──────────────────────────────────
 
   /**
-   * Checks whether an AI agent is permitted to perform an action, taking the
-   * confidence score into account (Confidence-Aware Auth ★).
-   * 
-   * Enhanced with Phase 1 observability features.
+   * @deprecated Use authorize() instead.
+   * Kept for backward compatibility — maps agentAuthorize inputs to authorize().
    */
   async agentAuthorize(req: AgentAuthRequest): Promise<AgentAuthDecision> {
     const validated = AgentAuthRequestSchema.parse(req);
-    
-    // Start enhanced tracing span
+
     return await agentTracer.withAgentSpan(
-      'ai.agent.authorize',
+      "ai.agent.authorize",
       {
         agentId: validated.actor,
         action: validated.action,
@@ -129,77 +133,21 @@ export class LeluClient {
         ...(validated.context.actingFor && { actingFor: validated.context.actingFor }),
         ...(validated.context.scope && { scope: validated.context.scope }),
       },
-      async (span) => {
-        const startTime = Date.now();
-        
-        const body = {
-          actor: validated.actor,
-          action: validated.action,
-          resource: validated.resource,
-          confidence: validated.context.confidence,
-          acting_for: validated.context.actingFor,
-          scope: validated.context.scope,
+      async () => {
+        const decision = await this.authorize({ tool: validated.action });
+        return {
+          ...decision,
+          requiresHumanReview: decision.decision === "human_review",
+          confidenceUsed: validated.context.confidence,
+          traceId: decision.requestId,
+          downgradedScope: undefined,
         };
-        
-        try {
-          const data = await this.post<{
-            allowed: boolean;
-            reason: string;
-            trace_id: string;
-            downgraded_scope?: string;
-            requires_human_review: boolean;
-            confidence_used: number;
-            risk_score?: number;
-          }>("/v1/agent/authorize", body);
-
-          const totalLatency = Date.now() - startTime;
-          
-          // Record decision metrics
-          const decisionMetrics: DecisionMetrics = {
-            allowed: data.allowed,
-            requiresHumanReview: data.requires_human_review,
-            confidence: data.confidence_used,
-            riskScore: data.risk_score || 0,
-            outcome: data.requires_human_review ? 'review' : data.allowed ? 'allowed' : 'denied',
-          };
-          
-          const latencyMetrics: LatencyMetrics = {
-            totalMs: totalLatency,
-          };
-          
-          agentTracer.recordDecision(span, decisionMetrics);
-          agentTracer.recordLatency(span, latencyMetrics);
-          
-          // Add trace ID to span
-          span.setAttributes({
-            'lelu.trace_id': data.trace_id,
-            'lelu.engine_decision': data.allowed,
-            'lelu.downgraded_scope': data.downgraded_scope || '',
-          });
-
-          return {
-            allowed: data.allowed,
-            reason: data.reason,
-            traceId: data.trace_id,
-            downgradedScope: data.downgraded_scope,
-            requiresHumanReview: data.requires_human_review,
-            confidenceUsed: data.confidence_used,
-          };
-        } catch (error) {
-          // Record error in span
-          span.recordException(error as Error);
-          throw error;
-        }
       }
     );
   }
 
   // ── JIT Token minting ──────────────────────────────────────────────────────
 
-  /**
-   * Mints a scoped JWT for an agent with an optional TTL.
-   * Default TTL is 60 seconds.
-   */
   async mintToken(req: MintTokenRequest): Promise<MintTokenResult> {
     const validated = MintTokenRequestSchema.parse(req);
     const body = {
@@ -222,9 +170,6 @@ export class LeluClient {
 
   // ── Token revocation ───────────────────────────────────────────────────────
 
-  /**
-   * Immediately revokes a JIT token by its ID.
-   */
   async revokeToken(tokenId: string): Promise<RevokeTokenResult> {
     const data = await this.delete<{ success: boolean }>(
       `/v1/tokens/${encodeURIComponent(tokenId)}`
@@ -234,41 +179,18 @@ export class LeluClient {
 
   // ── Multi-agent delegation ─────────────────────────────────────────────────
 
-  /**
-   * Delegates a constrained sub-scope from one agent to another.
-   *
-   * Validates the delegation rule in the loaded policy, caps the TTL to the
-   * policy maximum, and mints a child JIT token scoped to the granted actions.
-   *
-   * The delegator's `confidence` score is checked against the policy's
-   * `require_confidence_above` before delegation is granted.
-   * 
-   * Enhanced with Phase 1 observability features.
-   */
   async delegateScope(req: DelegateScopeRequest): Promise<DelegateScopeResult> {
     const validated = DelegateScopeRequestSchema.parse(req);
-    
-    // Start enhanced delegation tracing span
+
     return await agentTracer.withAgentSpan(
-      'ai.agent.delegate',
+      "ai.agent.delegate",
       {
         agentId: validated.delegator,
-        action: 'delegate',
+        action: "delegate",
         ...(validated.confidence !== undefined && { confidence: validated.confidence }),
         ...(validated.actingFor && { actingFor: validated.actingFor }),
       },
-      async (span) => {
-        const startTime = Date.now();
-        
-        // Add delegation-specific attributes
-        agentTracer.injectCorrelationContext(span, `${validated.delegator}→${validated.delegatee}`);
-        span.setAttributes({
-          'ai.parent.agent': validated.delegator,
-          'ai.child.agent': validated.delegatee,
-          'ai.delegation.scoped_to': validated.scopedTo?.join(',') || '',
-          'ai.delegation.ttl_seconds': validated.ttlSeconds || 60,
-        });
-        
+      async () => {
         const body = {
           delegator: validated.delegator,
           delegatee: validated.delegatee,
@@ -278,85 +200,46 @@ export class LeluClient {
           acting_for: validated.actingFor ?? "",
           tenant_id: validated.tenantId ?? "",
         };
-        
-        try {
-          const data = await this.post<{
-            token: string;
-            token_id: string;
-            expires_at: number;
-            delegator: string;
-            delegatee: string;
-            granted_scopes: string[];
-            trace_id: string;
-          }>("/v1/agent/delegate", body);
 
-          const totalLatency = Date.now() - startTime;
-          
-          // Record successful delegation metrics
-          const decisionMetrics: DecisionMetrics = {
-            allowed: true,
-            requiresHumanReview: false,
-            confidence: validated.confidence ?? 1.0,
-            riskScore: 0,
-            outcome: 'delegation_allowed',
-          };
-          
-          const latencyMetrics: LatencyMetrics = {
-            totalMs: totalLatency,
-          };
-          
-          agentTracer.recordDecision(span, decisionMetrics);
-          agentTracer.recordLatency(span, latencyMetrics);
-          
-          // Add delegation result attributes
-          span.setAttributes({
-            'lelu.trace_id': data.trace_id,
-            'lelu.token_id': data.token_id,
-            'lelu.granted_scopes': data.granted_scopes.join(','),
-            'lelu.delegation_success': true,
-          });
+        const data = await this.post<{
+          token: string;
+          token_id: string;
+          expires_at: number;
+          delegator: string;
+          delegatee: string;
+          granted_scopes: string[];
+          trace_id: string;
+        }>("/v1/agent/delegate", body);
 
-          return {
-            token: data.token,
-            tokenId: data.token_id,
-            expiresAt: new Date(data.expires_at * 1000),
-            delegator: data.delegator,
-            delegatee: data.delegatee,
-            grantedScopes: data.granted_scopes,
-            traceId: data.trace_id,
-          };
-        } catch (error) {
-          // Record delegation failure
-          const decisionMetrics: DecisionMetrics = {
-            allowed: false,
-            requiresHumanReview: false,
-            confidence: validated.confidence ?? 1.0,
-            riskScore: 1.0,
-            outcome: 'delegation_denied',
-          };
-          
-          agentTracer.recordDecision(span, decisionMetrics);
-          span.setAttributes({
-            'lelu.delegation_success': false,
-            'lelu.delegation_error': (error as Error).message,
-          });
-          
-          throw error;
-        }
+        return {
+          token: data.token,
+          tokenId: data.token_id,
+          expiresAt: new Date(data.expires_at * 1000),
+          delegator: data.delegator,
+          delegatee: data.delegatee,
+          grantedScopes: data.granted_scopes,
+          traceId: data.trace_id,
+        };
       }
     );
   }
 
   // ── Health check ───────────────────────────────────────────────────────────
 
-  /**
-   * Returns true if the engine is reachable and healthy.
-   * Uses /v1/fallback/status — /healthz is reserved by Cloud Run infrastructure.
-   */
   async isHealthy(): Promise<boolean> {
     try {
-      const data = await this.get<{ status: string }>("/v1/fallback/status");
-      return typeof data.status === "string";
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+      try {
+        const res = await fetch(`${this.baseUrl}/api/config-check`, {
+          method: "GET",
+          headers: this.headers(),
+          signal: ctrl.signal,
+        });
+        return res.ok;
+      } finally {
+        clearTimeout(timer);
+      }
     } catch {
       return false;
     }
@@ -364,13 +247,8 @@ export class LeluClient {
 
   // ── Audit log ──────────────────────────────────────────────────────────────
 
-  /**
-   * Lists audit events from the platform API.
-   * Requires the platform service to be running (not just the engine).
-   */
   async listAuditEvents(req: ListAuditEventsRequest = {}): Promise<ListAuditEventsResult> {
     const params = new URLSearchParams();
-    
     if (req.limit !== undefined) params.set("limit", req.limit.toString());
     if (req.cursor !== undefined) params.set("cursor", req.cursor.toString());
     if (req.actor) params.set("actor", req.actor);
@@ -380,21 +258,12 @@ export class LeluClient {
     if (req.from) params.set("from", req.from);
     if (req.to) params.set("to", req.to);
 
-    const headers = this.headers();
-    if (req.tenantId) {
-      headers["X-Tenant-ID"] = req.tenantId;
-    }
-
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
       const url = `${this.baseUrl}/api/v1/audit${params.toString() ? `?${params.toString()}` : ""}`;
-      const res = await fetch(url, {
-        method: "GET",
-        headers,
-        signal: ctrl.signal,
-      });
-      
+      const res = await fetch(url, { method: "GET", headers: this.headers(), signal: ctrl.signal });
+
       const data = await this.parseResponse<{
         events: AuditEvent[];
         count: number;
@@ -415,189 +284,129 @@ export class LeluClient {
     }
   }
 
-  // ─── Policy Management ────────────────────────────────────────────────────────
+  // ── Policy management ──────────────────────────────────────────────────────
 
-  async listPolicies(req: ListPoliciesRequest = {}): Promise<ListPoliciesResult> {
-    const headers = this.headers();
-    if (req.tenantId) {
-      headers["X-Tenant-ID"] = req.tenantId;
-    }
-
+  async listPolicies(_req: ListPoliciesRequest = {}): Promise<ListPoliciesResult> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
-      const res = await fetch(`${this.baseUrl}/api/v1/policies`, {
+      const res = await fetch(`${this.baseUrl}/api/policies`, {
         method: "GET",
-        headers,
+        headers: this.headers(),
         signal: ctrl.signal,
       });
-      
-      const data = await this.parseResponse<{
-        policies: Policy[];
-        count: number;
-      }>(res);
-
-      return {
-        policies: data.policies || [],
-        count: data.count,
-      };
+      const data = await this.parseResponse<{ policies: Policy[]; count: number }>(res);
+      return { policies: data.policies || [], count: data.count };
     } finally {
       clearTimeout(timer);
     }
   }
 
   async getPolicy(req: GetPolicyRequest): Promise<Policy> {
-    const headers = this.headers();
-    if (req.tenantId) {
-      headers["X-Tenant-ID"] = req.tenantId;
-    }
-
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
-      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
+      const res = await fetch(`${this.baseUrl}/api/policies/${encodeURIComponent(req.id)}`, {
         method: "GET",
-        headers,
+        headers: this.headers(),
         signal: ctrl.signal,
       });
-      
-      return await this.parseResponse<Policy>(res);
+      const data = await this.parseResponse<{ policy: Policy }>(res);
+      return data.policy;
     } finally {
       clearTimeout(timer);
     }
   }
 
   async upsertPolicy(req: UpsertPolicyRequest): Promise<Policy> {
-    const headers = this.headers();
-    if (req.tenantId) {
-      headers["X-Tenant-ID"] = req.tenantId;
-    }
-
     const body = {
-      content: req.content,
-      version: req.version || "1.0"
+      name: req.name,
+      description: req.description ?? "",
+      rules: req.rules,
+      isActive: req.isActive ?? true,
     };
-
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
-    try {
-      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-      
-      return await this.parseResponse<Policy>(res);
-    } finally {
-      clearTimeout(timer);
-    }
+    const data = await this.post<{ policy: Policy }>("/api/policies", body);
+    return data.policy;
   }
 
   async deletePolicy(req: DeletePolicyRequest): Promise<DeletePolicyResult> {
-    const headers = this.headers();
-    if (req.tenantId) {
-      headers["X-Tenant-ID"] = req.tenantId;
-    }
-
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
-      const res = await fetch(`${this.baseUrl}/api/v1/policies/${encodeURIComponent(req.name)}`, {
+      const res = await fetch(`${this.baseUrl}/api/policies/${encodeURIComponent(req.id)}`, {
         method: "DELETE",
-        headers,
+        headers: this.headers(),
         signal: ctrl.signal,
       });
-      
       return await this.parseResponse<DeletePolicyResult>(res);
     } finally {
       clearTimeout(timer);
     }
   }
 
-  // ─── Phase 2: Behavioral Analytics ─────────────────────────────────────────
+  // ── Phase 2: Behavioral Analytics ─────────────────────────────────────────
 
-  /**
-   * Gets reputation information for a specific agent.
-   */
   async getAgentReputation(agentId: string): Promise<AgentReputation> {
     return await this.get<AgentReputation>(`/v1/analytics/reputation/${encodeURIComponent(agentId)}`);
   }
 
-  /**
-   * Lists agent reputations sorted by performance.
-   */
   async listAgentReputations(options: {
-    sort: 'top' | 'problematic';
+    sort: "top" | "problematic";
     limit?: number;
     threshold?: number;
   }): Promise<ReputationListResponse> {
     const params = new URLSearchParams();
-    params.set('sort', options.sort);
-    if (options.limit) params.set('limit', options.limit.toString());
-    if (options.threshold) params.set('threshold', options.threshold.toString());
-    
+    params.set("sort", options.sort);
+    if (options.limit) params.set("limit", options.limit.toString());
+    if (options.threshold) params.set("threshold", options.threshold.toString());
     return await this.get<ReputationListResponse>(`/v1/analytics/reputation?${params.toString()}`);
   }
 
-  /**
-   * Gets recent anomalies for a specific agent.
-   */
   async getAgentAnomalies(agentId: string, since?: Date): Promise<AnomaliesResponse> {
     const params = new URLSearchParams();
-    if (since) params.set('since', since.toISOString());
-    
-    const path = `/v1/analytics/anomalies/${encodeURIComponent(agentId)}${params.toString() ? `?${params.toString()}` : ''}`;
+    if (since) params.set("since", since.toISOString());
+    const path = `/v1/analytics/anomalies/${encodeURIComponent(agentId)}${params.toString() ? `?${params.toString()}` : ""}`;
     return await this.get<AnomaliesResponse>(path);
   }
 
-  /**
-   * Gets behavioral baseline information for a specific agent.
-   */
   async getAgentBaseline(agentId: string): Promise<BaselineResponse> {
     return await this.get<BaselineResponse>(`/v1/analytics/baseline/${encodeURIComponent(agentId)}`);
   }
 
-  /**
-   * Triggers a baseline refresh for a specific agent.
-   */
   async refreshAgentBaseline(agentId: string): Promise<{ agent_id: string; status: string }> {
-    return await this.post<{ agent_id: string; status: string }>(`/v1/analytics/baseline/${encodeURIComponent(agentId)}/refresh`, {});
+    return await this.post<{ agent_id: string; status: string }>(
+      `/v1/analytics/baseline/${encodeURIComponent(agentId)}/refresh`,
+      {}
+    );
   }
 
-  /**
-   * Gets active alerts, optionally filtered by agent.
-   */
   async getAlerts(agentId?: string): Promise<AlertsResponse> {
     const params = new URLSearchParams();
-    if (agentId) params.set('agent_id', agentId);
-    
-    const path = `/v1/analytics/alerts${params.toString() ? `?${params.toString()}` : ''}`;
+    if (agentId) params.set("agent_id", agentId);
+    const path = `/v1/analytics/alerts${params.toString() ? `?${params.toString()}` : ""}`;
     return await this.get<AlertsResponse>(path);
   }
 
-  /**
-   * Acknowledges an alert.
-   */
   async acknowledgeAlert(alertId: string, acknowledgedBy: string): Promise<{ alert_id: string; status: string }> {
     const body: AcknowledgeAlertRequest = { acknowledged_by: acknowledgedBy };
-    return await this.post<{ alert_id: string; status: string }>(`/v1/analytics/alerts/${encodeURIComponent(alertId)}/acknowledge`, body);
+    return await this.post<{ alert_id: string; status: string }>(
+      `/v1/analytics/alerts/${encodeURIComponent(alertId)}/acknowledge`,
+      body
+    );
   }
 
-  /**
-   * Resolves an alert.
-   */
   async resolveAlert(alertId: string): Promise<{ alert_id: string; status: string }> {
-    return await this.post<{ alert_id: string; status: string }>(`/v1/analytics/alerts/${encodeURIComponent(alertId)}/resolve`, {});
+    return await this.post<{ alert_id: string; status: string }>(
+      `/v1/analytics/alerts/${encodeURIComponent(alertId)}/resolve`,
+      {}
+    );
   }
 
   // ── HTTP helpers ───────────────────────────────────────────────────────────
 
   private headers(): Record<string, string> {
     const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.apiKey) {
-      h["Authorization"] = `Bearer ${this.apiKey}`;
-    }
+    if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
     return h;
   }
 

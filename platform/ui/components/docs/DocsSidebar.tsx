@@ -165,7 +165,6 @@ const sections: NavSection[] = [
     items: [
       { href: "/docs/integrations/nextjs", label: "TypeScript" },
       { href: "/docs/integrations/backend", label: "Python" },
-      { href: "/docs/integrations/go", label: "Go" },
     ],
   },
 ];

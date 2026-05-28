@@ -15,7 +15,6 @@ import {
   SiKubernetes,
   SiPostgresql,
   SiSqlite,
-  SiGo,
   SiOpentelemetry,
   SiTypescript,
 } from "react-icons/si";
@@ -86,7 +85,7 @@ export default function AboutPage() {
                   { label: "Founder", value: "Abenezer Getachew" },
                   { label: "Product", value: "Authorization Engine for AI Agents" },
                   { label: "Status", value: "Production-ready (v1.0)" },
-                  { label: "SDKs Available", value: "TypeScript, Python, Go" },
+                  { label: "SDKs Available", value: "TypeScript, Python" },
                   { label: "License", value: "Open Source (MIT)" },
                 ].map((item, i) => (
                   <div key={i}>
@@ -326,14 +325,13 @@ export default function AboutPage() {
           >
             <h2 className="text-4xl font-bold mb-10">Available SDKs & Integration</h2>
             <p className="text-xl md:text-2xl text-zinc-600 dark:text-zinc-400 mb-16 max-w-4xl leading-relaxed">
-              Companies integrate Lelu using our SDKs for TypeScript, Python, and Go. All agent
+              Companies integrate Lelu using our SDKs for TypeScript and Python. All agent
               actions are evaluated through our authorization engine before execution.
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8">
               {[
                 { name: "TypeScript/Node.js", icon: <SiTypescript className="text-[#3178C6]" /> },
                 { name: "Python", icon: <FaPython className="text-[#3776AB]" /> },
-                { name: "Go", icon: <SiGo className="text-[#00ADD8]" /> },
                 { name: "Docker", icon: <FaDocker className="text-[#2496ED]" /> },
                 { name: "Kubernetes", icon: <SiKubernetes className="text-[#326CE5]" /> },
               ].map((sdk, i) => (
@@ -447,9 +445,9 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[
                 {
-                  icon: <SiGo className="text-[#00ADD8]" />,
+                  icon: <FiShield className="text-[#0A0A0A] dark:text-white" />,
                   title: "Authorization Engine",
-                  desc: "Go-based with sub-50ms latency",
+                  desc: "Sub-50ms latency, policy-as-code",
                 },
                 {
                   icon: <SiPostgresql className="text-[#336791]" />,
@@ -468,9 +466,9 @@ export default function AboutPage() {
                 },
                 { icon: <FaGithub />, title: "Open Source", desc: "MIT License on GitHub" },
                 {
-                  icon: <SiGo className="text-[#00ADD8]" />,
+                  icon: <SiTypescript className="text-[#3178C6]" />,
                   title: "SDKs",
-                  desc: "TypeScript, Python, Go",
+                  desc: "TypeScript, Python",
                 },
               ].map((tech, i) => (
                 <div

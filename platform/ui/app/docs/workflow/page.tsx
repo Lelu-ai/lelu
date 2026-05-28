@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 export default function DocsWorkflow() {
-  const [sdkTab, setSdkTab] = useState<"TypeScript" | "Python" | "Go">("TypeScript");
+  const [sdkTab, setSdkTab] = useState<"TypeScript" | "Python">("TypeScript");
 
   return (
     <div className="max-w-3xl">
@@ -86,7 +86,7 @@ export default function DocsWorkflow() {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <div className="flex gap-2">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -107,9 +107,6 @@ export default function DocsWorkflow() {
 npx lelu-agent-auth init`}
               {sdkTab === "Python" &&
                 `pip install lelu-agent-auth-sdk
-lelu init`}
-              {sdkTab === "Go" &&
-                `go get github.com/lelu-auth/lelu/sdk/go
 lelu init`}
             </pre>
           </div>
@@ -210,7 +207,7 @@ deny {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <div className="flex gap-2">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -228,7 +225,6 @@ deny {
             <pre className="p-4 font-mono text-sm text-zinc-300">
               {sdkTab === "TypeScript" && `npx lelu policies set auth ./config/auth.rego`}
               {sdkTab === "Python" && `lelu policies set auth ./config/auth.rego`}
-              {sdkTab === "Go" && `lelu policies set auth ./config/auth.rego`}
             </pre>
           </div>
 
@@ -260,7 +256,7 @@ deny {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <div className="flex gap-2">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -291,20 +287,6 @@ lelu = LeluClient(
     api_key=os.environ["LELU_API_KEY"],
     api_key=os.environ["LELU_API_KEY"]
 )`}
-              {sdkTab === "Go" &&
-                `package main
-
-import (
-    "os"
-    "github.com/lelu-auth/lelu/sdk/go"
-)
-
-func main() {
-    client := lelu.NewClient(
-        os.Getenv("LELU_API_KEY"),
-        os.Getenv("LELU_API_KEY"),
-    )
-}`}
             </pre>
           </div>
 
@@ -346,7 +328,7 @@ func main() {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <div className="flex gap-2">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -413,40 +395,6 @@ def delete_user(user_id: str, confidence: float):
     print("✅ Action approved")
     db.users.delete(user_id)
     return {"status": "completed"}`}
-              {sdkTab === "Go" &&
-                `package main
-
-import (
-    "fmt"
-    "github.com/lelu-auth/lelu/sdk/go"
-)
-
-func deleteUser(client *lelu.Client, userID string, confidence float64) error {
-    // Check authorization
-    decision, err := client.AgentAuthorize(&lelu.AuthRequest{
-        Actor:      "ai-agent-123",
-        Action:     "delete_user",
-        Resource:   map[string]interface{}{"userId": userID},
-        Confidence: confidence,
-    })
-    if err != nil {
-        return err
-    }
-    
-    if decision.RequiresHumanReview {
-        fmt.Println("⏳ Queued for human approval")
-        return nil
-    }
-    
-    if !decision.Allowed {
-        fmt.Println("❌ Action denied")
-        return fmt.Errorf("action denied")
-    }
-    
-    // Execute the action
-    fmt.Println("✅ Action approved")
-    return db.Users.Delete(userID)
-}`}
             </pre>
           </div>
 
@@ -475,7 +423,7 @@ func deleteUser(client *lelu.Client, userID string, confidence float64) error {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <div className="flex gap-2">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -493,7 +441,6 @@ func deleteUser(client *lelu.Client, userID string, confidence float64) error {
             <pre className="p-4 font-mono text-sm text-zinc-300">
               {sdkTab === "TypeScript" && `npx lelu studio`}
               {sdkTab === "Python" && `lelu studio`}
-              {sdkTab === "Go" && `lelu studio`}
             </pre>
           </div>
 
@@ -645,7 +592,7 @@ func deleteUser(client *lelu.Client, userID string, confidence float64) error {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-3">
               <span className="text-xs text-zinc-500 font-mono">Common Commands</span>
               <div className="flex gap-2 ml-auto">
-                {(["TypeScript", "Python", "Go"] as const).map((tab) => (
+                {(["TypeScript", "Python"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setSdkTab(tab)}
@@ -680,24 +627,6 @@ npx lelu studio
 # View audit logs
 npx lelu audit-log`}
               {sdkTab === "Python" &&
-                `# Initialize project
-lelu init
-
-# Upload policy
-lelu policies set <name> <file>
-
-# List policies
-lelu policies list
-
-# View policy
-lelu policies get <name>
-
-# Open Studio
-lelu studio
-
-# View audit logs
-lelu audit-log`}
-              {sdkTab === "Go" &&
                 `# Initialize project
 lelu init
 

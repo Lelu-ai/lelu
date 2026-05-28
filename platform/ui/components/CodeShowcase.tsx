@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { codeSnippets } from "@/data";
-import { SiTypescript, SiPython, SiGo } from "react-icons/si";
+import { SiTypescript, SiPython } from "react-icons/si";
 import { FiCopy, FiCheck, FiTerminal } from "react-icons/fi";
 
 type Lang = keyof typeof codeSnippets;
@@ -10,7 +10,6 @@ type Lang = keyof typeof codeSnippets;
 const langs: { id: Lang; label: string; icon: React.ReactNode }[] = [
   { id: "ts", label: "TypeScript", icon: <SiTypescript className="w-3.5 h-3.5 text-[#3178c6]" /> },
   { id: "py", label: "Python", icon: <SiPython className="w-3.5 h-3.5 text-[#ffe873]" /> },
-  { id: "go", label: "Go", icon: <SiGo className="w-3.5 h-3.5 text-[#00ADD8]" /> },
   { id: "curl", label: "cURL", icon: <FiTerminal className="w-3.5 h-3.5 text-zinc-400" /> },
 ];
 

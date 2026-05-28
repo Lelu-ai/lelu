@@ -79,8 +79,14 @@ curl -X POST https://lelu-ai.com/api/v1/authorize \
 
 ## Install
 
+**TypeScript / Node.js**
 ```bash
 npm install lelu-agent-auth
+```
+
+**Python**
+```bash
+pip install lelu-agent-auth-sdk
 ```
 
 Get an API key at [lelu-ai.com/api-key](https://lelu-ai.com/api-key) · Full docs at [lelu-ai.com/docs](https://lelu-ai.com/docs)
@@ -99,7 +105,6 @@ Works with any AI framework out of the box:
 | LangGraph | [docs/integrations/langgraph](https://lelu-ai.com/docs/integrations/langgraph) |
 | Model Context Protocol (MCP) | [docs/integrations/mcp](https://lelu-ai.com/docs/integrations/mcp) |
 | Vercel AI SDK | [docs/integrations/vercel-ai](https://lelu-ai.com/docs/integrations/vercel-ai) |
-| Go | [docs/integrations/go](https://lelu-ai.com/docs/integrations/go) |
 
 ---
 
@@ -110,7 +115,7 @@ Works with any AI framework out of the box:
 - **Audit log** — every decision logged with actor, tool, decision, reason, and latency
 - **Dashboard** — manage API keys, policies, and review pending approvals
 - **Self-hostable** — Docker image, Helm chart, GCP Cloud Run configs included
-- **Multi-framework** — TypeScript, Python, and Go SDKs
+- **Multi-framework** — TypeScript and Python SDKs
 
 ---
 

@@ -83,7 +83,7 @@ class AuthDecision(BaseModel):
     reason: str = Field(..., description="Human-readable explanation")
     rule: str = Field(..., description="Rule that matched")
     policy_name: str | None = Field(default=None, description="Policy that matched, if any")
-    latency_ms: int = Field(..., description="Evaluation latency in milliseconds")
+    latency_ms: float = Field(..., description="Evaluation latency in milliseconds")
     mode: str = Field(..., description="live | sandbox")
     key_id: str | None = Field(default=None, description="API key ID, if authenticated")
     timestamp: str = Field(..., description="ISO 8601 timestamp")
@@ -153,7 +153,7 @@ class AuditEvent(BaseModel):
     rule: str
     policy_name: str | None = None
     confidence: float
-    latency_ms: int
+    latency_ms: float
     mode: str
     created_at: str
 

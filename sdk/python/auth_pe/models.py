@@ -88,7 +88,7 @@ class AuthDecision(BaseModel):
     key_id: str | None = Field(default=None, description="API key ID, if authenticated")
     timestamp: str = Field(..., description="ISO 8601 timestamp")
     safe_tool: str | None = Field(default=None, description="Safe alternative tool (present when decision == 'compute')")
-    safe_args: dict | None = Field(default=None, description="Replacement args for safe_tool (present when decision == 'compute')")
+    safe_args: dict[str, object] | None = Field(default=None, description="Replacement args for safe_tool (present when decision == 'compute')")
 
     @property
     def allowed(self) -> bool:

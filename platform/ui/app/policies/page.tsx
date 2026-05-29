@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Shield, ToggleLeft, ToggleRight, ChevronDown, ChevronRight, Edit2, Check, X } from "lucide-react";
 
-type Decision = "allow" | "deny" | "human_review";
+type Decision = "allow" | "deny" | "human_review" | "compute";
 
 interface PolicyRule {
   id: string;
@@ -26,6 +26,7 @@ const DECISION_CONFIG: Record<Decision, { label: string; color: string; bg: stri
   allow: { label: "Allow", color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700/40", dot: "bg-emerald-500" },
   deny: { label: "Deny", color: "text-red-700 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/40", dot: "bg-red-500" },
   human_review: { label: "Human Review", color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/40", dot: "bg-amber-500" },
+  compute: { label: "Compute", color: "text-violet-700 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700/40", dot: "bg-violet-500" },
 };
 
 const DEFAULT_RULES: Omit<PolicyRule, "id">[] = [
@@ -378,6 +379,7 @@ export default function PoliciesPage() {
                                     <option value="allow">Allow</option>
                                     <option value="deny">Deny</option>
                                     <option value="human_review">Human Review</option>
+                                    <option value="compute">Compute</option>
                                   </select>
                                   <button onClick={() => removeRule(draft.rules, rules => setEditDraft(d => d ? { ...d, rules } : d), rule.id)} className="text-[#A3A3A3] hover:text-red-500 transition-colors"><X className="w-3.5 h-3.5" /></button>
                                 </div>

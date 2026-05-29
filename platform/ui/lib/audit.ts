@@ -100,6 +100,7 @@ export async function getAuditStats(userId?: string): Promise<{
   allowed: number;
   denied: number;
   human_review: number;
+  compute: number;
 }> {
   await ensureSchema();
   const sql = db();
@@ -109,13 +110,14 @@ export async function getAuditStats(userId?: string): Promise<{
     WHERE (${userId ?? null}::text IS NULL OR user_id = ${userId ?? null})
     GROUP BY decision
   `;
-  const stats = { total: 0, allowed: 0, denied: 0, human_review: 0 };
+  const stats = { total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 };
   for (const r of rows) {
     const cnt = r.cnt as number;
     stats.total += cnt;
     if (r.decision === "allowed") stats.allowed = cnt;
     else if (r.decision === "denied") stats.denied = cnt;
     else if (r.decision === "human_review") stats.human_review = cnt;
+    else if (r.decision === "compute") stats.compute = cnt;
   }
   return stats;
 }

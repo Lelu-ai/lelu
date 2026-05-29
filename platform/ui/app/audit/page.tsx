@@ -54,7 +54,7 @@ export default async function AuditPage({
       decision: params.decision,
       limit: 100,
     }).catch(() => []),
-    getAuditStats(user?.userId).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0 })),
+    getAuditStats(user?.userId).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 })),
   ]);
 
   const safeEvents = Array.isArray(events) ? events : [];
@@ -63,8 +63,9 @@ export default async function AuditPage({
   const allowed = stats.allowed;
   const denied = stats.denied;
   const review = stats.human_review;
+  const compute = stats.compute ?? 0;
   const highRiskIncidents = safeEvents
-    .filter((event) => event.decision === "denied" || event.decision === "human_review")
+    .filter((event) => event.decision === "denied" || event.decision === "human_review" || event.decision === "compute")
     .slice(0, 8);
 
   return (
@@ -265,10 +266,12 @@ export default async function AuditPage({
                         className={`px-2 py-0.5 rounded-full text-xs border ${
                           event.decision === "denied"
                             ? "text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/60"
+                            : event.decision === "compute"
+                            ? "text-violet-600 dark:text-violet-400 border-violet-200 dark:border-violet-900/60"
                             : "text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-900/60"
                         }`}
                       >
-                        {event.decision === "denied" ? "Denied" : "Human review"}
+                        {event.decision === "denied" ? "Denied" : event.decision === "compute" ? "Compute" : "Human review"}
                       </span>
                       <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {formatAgo(event.created_at)}
@@ -340,6 +343,7 @@ export default async function AuditPage({
             <option value="allowed">Allowed</option>
             <option value="denied">Denied</option>
             <option value="human_review">Human review</option>
+            <option value="compute">Compute</option>
           </select>
           <button
             type="submit"

@@ -12,9 +12,13 @@ import (
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
-	// Create temporary database
+	// Create temporary database.
+	// SetMaxOpenConns(1) is required for SQLite :memory: — each connection
+	// gets its own independent database, so without this the CREATE TABLE
+	// runs on one connection while queries land on a fresh empty one.
 	db, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
 
 	// Initialize schema
 	schema := `

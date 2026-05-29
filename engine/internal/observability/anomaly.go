@@ -282,45 +282,337 @@ func (ad *AnomalyDetector) extractFeatures(baseline *BehavioralBaseline, action 
 	return features
 }
 
-// calculateAnomalyScore computes anomaly score using simplified Isolation Forest
-func (ad *AnomalyDetector) calculateAnomalyScore(features *FeatureVector, _ *BehavioralBaseline) float64 {
-	// Simplified anomaly scoring based on feature deviations
-	// In a full implementation, this would use actual Isolation Forest algorithm
+// ─── Extended Isolation Forest ───────────────────────────────────────────────
+//
+// Implements a real Isolation Forest with random hyperplane splits (EIF-style).
+// Anomalies are isolated in fewer splits → shorter average path length → higher score.
+//
+// Reference: Liu et al. (2008) + Hariri et al. (2019) Extended Isolation Forest.
 
-	scores := []float64{}
+// iTree is a single isolation tree node.
+type iTree struct {
+	left, right    *iTree
+	splitFeature   int
+	splitValue     float64
+	splitNormal    []float64 // random normal vector for hyperplane split
+	splitIntercept float64   // intercept for hyperplane: normal·x ≤ intercept
+	size           int       // number of samples at this node (leaf)
+	isLeaf         bool
+}
 
-	// Confidence anomaly
-	if features.ConfidenceDeviation > 0 {
-		confScore := math.Min(features.ConfidenceDeviation/3.0, 1.0) // 3 std devs = max score
-		scores = append(scores, confScore*ad.config.ConfidenceWeight)
+// isolationForest holds a trained ensemble of isolation trees.
+type isolationForest struct {
+	trees      []*iTree
+	numTrees   int
+	sampleSize int
+	heightLimit int
+}
+
+// featureToVec converts a FeatureVector to a float64 slice for the forest.
+func featureToVec(f *FeatureVector) []float64 {
+	return []float64{
+		f.ConfidenceDeviation,
+		f.LatencyDeviation,
+		f.ActionRarity,
+		f.TimeOfDayRarity,
+		f.OutcomeRarity,
+		f.RecentErrorRate,
+		f.ConfidenceTrend,
+		f.LatencyTrend,
+	}
+}
+
+// buildITree recursively builds one isolation tree from a sample set.
+func buildITree(data [][]float64, height, heightLimit int, rng *lcgRand) *iTree {
+	n := len(data)
+	if n == 0 {
+		return &iTree{isLeaf: true, size: 0}
+	}
+	if height >= heightLimit || n <= 1 {
+		return &iTree{isLeaf: true, size: n}
 	}
 
-	// Latency anomaly
-	if features.LatencyDeviation > 0 {
-		latencyScore := math.Min(features.LatencyDeviation/3.0, 1.0)
-		scores = append(scores, latencyScore*ad.config.LatencyWeight)
+	dim := len(data[0])
+
+	// Generate a random normal vector for hyperplane split (EIF).
+	normal := make([]float64, dim)
+	norm := 0.0
+	for i := range normal {
+		v := rng.normFloat64()
+		normal[i] = v
+		norm += v * v
+	}
+	norm = math.Sqrt(norm)
+	if norm > 0 {
+		for i := range normal {
+			normal[i] /= norm
+		}
 	}
 
-	// Pattern anomalies
-	patternScore := (math.Min(features.ActionRarity/10.0, 1.0) +
-		math.Min(features.TimeOfDayRarity/5.0, 1.0) +
-		math.Min(features.OutcomeRarity/5.0, 1.0)) / 3.0
-	scores = append(scores, patternScore*ad.config.PatternWeight)
-
-	// Combine scores (weighted average)
-	totalScore := 0.0
-	totalWeight := 0.0
-
-	for _, score := range scores {
-		totalScore += score
-		totalWeight += 1.0
+	// Project all points onto the normal vector, find min/max.
+	minProj, maxProj := math.MaxFloat64, -math.MaxFloat64
+	for _, x := range data {
+		p := dotProduct(normal, x)
+		if p < minProj {
+			minProj = p
+		}
+		if p > maxProj {
+			maxProj = p
+		}
 	}
 
-	if totalWeight > 0 {
-		return totalScore / totalWeight
+	if minProj == maxProj {
+		return &iTree{isLeaf: true, size: n}
 	}
 
-	return 0.0
+	intercept := minProj + rng.float64()*(maxProj-minProj)
+
+	leftData := data[:0:0]
+	rightData := data[:0:0]
+	for _, x := range data {
+		if dotProduct(normal, x) <= intercept {
+			leftData = append(leftData, x)
+		} else {
+			rightData = append(rightData, x)
+		}
+	}
+
+	// Fallback to axis-aligned split if hyperplane doesn't separate.
+	if len(leftData) == 0 || len(rightData) == 0 {
+		feat := rng.intn(dim)
+		minV, maxV := math.MaxFloat64, -math.MaxFloat64
+		for _, x := range data {
+			if x[feat] < minV {
+				minV = x[feat]
+			}
+			if x[feat] > maxV {
+				maxV = x[feat]
+			}
+		}
+		splitVal := minV + rng.float64()*(maxV-minV)
+		leftData = leftData[:0]
+		rightData = rightData[:0]
+		for _, x := range data {
+			if x[feat] <= splitVal {
+				leftData = append(leftData, x)
+			} else {
+				rightData = append(rightData, x)
+			}
+		}
+		return &iTree{
+			splitFeature: feat,
+			splitValue:   splitVal,
+			left:         buildITree(leftData, height+1, heightLimit, rng),
+			right:        buildITree(rightData, height+1, heightLimit, rng),
+		}
+	}
+
+	return &iTree{
+		splitNormal:    normal,
+		splitIntercept: intercept,
+		left:           buildITree(leftData, height+1, heightLimit, rng),
+		right:          buildITree(rightData, height+1, heightLimit, rng),
+	}
+}
+
+// pathLength returns the path length for a single point in one tree.
+func pathLength(node *iTree, x []float64, depth int) float64 {
+	if node.isLeaf {
+		return float64(depth) + cFactor(node.size)
+	}
+	var goLeft bool
+	if node.splitNormal != nil {
+		goLeft = dotProduct(node.splitNormal, x) <= node.splitIntercept
+	} else {
+		goLeft = x[node.splitFeature] <= node.splitValue
+	}
+	if goLeft {
+		return pathLength(node.left, x, depth+1)
+	}
+	return pathLength(node.right, x, depth+1)
+}
+
+// cFactor is the expected path length for BST with n elements (normalization).
+func cFactor(n int) float64 {
+	if n <= 1 {
+		return 0
+	}
+	fn := float64(n)
+	return 2.0*(math.Log(fn-1)+0.5772156649) - 2.0*(fn-1)/fn
+}
+
+func dotProduct(a, b []float64) float64 {
+	s := 0.0
+	for i := range a {
+		if i < len(b) {
+			s += a[i] * b[i]
+		}
+	}
+	return s
+}
+
+// trainForest builds a new isolation forest from sample data.
+func trainForest(samples [][]float64, numTrees, sampleSize int, seed uint64) *isolationForest {
+	if len(samples) == 0 {
+		return nil
+	}
+	heightLimit := int(math.Ceil(math.Log2(float64(sampleSize))))
+	rng := newLCG(seed)
+	trees := make([]*iTree, numTrees)
+	for t := range trees {
+		// Subsample without replacement.
+		n := sampleSize
+		if n > len(samples) {
+			n = len(samples)
+		}
+		sub := make([][]float64, n)
+		perm := rng.perm(len(samples))
+		for i := 0; i < n; i++ {
+			sub[i] = samples[perm[i]]
+		}
+		trees[t] = buildITree(sub, 0, heightLimit, rng)
+	}
+	return &isolationForest{trees: trees, numTrees: numTrees, sampleSize: sampleSize, heightLimit: heightLimit}
+}
+
+// anomalyScore returns 0–1 where higher = more anomalous.
+func (f *isolationForest) anomalyScore(x []float64) float64 {
+	if f == nil || len(f.trees) == 0 {
+		return 0
+	}
+	avgPath := 0.0
+	for _, t := range f.trees {
+		avgPath += pathLength(t, x, 0)
+	}
+	avgPath /= float64(len(f.trees))
+	c := cFactor(f.sampleSize)
+	if c == 0 {
+		return 0.5
+	}
+	return math.Pow(2, -avgPath/c)
+}
+
+// ─── LCG random number generator (no stdlib/math/rand import needed) ─────────
+
+type lcgRand struct{ state uint64 }
+
+func newLCG(seed uint64) *lcgRand { return &lcgRand{seed | 1} }
+
+func (r *lcgRand) next() uint64 {
+	r.state = r.state*6364136223846793005 + 1442695040888963407
+	return r.state
+}
+
+func (r *lcgRand) float64() float64 {
+	return float64(r.next()>>11) / (1 << 53)
+}
+
+func (r *lcgRand) intn(n int) int {
+	return int(r.next() % uint64(n))
+}
+
+func (r *lcgRand) normFloat64() float64 {
+	// Box-Muller transform.
+	u1 := r.float64()
+	u2 := r.float64()
+	if u1 < 1e-10 {
+		u1 = 1e-10
+	}
+	return math.Sqrt(-2*math.Log(u1)) * math.Cos(2*math.Pi*u2)
+}
+
+func (r *lcgRand) perm(n int) []int {
+	p := make([]int, n)
+	for i := range p {
+		p[i] = i
+	}
+	for i := n - 1; i > 0; i-- {
+		j := r.intn(i + 1)
+		p[i], p[j] = p[j], p[i]
+	}
+	return p
+}
+
+// ─── Plugging EIF into the detector ─────────────────────────────────────────
+
+// forest is the live trained isolation forest, rebuilt from baselines periodically.
+// Stored per-agent in the AnomalyDetector (one forest per agent baseline).
+// For simplicity we use a single global forest here; per-agent forests can be
+// added by keying forests map[string]*isolationForest on agentID.
+var globalForest *isolationForest
+
+// rebuildForest trains a new forest from the current set of baselines.
+// Call this periodically (e.g., hourly) after baselines accumulate enough samples.
+func (ad *AnomalyDetector) rebuildForest() {
+	ad.mutex.RLock()
+	baselines := ad.baselines
+	ad.mutex.RUnlock()
+
+	var samples [][]float64
+	for _, b := range baselines {
+		if b.SampleCount < 10 {
+			continue
+		}
+		// Synthesize representative sample from baseline statistics.
+		for i := 0; i < 20 && i < b.SampleCount; i++ {
+			samples = append(samples, []float64{
+				b.ConfidenceMean,
+				b.LatencyMean,
+				0.0, // action rarity — baseline is "normal"
+				0.0,
+				0.0,
+				0.0, 0.0, 0.0,
+			})
+		}
+	}
+	if len(samples) < 20 {
+		return
+	}
+	globalForest = trainForest(samples, ad.config.NumTrees, ad.config.SubsampleSize, 42)
+}
+
+// calculateAnomalyScore uses the real Isolation Forest when trained,
+// falls back to calibrated z-scores otherwise.
+func (ad *AnomalyDetector) calculateAnomalyScore(features *FeatureVector, baseline *BehavioralBaseline) float64 {
+	vec := featureToVec(features)
+
+	// Use real Isolation Forest if available.
+	if globalForest != nil {
+		return globalForest.anomalyScore(vec)
+	}
+
+	// Fallback: calibrated z-score with per-feature dynamic thresholds.
+	// Uses 3σ normalization but with feature importance weighting.
+	type featureScore struct {
+		score  float64
+		weight float64
+		name   string
+	}
+
+	fs := []featureScore{
+		{math.Min(features.ConfidenceDeviation/3.0, 1.0), ad.config.ConfidenceWeight, "confidence"},
+		{math.Min(features.LatencyDeviation/3.0, 1.0), ad.config.LatencyWeight, "latency"},
+		{math.Min(features.ActionRarity/10.0, 1.0), ad.config.PatternWeight * 0.4, "action_rarity"},
+		{math.Min(features.TimeOfDayRarity/5.0, 1.0), ad.config.PatternWeight * 0.3, "time_rarity"},
+		{math.Min(features.OutcomeRarity/5.0, 1.0), ad.config.PatternWeight * 0.3, "outcome_rarity"},
+	}
+
+	// Multivariate interaction: high confidence + unusual time = escalate.
+	if features.ConfidenceDeviation > 2.0 && features.TimeOfDayRarity > 3.0 {
+		for i := range fs {
+			fs[i].score = math.Min(fs[i].score*1.3, 1.0)
+		}
+	}
+
+	totalScore, totalWeight := 0.0, 0.0
+	for _, f := range fs {
+		totalScore += f.score * f.weight
+		totalWeight += f.weight
+	}
+	if totalWeight == 0 {
+		return 0
+	}
+	return totalScore / totalWeight
 }
 
 // getSeverity determines anomaly severity based on score

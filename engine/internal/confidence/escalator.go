@@ -15,14 +15,29 @@ type ReviewEnqueuer interface {
 }
 
 // Escalator routes audit findings to the human-review queue based on severity.
+// Uses an isotonic regression Calibrator to map raw external scores to true
+// threat probabilities, and a feedback loop to tune the decision threshold.
 type Escalator struct {
 	reviewQueue ReviewEnqueuer
+	calibrator  *Calibrator
 }
 
 // NewEscalator returns a new Escalator. Pass nil for reviewQueue to disable
 // actual enqueueing (useful in tests).
 func NewEscalator(reviewQueue ReviewEnqueuer) *Escalator {
-	return &Escalator{reviewQueue: reviewQueue}
+	return &Escalator{
+		reviewQueue: reviewQueue,
+		calibrator:  NewCalibrator(500),
+	}
+}
+
+// RecordOutcome feeds a human review decision back into the calibrator.
+// Call this whenever a reviewer approves or denies a flagged request.
+//
+//	rawScore  — the ExternalScore from the original AuditResult
+//	wasThreat — true if the reviewer confirmed it was a real threat
+func (e *Escalator) RecordOutcome(rawScore float64, wasThreat bool) {
+	e.calibrator.Record(rawScore, wasThreat)
 }
 
 // EscalationAction describes what action should be taken.
@@ -36,10 +51,30 @@ const (
 )
 
 // Escalate decides whether to escalate to human review based on severity.
+// When calibration data is available, uses calibrated threat probability and
+// a dynamic threshold instead of fixed 3-tier thresholds.
 func (e *Escalator) Escalate(result *AuditResult, severity SeverityLevel) EscalationAction {
 	if result == nil {
 		return ActionAllow
 	}
+
+	// Use calibrated probability + dynamic threshold when fitted.
+	if e.calibrator.IsFitted() {
+		calibrated := e.calibrator.Calibrate(result.ExternalScore)
+		threshold := e.calibrator.Threshold()
+
+		// Calibrated threat probability above dynamic threshold → review.
+		if calibrated >= threshold {
+			return ActionReview
+		}
+		// Very high calibrated probability → deny immediately.
+		if calibrated >= threshold+0.3 {
+			return ActionDeny
+		}
+		return ActionAllow
+	}
+
+	// Fallback: original fixed 3-tier logic until calibrated.
 	switch severity {
 	case SeverityHigh:
 		return ActionReview

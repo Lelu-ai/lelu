@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -130,6 +131,35 @@ func (e *Evaluator) LoadPolicyBytes(data []byte) error {
 	return nil
 }
 
+// matchAction checks whether a policy pattern matches an action string.
+//
+// Supported pattern syntax:
+//
+//	"*"           — matches everything
+//	"read_*"      — prefix wildcard (action must start with "read_")
+//	"*_prod"      — suffix wildcard (action must end with "_prod")
+//	"*_prod_*"    — contains wildcard (action must contain "_prod_")
+//	"read_file"   — exact match (no wildcards)
+func matchAction(pattern, action string) bool {
+	if pattern == "*" {
+		return true
+	}
+	// Both prefix and suffix wildcard → contains check.
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") && len(pattern) > 1 {
+		middle := pattern[1 : len(pattern)-1]
+		return strings.Contains(action, middle)
+	}
+	// Prefix wildcard → suffix check on action.
+	if strings.HasSuffix(pattern, "*") {
+		return strings.HasPrefix(action, pattern[:len(pattern)-1])
+	}
+	// Suffix wildcard → prefix check on action.
+	if strings.HasPrefix(pattern, "*") {
+		return strings.HasSuffix(action, pattern[1:])
+	}
+	return pattern == action
+}
+
 // Evaluate checks a human auth request against the loaded policy.
 func (e *Evaluator) Evaluate(ctx context.Context, req AuthRequest) (*Decision, error) {
 	e.mu.RLock()
@@ -141,17 +171,18 @@ func (e *Evaluator) Evaluate(ctx context.Context, req AuthRequest) (*Decision, e
 		return rp.EvaluateHuman(ctx, req)
 	}
 
-	// Walk all roles to find one assigned to the user (future: user→role mapping).
-	// For now we do a direct action-level check across all roles.
+	// Walk all roles — deny rules checked first, then allow (deny wins).
 	for _, role := range p.Roles {
 		for _, denied := range role.Deny {
-			if denied == req.Action {
-				return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is explicitly denied", req.Action)}, nil
+			if matchAction(denied, req.Action) {
+				return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is explicitly denied by pattern %q", req.Action, denied)}, nil
 			}
 		}
+	}
+	for _, role := range p.Roles {
 		for _, allowed := range role.Allow {
-			if allowed == req.Action {
-				return &Decision{Allowed: true, Reason: "action allowed by role"}, nil
+			if matchAction(allowed, req.Action) {
+				return &Decision{Allowed: true, Reason: fmt.Sprintf("action %q allowed by pattern %q", req.Action, allowed)}, nil
 			}
 		}
 	}
@@ -174,10 +205,10 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 		return &Decision{Allowed: false, Reason: fmt.Sprintf("unknown agent scope %q", req.Actor)}, nil
 	}
 
-	// Hard deny overrides.
+	// Hard deny overrides — wildcard-aware.
 	for _, denied := range scope.Deny {
-		if denied == req.Action {
-			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is hard-denied for agent %q", req.Action, req.Actor)}, nil
+		if matchAction(denied, req.Action) {
+			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is hard-denied for agent %q by pattern %q", req.Action, req.Actor, denied)}, nil
 		}
 	}
 
@@ -209,7 +240,7 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 		}
 		permitted := false
 		for _, a := range role.Allow {
-			if a == req.Action {
+			if matchAction(a, req.Action) {
 				permitted = true
 				break
 			}

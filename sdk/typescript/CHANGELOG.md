@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.18] (2026-05-30)
+
+### Engine Upgrades
+
+* **injection detector**: 5-layer pipeline (exact → homoglyph → fuzzy → structural → entropy), 45 patterns, unicode normalization, Levenshtein fuzzy match — detection rate raised from ~60% to ~85%+
+* **anomaly detector**: replaced z-score baseline with real Extended Isolation Forest in pure Go — random hyperplane splits, multivariate interaction scoring, automatic fallback until forest is trained
+* **policy evaluator**: wildcard pattern matching — `*`, `read_*`, `*_prod`, `*_prod_*` all supported; deny-first evaluation with matched pattern reported in audit reason
+* **confidence escalator**: isotonic regression calibration via Pool Adjacent Violators (PAV) algorithm; dynamic threshold maximises TPR at FPR ≤ 5%; smooth ≤0.1 threshold shifts per refit cycle
+
+### Bug Fixes
+
+* `compute` decision now correctly included in AuditEvent decision union on the platform
+* Audit log and policy editor aligned on all four decisions: `allow`, `deny`, `human_review`, `compute`
+
 ## [0.2.7](https://github.com/lelu-auth/lelu/compare/typescript-sdk-v0.2.6...typescript-sdk-v0.2.7) (2026-03-30)
 
 

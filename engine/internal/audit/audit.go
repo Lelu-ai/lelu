@@ -26,10 +26,19 @@ type Event struct {
 	Action          string            `json:"action"`
 	Resource        map[string]string `json:"resource,omitempty"`
 	ConfidenceScore float64           `json:"confidence_score,omitempty"`
-	Decision        string            `json:"decision"` // "allowed" | "denied" | "human_review"
+	Decision        string            `json:"decision"` // "allowed" | "denied" | "human_review" | "compute"
 	Reason          string            `json:"reason,omitempty"`
 	DowngradedScope string            `json:"downgraded_scope,omitempty"`
 	LatencyMS       float64           `json:"latency_ms"`
+	// InputHash is the SHA-256 of the normalized request payload — tamper-proof
+	// record of exactly what the agent asked for.
+	InputHash string `json:"input_hash,omitempty"`
+	// OutputHash is the SHA-256 of the serialized decision — tamper-proof record
+	// of exactly what was decided and why.
+	OutputHash string `json:"output_hash,omitempty"`
+	// PolicyDigest is the SHA-256 of the policy bytes active at evaluation time,
+	// proving which policy version authorized this decision.
+	PolicyDigest string `json:"policy_digest,omitempty"`
 }
 
 // ─── Writer ───────────────────────────────────────────────────────────────────

@@ -48,6 +48,20 @@ agent_scopes:
       - downgrade_to_read_only_if_confidence_below: 0.70
       - hard_deny_if_confidence_below: 0.50
 
+    # Compute rules: instead of blocking, redirect the agent to a safe alternative.
+    # The engine returns decision="compute" with safe_tool + safe_args.
+    compute:
+      - action: write_*_prod
+        safe_tool: write_file
+        safe_args:
+          path: /dev/sandbox/{original}
+          sandboxed: true
+      - action: deploy_*
+        safe_tool: deploy
+        safe_args:
+          environment: staging
+          sandboxed: true
+
     deny:
       - delete_invoices
 

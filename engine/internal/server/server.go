@@ -5,7 +5,9 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -460,21 +462,39 @@ type agentAuthorizeRequest struct {
 }
 
 type agentAuthorizeResponse struct {
-	Allowed                      bool    `json:"allowed"`
-	Reason                       string  `json:"reason"`
-	TraceID                      string  `json:"trace_id"`
-	DowngradedScope              string  `json:"downgraded_scope,omitempty"`
-	EffectiveScope               string  `json:"effective_scope,omitempty"`
-	RequiresHumanReview          bool    `json:"requires_human_review"`
-	ConfidenceUsed               float64 `json:"confidence_used"`
-	RiskScore                    float64 `json:"risk_score,omitempty"`
-	RiskCriticality              float64 `json:"risk_criticality,omitempty"`
-	RiskReliability              float64 `json:"risk_reliability,omitempty"`
-	RiskAnomalyFactor            float64 `json:"risk_anomaly_factor,omitempty"`
-	ShadowMode                   bool    `json:"shadow_mode,omitempty"`
-	WouldHaveAllowed             *bool   `json:"would_have_allowed,omitempty"`
-	WouldHaveReason              string  `json:"would_have_reason,omitempty"`
-	WouldHaveRequiresHumanReview *bool   `json:"would_have_requires_human_review,omitempty"`
+	Allowed                      bool                   `json:"allowed"`
+	Reason                       string                 `json:"reason"`
+	TraceID                      string                 `json:"trace_id"`
+	DowngradedScope              string                 `json:"downgraded_scope,omitempty"`
+	EffectiveScope               string                 `json:"effective_scope,omitempty"`
+	RequiresHumanReview          bool                   `json:"requires_human_review"`
+	ConfidenceUsed               float64                `json:"confidence_used"`
+	RiskScore                    float64                `json:"risk_score,omitempty"`
+	RiskCriticality              float64                `json:"risk_criticality,omitempty"`
+	RiskReliability              float64                `json:"risk_reliability,omitempty"`
+	RiskAnomalyFactor            float64                `json:"risk_anomaly_factor,omitempty"`
+	ShadowMode                   bool                   `json:"shadow_mode,omitempty"`
+	WouldHaveAllowed             *bool                  `json:"would_have_allowed,omitempty"`
+	WouldHaveReason              string                 `json:"would_have_reason,omitempty"`
+	WouldHaveRequiresHumanReview *bool                  `json:"would_have_requires_human_review,omitempty"`
+	// Compute decision fields — present when the engine routes to a safe alternative.
+	Compute  bool                   `json:"compute,omitempty"`
+	SafeTool string                 `json:"safe_tool,omitempty"`
+	SafeArgs map[string]interface{} `json:"safe_args,omitempty"`
+	// Forensic fields for tamper-proof audit trails.
+	InputHash    string `json:"input_hash,omitempty"`
+	OutputHash   string `json:"output_hash,omitempty"`
+	PolicyDigest string `json:"policy_digest,omitempty"`
+}
+
+// payloadHash returns the SHA-256 hex of v serialised as JSON.
+func payloadHash(v interface{}) string {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
@@ -485,6 +505,9 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	// Compute input hash immediately after decode — tamper-proof record of the request.
+	inputHash := payloadHash(req)
 
 	// Start enhanced OpenTelemetry span with AI agent semantic conventions
 	var span trace.Span
@@ -733,7 +756,6 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	traceID := audit.NewTraceID()
-	h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, allowed, finalReason, confidenceScore, totalLatency)
 
 	authDecisionsTotal.WithLabelValues("agent", fmt.Sprintf("%t", allowed)).Inc()
 
@@ -742,6 +764,11 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		observability.RecordHumanReview(req.Actor, finalReason)
 		_, _ = h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor)
 	}
+
+	// Compute decision: evaluator approved but redirected to a safe alternative.
+	// Compute is only honoured when the final outcome is allow (confidence + risk
+	// didn't override it to deny/review).
+	isCompute := evalDec.Compute && allowed && !requiresReview
 
 	resp := agentAuthorizeResponse{
 		Allowed:             allowed,
@@ -755,7 +782,34 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		RiskCriticality:     riskDec.Criticality,
 		RiskReliability:     riskDec.Reliability,
 		RiskAnomalyFactor:   riskDec.AnomalyFactor,
+		Compute:             isCompute,
+		SafeTool:            evalDec.SafeTool,
+		SafeArgs:            evalDec.SafeArgs,
+		PolicyDigest:        evalDec.PolicyDigest,
+		InputHash:           inputHash,
 	}
+	resp.OutputHash = payloadHash(struct {
+		TraceID  string `json:"trace_id"`
+		Decision string `json:"decision"`
+		Reason   string `json:"reason"`
+	}{traceID, decisionStringFull(allowed, requiresReview, isCompute), finalReason})
+
+	// Audit log with full forensic fields.
+	h.audit.Log(audit.Event{
+		TenantID:        req.TenantID,
+		TraceID:         traceID,
+		Actor:           req.Actor,
+		Action:          req.Action,
+		Resource:        req.Resource,
+		ConfidenceScore: confidenceScore,
+		Decision:        decisionStringFull(allowed, requiresReview, isCompute),
+		Reason:          finalReason,
+		DowngradedScope: downgradedScope,
+		LatencyMS:       totalLatency,
+		InputHash:       inputHash,
+		OutputHash:      resp.OutputHash,
+		PolicyDigest:    evalDec.PolicyDigest,
+	})
 	h.notifyIncident(r.Context(), incident.Event{
 		Type:                eventTypeFrom(resp.Allowed, resp.RequiresHumanReview),
 		Severity:            severityFrom(resp.Allowed, resp.RequiresHumanReview),
@@ -1749,6 +1803,14 @@ func decisionString(allowed, requiresReview bool) string {
 		return "allowed"
 	}
 	return "denied"
+}
+
+// decisionStringFull extends decisionString with the compute case.
+func decisionStringFull(allowed, requiresReview, compute bool) string {
+	if compute {
+		return "compute"
+	}
+	return decisionString(allowed, requiresReview)
 }
 
 // apiKeyPrefix returns the first 8 characters of the Bearer token in the

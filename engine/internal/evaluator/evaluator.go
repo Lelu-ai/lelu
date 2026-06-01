@@ -4,6 +4,8 @@ package evaluator
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -35,11 +37,17 @@ type AgentAuthRequest struct {
 
 // Decision is the output of the policy evaluation.
 type Decision struct {
-	Allowed             bool    `json:"allowed"`
-	Reason              string  `json:"reason"`
-	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
-	RequiresHumanReview bool    `json:"requires_human_review"`
-	ConfidenceUsed      float64 `json:"confidence_used,omitempty"`
+	Allowed             bool                   `json:"allowed"`
+	Reason              string                 `json:"reason"`
+	DowngradedScope     string                 `json:"downgraded_scope,omitempty"`
+	RequiresHumanReview bool                   `json:"requires_human_review"`
+	ConfidenceUsed      float64                `json:"confidence_used,omitempty"`
+	// Compute fields — set when a compute rule matches instead of allow/deny.
+	Compute  bool                   `json:"compute,omitempty"`
+	SafeTool string                 `json:"safe_tool,omitempty"`
+	SafeArgs map[string]interface{} `json:"safe_args,omitempty"`
+	// PolicyDigest is the SHA-256 of the policy bytes active at evaluation time.
+	PolicyDigest string `json:"policy_digest,omitempty"`
 }
 
 // ─── Policy Schema ────────────────────────────────────────────────────────────
@@ -57,11 +65,19 @@ type Role struct {
 	Deny  []string `yaml:"deny"`
 }
 
+// ComputeRule routes a matching action to a safe alternative instead of blocking.
+type ComputeRule struct {
+	Action   string                 `yaml:"action"`
+	SafeTool string                 `yaml:"safe_tool"`
+	SafeArgs map[string]interface{} `yaml:"safe_args"`
+}
+
 // AgentScope defines agent-specific rules, inheriting from a Role.
 type AgentScope struct {
 	Inherits    string           `yaml:"inherits"`
 	Constraints []Constraint     `yaml:"constraints"`
 	Deny        []string         `yaml:"deny"`
+	Compute     []ComputeRule    `yaml:"compute"`     // safe-redirect rules
 	CanDelegate []DelegationRule `yaml:"can_delegate"` // agent-to-agent delegation rules
 }
 
@@ -97,9 +113,17 @@ type Constraint struct {
 
 // Evaluator holds the active policy and evaluates auth requests.
 type Evaluator struct {
-	mu     sync.RWMutex
-	policy *Policy
-	rego   *regoPolicy
+	mu           sync.RWMutex
+	policy       *Policy
+	rego         *regoPolicy
+	policyDigest string // SHA-256 hex of last loaded policy bytes
+}
+
+// PolicyDigest returns the SHA-256 hex digest of the currently loaded policy.
+func (e *Evaluator) PolicyDigest() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.policyDigest
 }
 
 // New returns a default Evaluator with an empty policy.
@@ -125,8 +149,11 @@ func (e *Evaluator) LoadPolicyBytes(data []byte) error {
 	if err := yaml.Unmarshal(data, &p); err != nil {
 		return fmt.Errorf("evaluator: parse policy: %w", err)
 	}
+	sum := sha256.Sum256(data)
+	digest := hex.EncodeToString(sum[:])
 	e.mu.Lock()
 	e.policy = &p
+	e.policyDigest = digest
 	e.mu.Unlock()
 	return nil
 }
@@ -202,18 +229,32 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 
 	scope, ok := p.AgentScopes[req.Actor]
 	if !ok {
-		return &Decision{Allowed: false, Reason: fmt.Sprintf("unknown agent scope %q", req.Actor)}, nil
+		return &Decision{Allowed: false, Reason: fmt.Sprintf("unknown agent scope %q", req.Actor), PolicyDigest: e.policyDigest}, nil
 	}
 
 	// Hard deny overrides — wildcard-aware.
 	for _, denied := range scope.Deny {
 		if matchAction(denied, req.Action) {
-			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is hard-denied for agent %q by pattern %q", req.Action, req.Actor, denied)}, nil
+			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q is hard-denied for agent %q by pattern %q", req.Action, req.Actor, denied), PolicyDigest: e.policyDigest}, nil
+		}
+	}
+
+	// Compute rules — safe redirect instead of block/allow.
+	for _, cr := range scope.Compute {
+		if matchAction(cr.Action, req.Action) {
+			return &Decision{
+				Allowed:      true,
+				Compute:      true,
+				SafeTool:     cr.SafeTool,
+				SafeArgs:     cr.SafeArgs,
+				Reason:       fmt.Sprintf("action %q redirected to safe alternative %q by compute rule", req.Action, cr.SafeTool),
+				PolicyDigest: e.policyDigest,
+			}, nil
 		}
 	}
 
 	// Confidence gates from constraints.
-	dec := &Decision{Allowed: true, ConfidenceUsed: req.Confidence}
+	dec := &Decision{Allowed: true, ConfidenceUsed: req.Confidence, PolicyDigest: e.policyDigest}
 	for _, c := range scope.Constraints {
 		if c.HardDenyIfConf != nil && req.Confidence < *c.HardDenyIfConf {
 			dec.Allowed = false
@@ -246,7 +287,7 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 			}
 		}
 		if !permitted {
-			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q not in inherited role %q", req.Action, scope.Inherits)}, nil
+			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q not in inherited role %q", req.Action, scope.Inherits), PolicyDigest: e.policyDigest}, nil
 		}
 	}
 

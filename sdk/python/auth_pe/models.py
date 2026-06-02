@@ -381,3 +381,56 @@ class AlertsResponse(BaseModel):
 
 class AcknowledgeAlertRequest(BaseModel):
     acknowledged_by: str = Field(..., min_length=1)
+
+
+# ─── Vault ────────────────────────────────────────────────────────────────────
+
+
+class VaultStoreRequest(BaseModel):
+    """Request to store an OAuth credential in the vault."""
+
+    agent_id: str = Field(..., description="Agent identifier")
+    user_id: str = Field(..., description="User the credential belongs to")
+    provider: str = Field(..., description="OAuth provider name, e.g. 'google', 'github'")
+    access_token: str = Field(..., description="OAuth access token")
+    refresh_token: str | None = Field(default=None, description="OAuth refresh token")
+    scopes: list[str] | None = Field(default=None, description="Granted OAuth scopes")
+    expires_in: int | None = Field(default=None, description="Seconds until access token expires; 0 = non-expiring")
+
+
+class VaultStoreResult(BaseModel):
+    """Result of a vault store operation."""
+
+    id: str
+    agent_id: str
+    user_id: str
+    provider: str
+    scopes: list[str]
+    expires_at: datetime | None = None
+    created_at: datetime
+
+
+class VaultTokenResult(BaseModel):
+    """Decrypted access token retrieved from the vault."""
+
+    agent_id: str
+    user_id: str
+    provider: str
+    access_token: str = Field(..., description="Decrypted OAuth access token")
+    scopes: list[str]
+    expires_at: datetime | None = None
+    refreshed: bool = Field(default=False, description="True when token was transparently refreshed")
+
+
+class VaultCredentialSummary(BaseModel):
+    """Redacted credential metadata — no tokens exposed."""
+
+    id: str
+    agent_id: str
+    user_id: str
+    provider: str
+    scopes: list[str]
+    expires_at: datetime | None = None
+    expired: bool = False
+    created_at: datetime
+    updated_at: datetime

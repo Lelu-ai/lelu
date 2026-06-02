@@ -37,6 +37,7 @@ import (
 	"github.com/lelu/engine/internal/shadow"
 	"github.com/lelu/engine/internal/telemetry"
 	"github.com/lelu/engine/internal/tokens"
+	"github.com/lelu/engine/internal/vault"
 )
 
 // ─── Metrics ──────────────────────────────────────────────────────────────────
@@ -109,6 +110,9 @@ type Handler struct {
 	extAuditor      *confidence.ExternalAuditor
 	confScorer      *confidence.Scorer
 	confEscalator   *confidence.Escalator
+
+	// OAuth Token Vault
+	vaultSvc *vault.Service
 }
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
@@ -327,6 +331,11 @@ func New(
 	}
 }
 
+// SetVault attaches an OAuth token vault to the handler after construction.
+func (h *Handler) SetVault(v *vault.Service) {
+	h.vaultSvc = v
+}
+
 // Shutdown gracefully shuts down the handler and its components
 func (h *Handler) Shutdown() {
 	if h.reputationMgr != nil {
@@ -363,6 +372,13 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/fallback/status", h.handleFallbackStatus)
 	mux.HandleFunc("GET /healthz", h.handleHealth)
 	mux.Handle("GET /metrics", promhttp.Handler())
+
+	// OAuth Token Vault
+	mux.HandleFunc("POST /v1/vault/store", h.handleVaultStore)
+	mux.HandleFunc("GET /v1/vault/token", h.handleVaultGetToken)
+	mux.HandleFunc("DELETE /v1/vault/credential", h.handleVaultRevoke)
+	mux.HandleFunc("GET /v1/vault/list", h.handleVaultList)
+	mux.HandleFunc("GET /v1/vault/providers", h.handleVaultProviders)
 }
 
 // ─── Authorize ────────────────────────────────────────────────────────────────
@@ -1522,6 +1538,129 @@ func (h *Handler) handleRevokeToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// ─── OAuth Token Vault ────────────────────────────────────────────────────────
+
+func (h *Handler) handleVaultStore(w http.ResponseWriter, r *http.Request) {
+	if h.vaultSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, "vault not configured")
+		return
+	}
+	var req struct {
+		AgentID      string   `json:"agent_id"`
+		UserID       string   `json:"user_id"`
+		Provider     string   `json:"provider"`
+		AccessToken  string   `json:"access_token"`
+		RefreshToken string   `json:"refresh_token,omitempty"`
+		Scopes       []string `json:"scopes,omitempty"`
+		ExpiresIn    int      `json:"expires_in,omitempty"` // seconds; 0 = non-expiring
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	storeReq := vault.StoreRequest{
+		AgentID:      req.AgentID,
+		UserID:       req.UserID,
+		Provider:     req.Provider,
+		AccessToken:  req.AccessToken,
+		RefreshToken: req.RefreshToken,
+		Scopes:       req.Scopes,
+	}
+	if req.ExpiresIn > 0 {
+		storeReq.ExpiresAt = time.Now().UTC().Add(time.Duration(req.ExpiresIn) * time.Second)
+	}
+
+	entry, err := h.vaultSvc.Store(r.Context(), storeReq)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"id":         entry.ID,
+		"agent_id":   entry.AgentID,
+		"user_id":    entry.UserID,
+		"provider":   entry.Provider,
+		"scopes":     entry.Scopes,
+		"expires_at": entry.ExpiresAt,
+		"created_at": entry.CreatedAt,
+	})
+}
+
+func (h *Handler) handleVaultGetToken(w http.ResponseWriter, r *http.Request) {
+	if h.vaultSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, "vault not configured")
+		return
+	}
+	agentID := r.URL.Query().Get("agent_id")
+	userID := r.URL.Query().Get("user_id")
+	provider := r.URL.Query().Get("provider")
+	if agentID == "" || userID == "" || provider == "" {
+		writeError(w, http.StatusBadRequest, "agent_id, user_id, and provider are required")
+		return
+	}
+
+	entry, err := h.vaultSvc.Get(r.Context(), agentID, userID, provider)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"agent_id":     entry.AgentID,
+		"user_id":      entry.UserID,
+		"provider":     entry.Provider,
+		"access_token": entry.AccessToken,
+		"scopes":       entry.Scopes,
+		"expires_at":   entry.ExpiresAt,
+		"refreshed":    entry.Refreshed,
+	})
+}
+
+func (h *Handler) handleVaultRevoke(w http.ResponseWriter, r *http.Request) {
+	if h.vaultSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, "vault not configured")
+		return
+	}
+	agentID := r.URL.Query().Get("agent_id")
+	userID := r.URL.Query().Get("user_id")
+	provider := r.URL.Query().Get("provider")
+	if agentID == "" || userID == "" || provider == "" {
+		writeError(w, http.StatusBadRequest, "agent_id, user_id, and provider are required")
+		return
+	}
+	if err := h.vaultSvc.Revoke(r.Context(), agentID, userID, provider); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+func (h *Handler) handleVaultList(w http.ResponseWriter, r *http.Request) {
+	if h.vaultSvc == nil {
+		writeError(w, http.StatusServiceUnavailable, "vault not configured")
+		return
+	}
+	agentID := r.URL.Query().Get("agent_id")
+	if agentID == "" {
+		writeError(w, http.StatusBadRequest, "agent_id is required")
+		return
+	}
+	summaries, err := h.vaultSvc.ListByAgent(r.Context(), agentID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"credentials": summaries})
+}
+
+func (h *Handler) handleVaultProviders(w http.ResponseWriter, _ *http.Request) {
+	if h.vaultSvc == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"providers": []string{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"providers": h.vaultSvc.Providers()})
 }
 
 // ─── Human Approval Queue ─────────────────────────────────────────────────────

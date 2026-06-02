@@ -162,6 +162,52 @@ export interface ListAuditEventsResult {
   nextCursor: number;
 }
 
+// ─── Vault types ─────────────────────────────────────────────────────────────
+
+export interface VaultStoreRequest {
+  agentId: string;
+  userId: string;
+  provider: string;
+  accessToken: string;
+  refreshToken?: string;
+  scopes?: string[];
+  /** Seconds until the access token expires. 0 = non-expiring. */
+  expiresIn?: number;
+}
+
+export interface VaultStoreResult {
+  id: string;
+  agentId: string;
+  userId: string;
+  provider: string;
+  scopes: string[];
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface VaultTokenResult {
+  agentId: string;
+  userId: string;
+  provider: string;
+  accessToken: string;
+  scopes: string[];
+  expiresAt: string;
+  /** True when the token was transparently refreshed before returning. */
+  refreshed: boolean;
+}
+
+export interface VaultCredentialSummary {
+  id: string;
+  agentId: string;
+  userId: string;
+  provider: string;
+  scopes: string[];
+  expiresAt: string | undefined;
+  expired: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ─── Typed input types ────────────────────────────────────────────────────────
 
 export type AuthorizeRequest = z.infer<typeof AuthorizeRequestSchema>;

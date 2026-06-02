@@ -26,6 +26,7 @@ import (
 	syncer "github.com/lelu/engine/internal/sync"
 	"github.com/lelu/engine/internal/telemetry"
 	"github.com/lelu/engine/internal/tokens"
+	"github.com/lelu/engine/internal/vault"
 )
 
 func main() {
@@ -176,11 +177,31 @@ func main() {
 			envOr("TENANT_AUTH_RATE_LIMIT", "0"), envOr("TENANT_MINT_RATE_LIMIT", "0"))
 	}
 
+	// ── OAuth Token Vault ─────────────────────────────────────────────────────
+	var vaultSvc *vault.Service
+	if db != nil {
+		vaultKey := envOr("VAULT_KEY", signingKey) // falls back to JWT signing key
+		var vErr error
+		vaultSvc, vErr = vault.New(vault.Config{
+			DB:        db,
+			VaultKey:  vaultKey,
+			Providers: vault.BuiltinProviders(),
+		})
+		if vErr != nil {
+			log.Printf("warning: vault init failed: %v", vErr)
+		} else {
+			log.Printf("OAuth token vault ready (providers: %v)", vaultSvc.Providers())
+		}
+	}
+
 	// ── HTTP server ───────────────────────────────────────────────────────────
 	h := server.New(eval, tokenSvc, confGate, auditWriter, reviewQueue, apiKey, server.ConfidenceConfig{
 		AllowUnverifiedConfidence: allowUnverifiedConfidence,
 		MissingSignalMode:         missingConfidenceMode,
 	}, enforcementMode, incidentNotifier, rl, fb, tp, db)
+	if vaultSvc != nil {
+		h.SetVault(vaultSvc)
+	}
 	srv := server.NewHTTPServer(addr, h)
 
 	// ── Policy sync worker (optional) ─────────────────────────────────────────

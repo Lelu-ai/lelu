@@ -37,6 +37,10 @@ export type {
   UpsertPolicyRequest,
   DeletePolicyRequest,
   DeletePolicyResult,
+  VaultStoreRequest,
+  VaultStoreResult,
+  VaultTokenResult,
+  VaultCredentialSummary,
 } from "./types.js";
 
 export {

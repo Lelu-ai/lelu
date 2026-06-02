@@ -30,6 +30,10 @@ import {
   type AlertsResponse,
   type ReputationListResponse,
   type AcknowledgeAlertRequest,
+  type VaultStoreRequest,
+  type VaultStoreResult,
+  type VaultTokenResult,
+  type VaultCredentialSummary,
 } from "./types.js";
 import { agentTracer } from "./observability/tracer.js";
 
@@ -411,6 +415,80 @@ export class LeluClient {
       `/v1/analytics/alerts/${encodeURIComponent(alertId)}/resolve`,
       {}
     );
+  }
+
+  // ── OAuth Token Vault ──────────────────────────────────────────────────────
+
+  /**
+   * Stores an OAuth credential (access token + optional refresh token) in the
+   * encrypted vault, bound to the given agent and user.
+   */
+  async vaultStore(req: VaultStoreRequest): Promise<VaultStoreResult> {
+    const body: Record<string, unknown> = {
+      agent_id: req.agentId,
+      user_id: req.userId,
+      provider: req.provider,
+      access_token: req.accessToken,
+    };
+    if (req.refreshToken) body.refresh_token = req.refreshToken;
+    if (req.scopes?.length) body.scopes = req.scopes;
+    if (req.expiresIn) body.expires_in = req.expiresIn;
+    const d = await this.post<{
+      id: string; agent_id: string; user_id: string; provider: string;
+      scopes: string[]; expires_at: string; created_at: string;
+    }>("/v1/vault/store", body);
+    return { id: d.id, agentId: d.agent_id, userId: d.user_id, provider: d.provider,
+      scopes: d.scopes, expiresAt: d.expires_at, createdAt: d.created_at };
+  }
+
+  /**
+   * Retrieves a stored access token for (agentId, userId, provider).
+   * The vault transparently refreshes expiring tokens when a refresh token
+   * and provider config are available.
+   */
+  async vaultGetToken(agentId: string, userId: string, provider: string): Promise<VaultTokenResult> {
+    const params = new URLSearchParams({ agent_id: agentId, user_id: userId, provider });
+    const d = await this.get<{
+      agent_id: string; user_id: string; provider: string; access_token: string;
+      scopes: string[]; expires_at: string; refreshed: boolean;
+    }>(`/v1/vault/token?${params}`);
+    return { agentId: d.agent_id, userId: d.user_id, provider: d.provider,
+      accessToken: d.access_token, scopes: d.scopes, expiresAt: d.expires_at,
+      refreshed: d.refreshed };
+  }
+
+  /**
+   * Revokes and deletes a stored credential for (agentId, userId, provider).
+   */
+  async vaultRevoke(agentId: string, userId: string, provider: string): Promise<{ success: boolean }> {
+    const params = new URLSearchParams({ agent_id: agentId, user_id: userId, provider });
+    return await this.delete<{ success: boolean }>(`/v1/vault/credential?${params}`);
+  }
+
+  /**
+   * Lists all stored credential summaries (no tokens exposed) for an agent.
+   */
+  async vaultList(agentId: string): Promise<VaultCredentialSummary[]> {
+    const d = await this.get<{
+      credentials: Array<{
+        id: string; agent_id: string; user_id: string; provider: string;
+        scopes: string[]; expires_at?: string; expired: boolean;
+        created_at: string; updated_at: string;
+      }>
+    }>(`/v1/vault/list?agent_id=${encodeURIComponent(agentId)}`);
+    return (d.credentials ?? []).map(c => ({
+      id: c.id, agentId: c.agent_id, userId: c.user_id, provider: c.provider,
+      scopes: c.scopes, expiresAt: c.expires_at, expired: c.expired,
+      createdAt: c.created_at, updatedAt: c.updated_at,
+    }));
+  }
+
+  /**
+   * Returns the names of all OAuth providers configured in the engine vault.
+   */
+  async vaultProviders(): Promise<string[]> {
+    const d = await this.get<{ providers: string[] }>("/v1/vault/providers");
+    return d.providers ?? [];
   }
 
   // ── HTTP helpers ───────────────────────────────────────────────────────────

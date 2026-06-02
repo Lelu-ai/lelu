@@ -37,6 +37,10 @@ from .models import (
     AlertsResponse,
     ReputationListResponse,
     AcknowledgeAlertRequest,
+    VaultStoreRequest,
+    VaultStoreResult,
+    VaultTokenResult,
+    VaultCredentialSummary,
 )
 from .observability import (
     agent_tracer,
@@ -388,6 +392,72 @@ class LeluClient:
         resp = await self._client.post(f"/v1/analytics/alerts/{alert_id}/resolve", json={})
         await self._raise_for_status(resp)
         return resp.json()  # type: ignore[no-any-return]
+
+    # ── OAuth Token Vault ──────────────────────────────────────────────────────
+
+    async def vault_store(self, req: VaultStoreRequest) -> VaultStoreResult:
+        """Store an OAuth credential in the encrypted vault."""
+        payload: dict[str, Any] = {
+            "agent_id": req.agent_id,
+            "user_id": req.user_id,
+            "provider": req.provider,
+            "access_token": req.access_token,
+        }
+        if req.refresh_token:
+            payload["refresh_token"] = req.refresh_token
+        if req.scopes:
+            payload["scopes"] = req.scopes
+        if req.expires_in:
+            payload["expires_in"] = req.expires_in
+        data = await self._post("/v1/vault/store", payload)
+        return VaultStoreResult(**{
+            "id": data["id"],
+            "agent_id": data["agent_id"],
+            "user_id": data["user_id"],
+            "provider": data["provider"],
+            "scopes": data.get("scopes") or [],
+            "expires_at": data.get("expires_at"),
+            "created_at": data["created_at"],
+        })
+
+    async def vault_get_token(self, agent_id: str, user_id: str, provider: str) -> VaultTokenResult:
+        """Retrieve an access token from the vault (auto-refreshes if expiring)."""
+        resp = await self._client.get(
+            "/v1/vault/token",
+            params={"agent_id": agent_id, "user_id": user_id, "provider": provider},
+        )
+        await self._raise_for_status(resp)
+        data = resp.json()
+        return VaultTokenResult(**{
+            "agent_id": data["agent_id"],
+            "user_id": data["user_id"],
+            "provider": data["provider"],
+            "access_token": data["access_token"],
+            "scopes": data.get("scopes") or [],
+            "expires_at": data.get("expires_at"),
+            "refreshed": data.get("refreshed", False),
+        })
+
+    async def vault_revoke(self, agent_id: str, user_id: str, provider: str) -> bool:
+        """Revoke and delete a stored credential."""
+        resp = await self._client.delete(
+            "/v1/vault/credential",
+            params={"agent_id": agent_id, "user_id": user_id, "provider": provider},
+        )
+        await self._raise_for_status(resp)
+        return resp.json().get("success", False)
+
+    async def vault_list(self, agent_id: str) -> list[VaultCredentialSummary]:
+        """List stored credential summaries for an agent (no tokens exposed)."""
+        resp = await self._client.get("/v1/vault/list", params={"agent_id": agent_id})
+        await self._raise_for_status(resp)
+        return [VaultCredentialSummary(**c) for c in resp.json().get("credentials") or []]
+
+    async def vault_providers(self) -> list[str]:
+        """List available OAuth provider names configured in the engine."""
+        resp = await self._client.get("/v1/vault/providers")
+        await self._raise_for_status(resp)
+        return resp.json().get("providers") or []
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 

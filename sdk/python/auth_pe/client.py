@@ -445,7 +445,7 @@ class LeluClient:
             params={"agent_id": agent_id, "user_id": user_id, "provider": provider},
         )
         await self._raise_for_status(resp)
-        return resp.json().get("success", False)
+        return bool(resp.json().get("success", False))
 
     async def vault_list(self, agent_id: str) -> list[VaultCredentialSummary]:
         """List stored credential summaries for an agent (no tokens exposed)."""

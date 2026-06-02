@@ -26,9 +26,9 @@ except ImportError:
         OK = "OK"
         ERROR = "ERROR"
     
-    otel_trace = OtelTrace()
-    OtelStatus = _StubStatus
-    OtelStatusCode = _StubStatusCode
+    otel_trace = OtelTrace()  # type: ignore[assignment]
+    OtelStatus = _StubStatus  # type: ignore[assignment,misc]
+    OtelStatusCode = _StubStatusCode  # type: ignore[assignment,misc]
 
 
 class NoOpSpan:
@@ -155,7 +155,7 @@ class AgentTracer:
         if OTEL_AVAILABLE:
             self.tracer = otel_trace.get_tracer(service_name, service_version)
         else:
-            self.tracer = NoOpTracer()
+            self.tracer = NoOpTracer()  # type: ignore[assignment]
     
     def start_agent_span(
         self,

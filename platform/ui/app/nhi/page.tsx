@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Shield, RefreshCw, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronUp, Bot, Key } from "lucide-react";
 import FlowBackground from "@/components/modern/FlowBackground";
-import { type NHIEntry, type RiskLevel, scoreNHI } from "@/lib/agents";
+import { type NHIEntry, type RiskLevel, scoreNHI } from "@/lib/nhi-scoring";
 
 type AgentStatus = "active" | "suspended" | "revoked";
 interface ApiKey { id: string; name: string; keyPrefix: string; createdAt: string; lastUsedAt: string | null; expiresAt: string | null; revoked: boolean; }

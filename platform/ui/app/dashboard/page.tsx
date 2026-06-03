@@ -13,6 +13,8 @@ import {
   ArrowUpRight,
   Lock,
   Globe,
+  Bot,
+  AlertTriangle,
 } from "lucide-react";
 import FlowBackground from "@/components/modern/FlowBackground";
 
@@ -27,6 +29,7 @@ interface ApiKey {
 
 export default function DashboardPage() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [agentCount, setAgentCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -44,20 +47,34 @@ export default function DashboardPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchKeys();
+    fetchData();
   }, []);
 
-  async function fetchKeys() {
+  async function fetchData() {
     try {
-      const res = await fetch("/api/dashboard/keys");
-      if (!res.ok) throw new Error("Failed to load keys");
-      const data = await res.json();
-      setApiKeys((data.keys as ApiKey[]).filter((k) => !k.revoked));
+      const [keysRes, agentsRes] = await Promise.all([
+        fetch("/api/dashboard/keys"),
+        fetch("/api/agents"),
+      ]);
+      if (!keysRes.ok) throw new Error("Failed to load keys");
+      const keysData = await keysRes.json();
+      setApiKeys((keysData.keys as ApiKey[]).filter((k) => !k.revoked));
+      if (agentsRes.ok) {
+        const agentsData = await agentsRes.json();
+        setAgentCount((agentsData.agents ?? []).filter((a: { status: string }) => a.status === "active").length);
+      }
     } catch {
-      setError("Failed to load API keys. Please refresh.");
+      setError("Failed to load data. Please refresh.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchKeys() {
+    const res = await fetch("/api/dashboard/keys");
+    if (!res.ok) return;
+    const data = await res.json();
+    setApiKeys((data.keys as ApiKey[]).filter((k) => !k.revoked));
   }
 
   async function handleCreate() {
@@ -130,25 +147,25 @@ export default function DashboardPage() {
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-12">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-6 mb-8 sm:mb-12">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2">
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white mb-2">
               Developer Overview
             </h1>
-            <p className="text-zinc-500 dark:text-zinc-400">
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-base">
               Monitor your agent usage and manage security credentials.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/docs"
-              className="px-4 py-2 text-sm font-medium border border-zinc-200 dark:border-white/10 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+              className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border border-zinc-200 dark:border-white/10 rounded-lg hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
             >
-              Documentation
+              Docs
             </Link>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 text-sm font-bold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-95 transition-all flex items-center gap-2"
+              className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-100 active:scale-95 transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />
               New API Key
@@ -156,36 +173,59 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-          <div className="lg:col-span-2 p-8 rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-2xl shadow-xl">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-500/10 flex items-center justify-center">
+        {/* Stats cards — 2×2 on mobile, 4-col on lg */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">
+          {[
+            { label: "API Keys", value: apiKeys.length, icon: <Key className="w-5 h-5 text-amber-500" />, href: "/api-key" },
+            { label: "Active Agents", value: agentCount, icon: <Bot className="w-5 h-5 text-violet-500" />, href: "/agents" },
+            { label: "Policies", value: null, icon: <Shield className="w-5 h-5 text-emerald-500" />, href: "/policies" },
+            { label: "NHI Security", value: null, icon: <AlertTriangle className="w-5 h-5 text-orange-500" />, href: "/nhi" },
+          ].map(stat => (
+            <Link
+              key={stat.label}
+              href={stat.href}
+              className="group p-4 sm:p-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-zinc-300 dark:hover:border-white/20 transition-all"
+            >
+              <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                {stat.icon}
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-zinc-500">{stat.label}</span>
+              </div>
+              {stat.value !== null
+                ? <p className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-white">{stat.value}</p>
+                : <ArrowUpRight className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 dark:group-hover:text-zinc-200 transition-colors mt-1" />
+              }
+            </Link>
+          ))}
+        </div>
+
+        {/* CTA cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 sm:mb-12">
+          <div className="p-6 sm:p-8 rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-xl flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-zinc-100 dark:bg-zinc-500/10 flex items-center justify-center">
                 <Activity className="w-5 h-5 text-zinc-700 dark:text-zinc-300" />
               </div>
-              <h2 className="text-lg font-bold">Active Keys</h2>
+              <h2 className="text-base font-bold">Live Audit Log</h2>
             </div>
-            <p className="text-5xl font-bold text-zinc-900 dark:text-white">{apiKeys.length}</p>
-            <p className="text-sm text-zinc-500 mt-2">
-              {apiKeys.length === 0
-                ? "No keys yet — create one to get started."
-                : apiKeys.length === 1
-                ? "1 active API key"
-                : `${apiKeys.length} active API keys`}
-            </p>
+            <p className="text-sm text-zinc-500">Every authorization decision your agents make, in real time.</p>
+            <Link href="/audit" className="mt-auto flex items-center gap-2 text-sm font-bold hover:underline">
+              View Log <ArrowUpRight className="w-4 h-4" />
+            </Link>
           </div>
 
-          <div className="p-8 rounded-[2rem] border border-zinc-200 dark:border-white/10 bg-[#0A0A0A] dark:bg-[#141416] shadow-xl overflow-hidden relative">
+          <div className="p-6 sm:p-8 rounded-[2rem] bg-[#0A0A0A] dark:bg-[#141416] shadow-xl overflow-hidden relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl -translate-y-12 translate-x-12" />
-            <div className="relative z-10 flex flex-col h-full">
-              <Shield className="w-10 h-10 text-white/40 mb-6" />
-              <h3 className="text-xl font-bold text-white mb-2">Real-time Gating</h3>
-              <p className="text-zinc-400 text-sm leading-relaxed mb-8 flex-1">
-                Your agents are being secured by Lelu's active policy engine.
-              </p>
+            <div className="relative z-10 flex flex-col h-full gap-4">
+              <Shield className="w-9 h-9 text-white/40" />
+              <div>
+                <h3 className="text-base font-bold text-white mb-1">Real-time Gating</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  Your agents are secured by Lelu&apos;s active policy engine.
+                </p>
+              </div>
               <Link
                 href="/audit"
-                className="w-full py-3 bg-white text-[#0A0A0A] rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2 hover:bg-zinc-100 transition-colors"
+                className="mt-auto w-full py-3 bg-white text-[#0A0A0A] rounded-xl font-bold text-sm text-center flex items-center justify-center gap-2 hover:bg-zinc-100 transition-colors"
               >
                 View Live Audit Log
                 <ArrowUpRight className="w-4 h-4" />
@@ -195,10 +235,10 @@ export default function DashboardPage() {
         </div>
 
         {/* API Keys Table */}
-        <div className="rounded-[2.5rem] border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-2xl shadow-2xl overflow-hidden">
-          <div className="px-8 py-6 border-b border-zinc-200 dark:border-white/10 flex items-center gap-3">
+        <div className="rounded-2xl sm:rounded-[2.5rem] border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-2xl shadow-2xl overflow-hidden">
+          <div className="px-4 sm:px-8 py-4 sm:py-6 border-b border-zinc-200 dark:border-white/10 flex items-center gap-3">
             <Key className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-bold">Authenticated Environments</h2>
+            <h2 className="text-base sm:text-lg font-bold">Authenticated Environments</h2>
           </div>
 
           {error && (
@@ -218,14 +258,14 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full text-left border-collapse min-w-[480px]">
                 <thead>
                   <tr className="border-b border-zinc-100 dark:border-white/5 uppercase tracking-widest text-[10px] font-bold text-zinc-500">
-                    <th className="px-8 py-4">Name</th>
-                    <th className="px-8 py-4">Key Prefix</th>
-                    <th className="px-8 py-4">Created</th>
-                    <th className="px-8 py-4">Last Used</th>
-                    <th className="px-8 py-4 text-right">Actions</th>
+                    <th className="px-4 sm:px-8 py-3 sm:py-4">Name</th>
+                    <th className="px-4 sm:px-8 py-3 sm:py-4">Key Prefix</th>
+                    <th className="hidden sm:table-cell px-8 py-4">Created</th>
+                    <th className="hidden sm:table-cell px-8 py-4">Last Used</th>
+                    <th className="px-4 sm:px-8 py-3 sm:py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
@@ -234,9 +274,9 @@ export default function DashboardPage() {
                       key={key.id}
                       className="group hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors"
                     >
-                      <td className="px-8 py-5 font-semibold">{key.name}</td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-2 font-mono text-sm text-zinc-500">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5 font-semibold text-sm">{key.name}</td>
+                      <td className="px-4 sm:px-8 py-4 sm:py-5">
+                        <div className="flex items-center gap-2 font-mono text-xs sm:text-sm text-zinc-500">
                           <span>lelu_sk_{key.keyPrefix}…</span>
                           <button
                             onClick={() => copyToClipboard(`lelu_sk_${key.keyPrefix}`)}
@@ -251,13 +291,13 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-sm text-zinc-500">
+                      <td className="hidden sm:table-cell px-8 py-5 text-sm text-zinc-500">
                         {new Date(key.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="px-8 py-5 text-sm text-zinc-500">
+                      <td className="hidden sm:table-cell px-8 py-5 text-sm text-zinc-500">
                         {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : "Never"}
                       </td>
-                      <td className="px-8 py-5 text-right">
+                      <td className="px-4 sm:px-8 py-4 sm:py-5 text-right">
                         <button
                           onClick={() => setRevokeId(key.id)}
                           className="text-zinc-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-all"

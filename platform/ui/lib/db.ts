@@ -116,4 +116,24 @@ export async function ensureSchema(): Promise<void> {
   await sql`
     CREATE INDEX IF NOT EXISTS idx_lelu_audit_decision ON lelu_audit_events (decision, created_at DESC)
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_agents (
+      id           TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      name         TEXT NOT NULL,
+      description  TEXT NOT NULL DEFAULT '',
+      agent_type   TEXT NOT NULL DEFAULT 'autonomous',
+      owner_email  TEXT NOT NULL DEFAULT '',
+      status       TEXT NOT NULL DEFAULT 'active',
+      scopes       JSONB NOT NULL DEFAULT '[]',
+      last_seen_at TIMESTAMPTZ,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_agents_user ON lelu_agents (user_id, status)
+  `;
 }

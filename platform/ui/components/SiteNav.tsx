@@ -14,6 +14,8 @@ interface User {
 
 const NAV_LINKS = [
   { name: "Docs", href: "/docs" },
+  { name: "Agents", href: "/agents" },
+  { name: "Security", href: "/nhi" },
   { name: "Audit Log", href: "/audit" },
   { name: "Policies", href: "/policies" },
 ];
@@ -164,6 +166,8 @@ export function SiteNav() {
                     <div className="py-1">
                       {[
                         { label: "Dashboard", href: "/dashboard" },
+                        { label: "Agent Registry", href: "/agents" },
+                        { label: "NHI Security", href: "/nhi" },
                         { label: "API Keys", href: "/api-key" },
                         { label: "Audit Log", href: "/audit" },
                       ].map((item) => (

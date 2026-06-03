@@ -7,28 +7,37 @@ import time
 from typing import Dict, List, Optional, Any, Union, Tuple
 from contextlib import contextmanager
 
+# Declared as Any before the try/except so mypy accepts both branches
+# without no-redef or unused-ignore errors.
+otel_trace: Any = None
+OtelStatus: Any = None
+OtelStatusCode: Any = None
+
 try:
-    from opentelemetry import trace as otel_trace
-    from opentelemetry.trace import Status as OtelStatus, StatusCode as OtelStatusCode
+    from opentelemetry import trace as _otel_trace
+    from opentelemetry.trace import Status as _OtelStatus, StatusCode as _OtelStatusCode
+    otel_trace = _otel_trace
+    OtelStatus = _OtelStatus
+    OtelStatusCode = _OtelStatusCode
     OTEL_AVAILABLE = True
 except ImportError:
     OTEL_AVAILABLE = False
-    # Provide stub classes for when OpenTelemetry is not available
+
     class OtelTrace:
         @staticmethod
         def get_tracer(name: str, version: Optional[str] = None) -> 'NoOpTracer':
             return NoOpTracer()
-    
+
     class _StubStatus:
         pass
-    
+
     class _StubStatusCode:
         OK = "OK"
         ERROR = "ERROR"
-    
-    otel_trace = OtelTrace()  # type: ignore[assignment]
-    OtelStatus = _StubStatus  # type: ignore[assignment,misc]
-    OtelStatusCode = _StubStatusCode  # type: ignore[assignment,misc]
+
+    otel_trace = OtelTrace()
+    OtelStatus = _StubStatus
+    OtelStatusCode = _StubStatusCode
 
 
 class NoOpSpan:
@@ -153,9 +162,9 @@ class AgentTracer:
     
     def __init__(self, service_name: str = "lelu-python-sdk", service_version: str = "0.2.0") -> None:
         if OTEL_AVAILABLE:
-            self.tracer = otel_trace.get_tracer(service_name, service_version)
+            self.tracer: Any = otel_trace.get_tracer(service_name, service_version)
         else:
-            self.tracer = NoOpTracer()  # type: ignore[assignment]
+            self.tracer = NoOpTracer()
     
     def start_agent_span(
         self,

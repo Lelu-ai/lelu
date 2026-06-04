@@ -41,6 +41,15 @@ from .models import (
     VaultStoreResult,
     VaultTokenResult,
     VaultCredentialSummary,
+    RegisterAgentRequest,
+    RegisteredAgent,
+    AgentWorkloadToken,
+    AgentStatusResult,
+    NHIEntry,
+    NHIScanResult,
+    NHIStats,
+    RegisterOAuthClientRequest,
+    OAuthClient,
 )
 from .observability import (
     agent_tracer,
@@ -458,6 +467,129 @@ class LeluClient:
         resp = await self._client.get("/v1/vault/providers")
         await self._raise_for_status(resp)
         return resp.json().get("providers") or []
+
+    # ── Agent Identity Registry ───────────────────────────────────────────────
+
+    async def register_agent(self, req: RegisterAgentRequest) -> RegisteredAgent:
+        """Register a new agent identity with a stable UUID."""
+        payload: dict[str, Any] = {"name": req.name}
+        if req.description is not None:
+            payload["description"] = req.description
+        if req.agent_type is not None:
+            payload["agent_type"] = req.agent_type
+        if req.owner_email is not None:
+            payload["owner_email"] = req.owner_email
+        if req.scopes is not None:
+            payload["scopes"] = req.scopes
+        if req.metadata is not None:
+            payload["metadata"] = req.metadata
+        data = await self._post("/v1/agents", payload)
+        return RegisteredAgent(**data)
+
+    async def list_agents(self, tenant_id: str | None = None) -> list[RegisteredAgent]:
+        """List all registered agents, optionally filtered by tenant."""
+        params = {"tenant_id": tenant_id} if tenant_id else {}
+        resp = await self._client.get("/v1/agents", params=params)
+        await self._raise_for_status(resp)
+        return [RegisteredAgent(**a) for a in resp.json().get("agents") or []]
+
+    async def get_agent(self, agent_id: str) -> RegisteredAgent:
+        """Get a single registered agent by its stable ID."""
+        resp = await self._client.get(f"/v1/agents/{agent_id}")
+        await self._raise_for_status(resp)
+        return RegisteredAgent(**resp.json())
+
+    async def revoke_agent(self, agent_id: str) -> AgentStatusResult:
+        """Permanently revoke an agent — all future token issuances are rejected."""
+        resp = await self._client.delete(f"/v1/agents/{agent_id}")
+        await self._raise_for_status(resp)
+        d = resp.json()
+        return AgentStatusResult(agent_id=d["agent_id"], status=d["status"])
+
+    async def suspend_agent(self, agent_id: str) -> AgentStatusResult:
+        """Suspend an agent (reversible). Use revoke_agent for permanent revocation."""
+        data = await self._post(f"/v1/agents/{agent_id}/suspend", {})
+        return AgentStatusResult(agent_id=data["agent_id"], status=data["status"])
+
+    async def issue_agent_token(self, agent_id: str) -> AgentWorkloadToken:
+        """Issue a short-lived OIDC-compatible RS256 JWT for a registered agent."""
+        data = await self._post(f"/v1/agents/{agent_id}/token", {})
+        return AgentWorkloadToken(
+            token=data["token"],
+            agent_id=data["agent_id"],
+            scopes=data.get("scopes") or [],
+            expires_at=data["expires_at"],
+            issued_at=data["issued_at"],
+        )
+
+    # ── NHI Discovery + ISPM ──────────────────────────────────────────────────
+
+    async def list_nhi(self, tenant_id: str | None = None) -> list[NHIEntry]:
+        """List all NHIs (registered agents + shadow agents + credentials) with risk scores."""
+        params = {"tenant_id": tenant_id} if tenant_id else {}
+        resp = await self._client.get("/v1/nhi/inventory", params=params)
+        await self._raise_for_status(resp)
+        return [NHIEntry(**e) for e in resp.json().get("nhis") or []]
+
+    async def get_nhi(self, nhi_id: str) -> NHIEntry:
+        """Get a single NHI by ID with full OWASP findings and remediation."""
+        resp = await self._client.get(f"/v1/nhi/inventory/{nhi_id}")
+        await self._raise_for_status(resp)
+        return NHIEntry(**resp.json())
+
+    async def get_top_risks(
+        self, tenant_id: str | None = None, limit: int = 10
+    ) -> list[NHIEntry]:
+        """Return the top-N highest-risk NHIs."""
+        params: dict[str, Any] = {"limit": limit}
+        if tenant_id:
+            params["tenant_id"] = tenant_id
+        resp = await self._client.get("/v1/nhi/risks", params=params)
+        await self._raise_for_status(resp)
+        return [NHIEntry(**e) for e in resp.json().get("top_risks") or []]
+
+    async def trigger_nhi_scan(self, tenant_id: str | None = None) -> NHIScanResult:
+        """Trigger a full NHI scan and return an aggregate posture summary."""
+        params = {"tenant_id": tenant_id} if tenant_id else {}
+        resp = await self._client.post("/v1/nhi/scan", params=params)
+        await self._raise_for_status(resp)
+        return NHIScanResult(**resp.json())
+
+    async def get_nhi_stats(self, tenant_id: str | None = None) -> NHIStats:
+        """Return lightweight aggregate NHI counts without running full checks."""
+        params = {"tenant_id": tenant_id} if tenant_id else {}
+        resp = await self._client.get("/v1/nhi/stats", params=params)
+        await self._raise_for_status(resp)
+        return NHIStats(**resp.json())
+
+    # ── MCP OAuth 2.1 ────────────────────────────────────────────────────────
+
+    async def register_oauth_client(
+        self, req: RegisterOAuthClientRequest
+    ) -> OAuthClient:
+        """Dynamically register an MCP OAuth 2.1 client (RFC 7591)."""
+        payload: dict[str, Any] = {}
+        if req.client_name is not None:
+            payload["client_name"] = req.client_name
+        if req.redirect_uris is not None:
+            payload["redirect_uris"] = req.redirect_uris
+        if req.grant_types is not None:
+            payload["grant_types"] = req.grant_types
+        if req.scope is not None:
+            payload["scope"] = req.scope
+        if req.token_endpoint_auth_method is not None:
+            payload["token_endpoint_auth_method"] = req.token_endpoint_auth_method
+        data = await self._post("/oauth/clients", payload)
+        return OAuthClient(
+            client_id=data["client_id"],
+            client_secret=data.get("client_secret"),
+            client_name=data.get("client_name", ""),
+            redirect_uris=data.get("redirect_uris") or [],
+            grant_types=data.get("grant_types") or [],
+            scope=data.get("scope", ""),
+            token_endpoint_auth_method=data.get("token_endpoint_auth_method", ""),
+            client_id_issued_at=data.get("client_id_issued_at", 0),
+        )
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 

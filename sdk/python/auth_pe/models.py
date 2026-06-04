@@ -434,3 +434,129 @@ class VaultCredentialSummary(BaseModel):
     expired: bool = False
     created_at: datetime
     updated_at: datetime
+
+
+# ── Agent Identity Registry ───────────────────────────────────────────────────
+
+class RegisterAgentRequest(BaseModel):
+    """Request to register a new agent identity."""
+
+    name: str = Field(..., description="Human-readable agent name")
+    description: str | None = Field(default=None, description="What the agent does")
+    agent_type: str | None = Field(default="autonomous", description="autonomous | assistant | workflow")
+    owner_email: str | None = Field(default=None, description="Email of the team or person owning this agent")
+    scopes: list[str] | None = Field(default=None, description="OAuth-style scopes this agent is permitted")
+    metadata: dict[str, Any] | None = Field(default=None, description="Arbitrary key-value metadata")
+
+
+class RegisteredAgent(BaseModel):
+    """A registered agent identity with stable ID."""
+
+    id: str
+    tenant_id: str
+    name: str
+    description: str
+    agent_type: str
+    owner_email: str
+    status: str  # "active" | "suspended" | "revoked"
+    scopes: list[str]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentWorkloadToken(BaseModel):
+    """Short-lived OIDC-compatible RS256 JWT for a registered agent."""
+
+    token: str
+    agent_id: str
+    scopes: list[str]
+    expires_at: datetime
+    issued_at: datetime
+
+
+class AgentStatusResult(BaseModel):
+    """Result of a suspend or revoke operation."""
+
+    agent_id: str
+    status: str  # "suspended" | "revoked"
+
+
+# ── NHI Discovery + ISPM ─────────────────────────────────────────────────────
+
+class OWASPFinding(BaseModel):
+    """A single OWASP NHI top-10 risk finding."""
+
+    check_id: str = Field(..., description="OWASP check identifier, e.g. NHI-05")
+    title: str
+    severity: str  # "critical" | "high" | "medium" | "low"
+    description: str
+    remediation: str
+
+
+class NHIEntry(BaseModel):
+    """A non-human identity with OWASP risk posture."""
+
+    id: str
+    tenant_id: str
+    type: str  # "registered_agent" | "shadow_agent" | "credential"
+    name: str
+    status: str
+    scopes: list[str]
+    risk_score: float = Field(..., description="0.0 to 1.0")
+    risk_level: str  # "critical" | "high" | "medium" | "low" | "none"
+    findings: list[OWASPFinding]
+    last_seen: datetime | None = None
+    created_at: datetime
+    agent_type: str | None = None
+    owner_email: str | None = None
+    provider: str | None = None
+    request_count: int | None = None
+    expires_at: datetime | None = None
+
+
+class NHIScanResult(BaseModel):
+    """Aggregate summary of a full NHI scan."""
+
+    tenant_id: str
+    scanned_at: datetime
+    total_nhis: int
+    by_type: dict[str, int]
+    by_status: dict[str, int]
+    by_risk_level: dict[str, int]
+    top_risks: list[NHIEntry]
+    finding_counts: dict[str, int]
+
+
+class NHIStats(BaseModel):
+    """Lightweight aggregate NHI counts."""
+
+    tenant_id: str
+    total_nhis: int
+    by_type: dict[str, int]
+    by_status: dict[str, int]
+    by_risk_level: dict[str, int]
+    generated_at: datetime
+
+
+class RegisterOAuthClientRequest(BaseModel):
+    """Request to register an MCP OAuth 2.1 client."""
+
+    client_name: str | None = None
+    redirect_uris: list[str] | None = None
+    grant_types: list[str] | None = None
+    scope: str | None = None
+    token_endpoint_auth_method: str | None = None
+
+
+class OAuthClient(BaseModel):
+    """A registered MCP OAuth 2.1 client."""
+
+    client_id: str
+    client_secret: str | None = None
+    client_name: str
+    redirect_uris: list[str]
+    grant_types: list[str]
+    scope: str
+    token_endpoint_auth_method: str
+    client_id_issued_at: int

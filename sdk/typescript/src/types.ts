@@ -525,3 +525,101 @@ export interface NHIStats {
   byRiskLevel: Record<string, number>;
   generatedAt: string;
 }
+
+// ─── Shadow Mode ──────────────────────────────────────────────────────────────
+
+export interface ShadowBucket {
+  allow: number;
+  review: number;
+  deny: number;
+}
+
+export interface ShadowSummaryBucket extends ShadowBucket {
+  minute: string;
+}
+
+export interface ShadowSummaryResponse {
+  mode: string;
+  window_minutes: number;
+  generated_at: string;
+  totals: ShadowBucket;
+  buckets: ShadowSummaryBucket[];
+}
+
+// ─── Human Review Queue ───────────────────────────────────────────────────────
+
+export type QueueItemStatus = "pending" | "approved" | "denied";
+
+export interface ReviewQueueItem {
+  id: string;
+  tenant_id: string;
+  actor: string;
+  action: string;
+  resource?: Record<string, string>;
+  confidence_score: number;
+  reason: string;
+  acting_for?: string;
+  enqueued_at: string;
+  status: QueueItemStatus;
+  resolved_at?: string;
+  resolved_by?: string;
+  resolution_note?: string;
+}
+
+// ─── Policy Simulator ─────────────────────────────────────────────────────────
+
+export interface SimulatorTraceItem {
+  id?: string;
+  kind: "human" | "agent";
+  tenant_id: string;
+  user_id?: string;
+  actor?: string;
+  action: string;
+  resource?: Record<string, string>;
+  acting_for?: string;
+  scope?: string;
+  confidence?: number;
+}
+
+export interface SimulatorDecision {
+  allowed: boolean;
+  requires_human_review: boolean;
+  downgraded_scope?: string;
+  reason: string;
+  outcome: "allow" | "human_review" | "deny";
+  confidence_used?: number;
+}
+
+export interface SimulatorReplayDelta {
+  id?: string;
+  index: number;
+  kind: string;
+  action: string;
+  actor?: string;
+  user_id?: string;
+  changed: boolean;
+  before: SimulatorDecision;
+  after: SimulatorDecision;
+}
+
+export interface SimulatorReplaySummary {
+  total: number;
+  changed: number;
+  allow_to_deny: number;
+  allow_to_review: number;
+  review_to_deny: number;
+  deny_to_allow: number;
+  review_to_allow: number;
+  deny_to_review: number;
+  other_changes: number;
+}
+
+export interface SimulatorReplayRequest {
+  proposed_policy_yaml: string;
+  traces: SimulatorTraceItem[];
+}
+
+export interface SimulatorReplayResponse {
+  summary: SimulatorReplaySummary;
+  items: SimulatorReplayDelta[];
+}

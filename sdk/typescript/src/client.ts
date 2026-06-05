@@ -34,6 +34,10 @@ import {
   type VaultStoreResult,
   type VaultTokenResult,
   type VaultCredentialSummary,
+  type ShadowSummaryResponse,
+  type ReviewQueueItem,
+  type SimulatorReplayRequest,
+  type SimulatorReplayResponse,
   type RegisterAgentRequest,
   type RegisteredAgent,
   type ListAgentsResult,
@@ -119,7 +123,7 @@ export class LeluClient {
       inputHash?: string;
       outputHash?: string;
       policyDigest?: string;
-    }>("/api/v1/authorize", body);
+    }>("/v1/authorize", body);
 
     return {
       requestId: data.requestId,
@@ -258,7 +262,7 @@ export class LeluClient {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
       try {
-        const res = await fetch(`${this.baseUrl}/api/config-check`, {
+        const res = await fetch(`${this.baseUrl}/healthz`, {
           method: "GET",
           headers: this.headers(),
           signal: ctrl.signal,
@@ -272,7 +276,51 @@ export class LeluClient {
     }
   }
 
-  // ── Audit log ──────────────────────────────────────────────────────────────
+  // ── Shadow mode summary ────────────────────────────────────────────────────
+
+  async getShadowSummary(windowMinutes = 60): Promise<ShadowSummaryResponse> {
+    return this.get<ShadowSummaryResponse>(
+      `/v1/shadow/summary?window_minutes=${windowMinutes}`
+    );
+  }
+
+  // ── Human review queue ─────────────────────────────────────────────────────
+
+  async listQueue(): Promise<{ items: ReviewQueueItem[]; count: number }> {
+    return this.get<{ items: ReviewQueueItem[]; count: number }>("/v1/queue/pending");
+  }
+
+  async getQueueItem(id: string): Promise<ReviewQueueItem> {
+    return this.get<ReviewQueueItem>(`/v1/queue/${encodeURIComponent(id)}`);
+  }
+
+  async approveQueueItem(id: string, resolvedBy: string, note = ""): Promise<{ success: boolean }> {
+    return this.post<{ success: boolean }>(
+      `/v1/queue/${encodeURIComponent(id)}/approve`,
+      { resolved_by: resolvedBy, note }
+    );
+  }
+
+  async denyQueueItem(id: string, resolvedBy: string, note = ""): Promise<{ success: boolean }> {
+    return this.post<{ success: boolean }>(
+      `/v1/queue/${encodeURIComponent(id)}/deny`,
+      { resolved_by: resolvedBy, note }
+    );
+  }
+
+  // ── Policy simulator ───────────────────────────────────────────────────────
+
+  async simulatorReplay(req: SimulatorReplayRequest): Promise<SimulatorReplayResponse> {
+    return this.post<SimulatorReplayResponse>("/v1/simulator/replay", req);
+  }
+
+  // ── Fallback status ────────────────────────────────────────────────────────
+
+  async getFallbackStatus(): Promise<{ status: string }> {
+    return this.get<{ status: string }>("/v1/fallback/status");
+  }
+
+  // ── Audit log (platform API — only available via lelu-ai.com) ─────────────
 
   async listAuditEvents(req: ListAuditEventsRequest = {}): Promise<ListAuditEventsResult> {
     const params = new URLSearchParams();
@@ -311,7 +359,7 @@ export class LeluClient {
     }
   }
 
-  // ── Policy management ──────────────────────────────────────────────────────
+  // ── Policy management (platform API — only available via lelu-ai.com) ──────
 
   async listPolicies(_req: ListPoliciesRequest = {}): Promise<ListPoliciesResult> {
     const ctrl = new AbortController();

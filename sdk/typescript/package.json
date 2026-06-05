@@ -1,6 +1,6 @@
 {
   "name": "lelu-agent-auth",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer Getachew",
   "contributors": [
@@ -84,7 +84,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "lelu-agent-auth": "^0.0.25",
     "zod": "^3.23.0"
   },
   "peerDependencies": {

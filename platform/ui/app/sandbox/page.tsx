@@ -222,7 +222,7 @@ function SandboxContent() {
         ...prev,
       ].slice(0, 8));
     } catch {
-      setError("Network error — is the server running?");
+      setError("Network error — please try again.");
     } finally {
       setLoading(false);
     }
@@ -238,10 +238,20 @@ function SandboxContent() {
     return JSON.stringify(body, null, 2);
   }
 
+  const curlBody = (() => {
+    const b: Record<string, unknown> = { tool: tool.trim() || "your_tool" };
+    if (context.trim()) b.context = context.trim();
+    try {
+      const parsed = JSON.parse(argsText);
+      if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) b.args = parsed;
+    } catch { /* ignore invalid json */ }
+    return JSON.stringify(b);
+  })();
+
   const curlCommand = `curl -X POST https://lelu-ai.com/api/v1/authorize \\
   -H "Authorization: Bearer ${SANDBOX_KEY}" \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ tool: tool.trim() || "your_tool", ...(context.trim() ? { context: context.trim() } : {}) })}'`;
+  -d '${curlBody}'`;
 
   function copyText(text: string, setter: (v: boolean) => void) {
     navigator.clipboard.writeText(text);

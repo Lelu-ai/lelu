@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
   const outputHash = sha256({ requestId, decision: decisionMapped, reason: result.reason });
 
   // Log async — don't await so response isn't delayed
-  logAuditEvent({
+  void logAuditEvent({
     traceId: requestId,
     userId,
     keyId,

@@ -1,0 +1,52 @@
+[
+  {
+    "name": "engine",
+    "image": "<ECR_REPO_URL>/lelu-production-engine:latest",
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 8080,
+        "protocol": "tcp"
+      }
+    ],
+    "environment": [
+      { "name": "LISTEN_ADDR",                  "value": ":8080" },
+      { "name": "POLICY_PATH",                  "value": "/etc/lelu/auth.yaml" },
+      { "name": "LELU_MODE",                    "value": "enforce" },
+      { "name": "CONFIDENCE_MISSING_MODE",      "value": "deny" },
+      { "name": "CONFIDENCE_ALLOW_UNVERIFIED",  "value": "false" },
+      { "name": "BEHAVIORAL_ANALYTICS_ENABLED", "value": "true" }
+    ],
+    "secrets": [
+      {
+        "name": "JWT_SIGNING_KEY",
+        "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:lelu-production/jwt-signing-key"
+      },
+      {
+        "name": "API_KEY",
+        "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:lelu-production/api-key"
+      },
+      {
+        "name": "REDIS_ADDR",
+        "valueFrom": "arn:aws:secretsmanager:<REGION>:<ACCOUNT_ID>:secret:lelu-production/redis-addr"
+      }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/lelu-production/engine",
+        "awslogs-region": "<REGION>",
+        "awslogs-stream-prefix": "engine"
+      }
+    },
+    "healthCheck": {
+      "command": ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz || exit 1"],
+      "interval": 30,
+      "timeout": 5,
+      "retries": 3,
+      "startPeriod": 10
+    },
+    "cpu": 512,
+    "memory": 1024
+  }
+]

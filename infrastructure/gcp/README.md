@@ -1,6 +1,9 @@
 # Lelu — GCP Cloud Run Deployment
 
-This directory contains everything needed to migrate from Render to GCP Cloud Run.
+> Looking for AWS? See [`../aws/`](../aws/) for the ECS Fargate + Terraform path.
+> For Kubernetes (EKS, GKE, AKS), see [`../../helm/prism/`](../../helm/prism/).
+
+This directory contains the GCP Cloud Run deployment for teams already on Google Cloud.
 
 ## Architecture
 

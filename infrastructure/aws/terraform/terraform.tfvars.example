@@ -1,0 +1,14 @@
+aws_region         = "us-east-1"
+environment        = "production"
+project            = "lelu"
+
+# Networking
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b"]
+
+# Database — use a strong password, store it in a password manager
+db_password        = "change-me-strong-password"
+
+# TLS — create a certificate in AWS Certificate Manager first, then paste the ARN
+acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+domain              = "lelu-ai.com"

@@ -5,7 +5,7 @@ The Lelu TypeScript SDK includes a built-in CLI for viewing audit logs and other
 ## Installation
 
 ```bash
-npm install @lelu-auth/lelu
+npm install lelu-agent-auth
 ```
 
 ## Usage
@@ -13,13 +13,13 @@ npm install @lelu-auth/lelu
 ### View Audit Logs
 
 ```bash
-npx @lelu-auth/lelu audit-log
+npx lelu audit-log
 ```
 
 ### Help
 
 ```bash
-npx @lelu-auth/lelu help
+npx lelu help
 ```
 
 ## Environment Variables
@@ -31,13 +31,13 @@ npx @lelu-auth/lelu help
 
 ```bash
 # View recent audit events
-npx @lelu-auth/lelu audit-log
+npx lelu audit-log
 
 # View 50 recent events
-LELU_AUDIT_LIMIT=50 npx @lelu-auth/lelu audit-log
+LELU_AUDIT_LIMIT=50 npx lelu audit-log
 
 # Use custom platform URL
-LELU_PLATFORM_URL=https://api.example.com npx @lelu-auth/lelu audit-log
+LELU_PLATFORM_URL=https://api.example.com npx lelu audit-log
 ```
 
 ## Requirements

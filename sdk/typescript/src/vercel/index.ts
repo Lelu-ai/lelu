@@ -10,8 +10,8 @@
  * ```ts
  * import { tool } from 'ai';
  * import { z } from 'zod';
- * import { LeluClient } from '@lelu-auth/lelu';
- * import { secureTool } from 'lelu/vercel';
+ * import { LeluClient } from 'lelu-agent-auth';
+ * import { secureTool } from 'lelu-agent-auth/vercel';
  *
  * const lelu = new LeluClient({ baseUrl: 'http://localhost:8082' });
  *

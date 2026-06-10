@@ -17,5 +17,5 @@ node start.js
 
 ## Note
 
-This is a standalone Next.js build bundled with the @lelu-auth/lelu npm package.
+This is a standalone Next.js build bundled with the lelu-agent-auth npm package.
 It allows `lelu studio` to work without requiring Docker or external dependencies.

@@ -1,5 +1,6 @@
 # ── RETIRED ──────────────────────────────────────────────────────────────────
-# Render deployment has been replaced by deploy-gcp.yml (Cloud Run).
+# Render deployment is retired. Production deploys use AWS ECS Fargate.
+# See infrastructure/aws/ for the Terraform setup and deployment guide.
 # This file is kept for historical reference only and will never trigger.
 # ─────────────────────────────────────────────────────────────────────────────
 name: Deploy to Render (retired)
@@ -8,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "This workflow is retired. Use deploy-gcp.yml instead."
+        description: "This workflow is retired. See infrastructure/aws/ for the current deploy path."
         required: true
 
 jobs:
@@ -18,5 +19,6 @@ jobs:
       - name: Migration notice
         run: |
           echo "This workflow is retired."
-          echo "Deployment now uses GCP Cloud Run via .github/workflows/deploy-gcp.yml"
+          echo "Production deployment uses AWS ECS Fargate."
+          echo "See infrastructure/aws/README.md for the current deploy path."
           exit 1

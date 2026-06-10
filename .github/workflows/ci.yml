@@ -249,10 +249,10 @@ jobs:
         run: helm lint ./helm/prism
 
       - name: Helm template (default values)
-        run: helm template prism ./helm/prism > /tmp/prism-default.yaml
+        run: helm template lelu ./helm/prism > /tmp/lelu-default.yaml
 
       - name: Helm template (production values)
-        run: helm template prism ./helm/prism -f ./helm/prism/values-production.yaml > /tmp/prism-prod.yaml
+        run: helm template lelu ./helm/prism -f ./helm/prism/values-production.yaml > /tmp/lelu-prod.yaml
 
   # ── Security scan ────────────────────────────────────────────────────────────
   security:

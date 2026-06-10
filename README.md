@@ -110,7 +110,7 @@ Get an API key → [lelu-ai.com/api-key](https://lelu-ai.com/api-key)
 
 ## SDKs
 
-**TypeScript** (`lelu-agent-auth` v0.0.25) · **Python** (`lelu-agent-auth-sdk` v0.3.65)
+**TypeScript** (`lelu-agent-auth` v0.0.26) · **Python** (`lelu-agent-auth-sdk` v0.3.65)
 
 Works with OpenAI, Anthropic, LangChain, LangGraph, Vercel AI SDK, MCP out of the box.
 

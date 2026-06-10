@@ -20,7 +20,7 @@ export interface AuthorizeOptions {
  *
  * ```ts
  * import express from "express";
- * import { authorize } from "@lelu/sdk/express";
+ * import { authorize } from "lelu-agent-auth/express";
  *
  * const app = express();
  * app.get("/sensitive", authorize("files.read", { confidence: 0.9 }), handler);

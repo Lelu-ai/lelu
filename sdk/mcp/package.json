@@ -1,6 +1,6 @@
 {
   "name": "lelu-mcp",
-  "version": "1.0.0",
+  "version": "0.0.28",
   "description": "Model Context Protocol (MCP) server for Lelu — gives AI agents secure, policy-gated access to your infrastructure",
   "author": "Abenezer",
   "license": "MIT",

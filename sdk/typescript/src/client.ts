@@ -143,46 +143,49 @@ export class LeluClient {
    */
   async authorize(req: AuthorizeRequest): Promise<AuthDecision> {
     const validated = AuthorizeRequestSchema.parse(req);
-    const body: Record<string, unknown> = { tool: validated.tool };
-    if (validated.context) body.context = validated.context;
-    if (validated.args) body.args = validated.args;
+    const ctx = validated.context;
+
+    const body: Record<string, unknown> = { action: validated.tool };
+    if (ctx?.confidence !== undefined) body.confidence = ctx.confidence;
+    if (ctx?.actingFor)                body.acting_for = ctx.actingFor;
+    if (ctx?.scope)                    body.scope       = ctx.scope;
+    if (validated.args)                body.args        = validated.args;
 
     const data = await this.post<{
-      requestId: string;
-      tool: string;
-      decision: "allow" | "deny" | "human_review" | "compute";
+      allowed: boolean;
       reason: string;
-      rule: string;
-      policyName?: string;
-      latencyMs: number;
-      mode: string;
-      keyId?: string;
-      timestamp: string;
-      safeTool?: string;
-      safeArgs?: Record<string, unknown>;
-      inputHash?: string;
-      outputHash?: string;
-      policyDigest?: string;
-    }>("/v1/authorize", body);
+      trace_id: string;
+      requires_human_review: boolean;
+      compute?: boolean;
+      safe_tool?: string;
+      safe_args?: Record<string, unknown>;
+      input_hash?: string;
+      output_hash?: string;
+      policy_digest?: string;
+    }>("/v1/agent/authorize", body);
+
+    const decision: "allow" | "deny" | "human_review" | "compute" =
+      data.compute              ? "compute"      :
+      data.requires_human_review ? "human_review" :
+      data.allowed               ? "allow"        :
+                                   "deny";
 
     return {
-      requestId: data.requestId,
-      tool: data.tool,
-      decision: data.decision,
-      reason: data.reason,
-      rule: data.rule,
-      ...(data.policyName !== undefined ? { policyName: data.policyName } : {}),
-      latencyMs: data.latencyMs,
-      mode: data.mode as "live" | "sandbox",
-      ...(data.keyId !== undefined ? { keyId: data.keyId } : {}),
-      timestamp: data.timestamp,
-      allowed: data.decision === "allow",
-      computed: data.decision === "compute",
-      ...(data.safeTool !== undefined ? { safeTool: data.safeTool } : {}),
-      ...(data.safeArgs !== undefined ? { safeArgs: data.safeArgs } : {}),
-      ...(data.inputHash !== undefined ? { inputHash: data.inputHash } : {}),
-      ...(data.outputHash !== undefined ? { outputHash: data.outputHash } : {}),
-      ...(data.policyDigest !== undefined ? { policyDigest: data.policyDigest } : {}),
+      requestId: data.trace_id,
+      tool:      validated.tool,
+      decision,
+      reason:    data.reason,
+      rule:      "",
+      latencyMs: 0,
+      mode:      "live",
+      timestamp: new Date().toISOString(),
+      allowed:   data.allowed,
+      computed:  !!data.compute,
+      ...(data.safe_tool     !== undefined ? { safeTool:     data.safe_tool     } : {}),
+      ...(data.safe_args     !== undefined ? { safeArgs:     data.safe_args     } : {}),
+      ...(data.input_hash    !== undefined ? { inputHash:    data.input_hash    } : {}),
+      ...(data.output_hash   !== undefined ? { outputHash:   data.output_hash   } : {}),
+      ...(data.policy_digest !== undefined ? { policyDigest: data.policy_digest } : {}),
     };
   }
 
@@ -205,7 +208,10 @@ export class LeluClient {
         ...(validated.context.scope && { scope: validated.context.scope }),
       },
       async () => {
-        const decision = await this.authorize({ tool: validated.action });
+        const decision = await this.authorize({
+          tool: validated.action,
+          context: validated.context,
+        });
         return {
           ...decision,
           requiresHumanReview: decision.decision === "human_review",

@@ -2,20 +2,6 @@ import { z } from "zod";
 
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
-/** Primary authorization request — send this to lelu.authorize(). */
-export const AuthorizeRequestSchema = z.object({
-  tool: z.string().min(1, "tool is required").max(128),
-  context: z.string().optional(),
-  args: z.record(z.unknown()).optional(),
-});
-
-// Legacy schemas kept for backward compatibility
-export const AuthRequestSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
-  action: z.string().min(1, "action is required"),
-  resource: z.record(z.string()).optional(),
-});
-
 export const AgentContextSchema = z.object({
   /**
    * LLM confidence score (0.0–1.0). Omit to let the engine apply its
@@ -27,6 +13,20 @@ export const AgentContextSchema = z.object({
   actingFor: z.string().optional(),
   /** Requested agent scope */
   scope: z.string().optional(),
+});
+
+/** Primary authorization request — send this to lelu.authorize(). */
+export const AuthorizeRequestSchema = z.object({
+  tool: z.string().min(1, "tool is required").max(128),
+  context: AgentContextSchema.optional(),
+  args: z.record(z.unknown()).optional(),
+});
+
+// Legacy schemas kept for backward compatibility
+export const AuthRequestSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+  action: z.string().min(1, "action is required"),
+  resource: z.record(z.string()).optional(),
 });
 
 export const AgentAuthRequestSchema = z.object({

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * @lelu/mcp CLI
+ * lelu-mcp CLI
  *
  * Usage:
- *   npx @lelu/mcp start [options]
- *   npx @lelu/mcp add [target] [options]
+ *   npx lelu-mcp start [options]
+ *   npx lelu-mcp add [target] [options]
  *
  * Options:
  *   --engine-url  <url>   Lelu Engine base URL (default: http://localhost:8082)
@@ -40,11 +40,11 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 function printHelp() {
   console.error(`
-@lelu/mcp — Model Context Protocol server for Lelu
+lelu-mcp — Model Context Protocol server for Lelu
 
 Usage:
-  npx @lelu/mcp start [options]
-  npx @lelu/mcp add [target] [options]
+  npx lelu-mcp start [options]
+  npx lelu-mcp add [target] [options]
 
 Options:
   --engine-url <url>    Lelu Engine base URL (default: http://localhost:8082)
@@ -71,17 +71,17 @@ Tools exposed to the AI agent:
 
 Examples:
   # Start with defaults (Engine on localhost:8082, no auth)
-  npx @lelu/mcp start
+  npx lelu-mcp start
 
   # Start with a custom Engine URL and API key
-  npx @lelu/mcp start --engine-url http://lelu.internal:8082 --api-key sk_live_xxx
+  npx lelu-mcp start --engine-url http://lelu.internal:8082 --api-key sk_live_xxx
 
   # Cursor / Claude Desktop config (settings.json or claude_desktop_config.json):
   # {
   #   "mcpServers": {
   #     "lelu": {
   #       "command": "npx",
-  #       "args": ["@lelu/mcp", "start"],
+  #       "args": ["lelu-mcp", "start"],
   #       "env": {
   #         "LELU_ENGINE_URL": "http://localhost:8082",
   #         "LELU_API_KEY": "your_key"
@@ -91,12 +91,12 @@ Examples:
   # }
 
   # Print client setup snippets
-  npx @lelu/mcp add --cursor
-  npx @lelu/mcp add --claude
-  npx @lelu/mcp add --open-code
+  npx lelu-mcp add --cursor
+  npx lelu-mcp add --claude
+  npx lelu-mcp add --open-code
 
   # Write a Cursor config file in the current project
-  npx @lelu/mcp add --cursor --write
+  npx lelu-mcp add --cursor --write
 `);
 }
 
@@ -119,7 +119,7 @@ function buildMcpServerConfig(flags: Record<string, string>): Record<string, unk
   if (mode === "stdio") {
     return {
       command: "npx",
-      args: ["@lelu/mcp", "start", "--transport", "stdio"],
+      args: ["lelu-mcp", "start", "--transport", "stdio"],
       env: {
         LELU_ENGINE_URL: engineUrl,
         LELU_API_KEY: apiKey,
@@ -147,7 +147,7 @@ async function runAdd(flags: Record<string, string>): Promise<void> {
   if (target === "claude") {
     const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
     if (mode === "stdio") {
-      console.log("npx @lelu/mcp start --transport stdio --engine-url http://localhost:8082 --api-key YOUR_API_KEY");
+      console.log("npx lelu-mcp start --transport stdio --engine-url http://localhost:8082 --api-key YOUR_API_KEY");
       return;
     }
     console.log(`claude mcp add --transport http lelu ${sseUrl}`);
@@ -185,7 +185,7 @@ async function main() {
   }
 
   if (command !== "start" && command !== "add") {
-    console.error(`Unknown command: ${command}\nRun "npx @lelu/mcp --help" for usage.`);
+    console.error(`Unknown command: ${command}\nRun "npx lelu-mcp --help" for usage.`);
     process.exit(1);
   }
 

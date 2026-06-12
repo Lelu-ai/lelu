@@ -11,11 +11,11 @@ export default function DocsConceptCli() {
   );
 
   const quickAddCommands: Record<typeof quickTab, string> = {
-    Cursor: "npx @lelu/mcp add --cursor",
-    "Claude Code": "npx @lelu/mcp add --claude",
-    "Open Code": "npx @lelu/mcp add --open-code",
+    Cursor: "npx lelu-mcp add --cursor",
+    "Claude Code": "npx lelu-mcp add --claude",
+    "Open Code": "npx lelu-mcp add --open-code",
     Manual:
-      "npx @lelu/mcp start --transport stdio --engine-url https://lelu-ai.com --api-key YOUR_API_KEY",
+      "npx lelu-mcp start --transport stdio --engine-url https://lelu-ai.com --api-key YOUR_API_KEY",
   };
 
   const configSnippets: Record<typeof configTab, string> = {
@@ -30,7 +30,7 @@ export default function DocsConceptCli() {
   "mcpServers": {
     "lelu": {
       "command": "npx",
-      "args": ["@lelu/mcp", "start", "--transport", "stdio"],
+      "args": ["lelu-mcp", "start", "--transport", "stdio"],
       "env": {
         "LELU_API_KEY": "your_key_here",
         "LELU_API_KEY": "YOUR_API_KEY"
@@ -284,7 +284,7 @@ LELU_TENANT_ID=prod lelu policies list`}
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
             Lelu ships a standalone MCP server (
             <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
-              @lelu/mcp
+              lelu-mcp
             </code>
             ) that exposes policy-aware authorization tools over both stdio (for local AI clients)
             and HTTP/SSE (for networked or Docker deployments). When an AI assistant calls a tool,
@@ -345,7 +345,7 @@ curl http://localhost:3003/healthz
               <span className="text-xs text-zinc-500 font-mono">terminal</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-              {`npx @lelu/mcp start --transport stdio \\
+              {`npx lelu-mcp start --transport stdio \\
   --engine-url https://lelu-ai.com \\
   --api-key YOUR_API_KEY`}
             </pre>

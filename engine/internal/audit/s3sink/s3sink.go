@@ -7,7 +7,7 @@
 //
 // The sink is designed to be plugged into audit.New():
 //
-//	import "github.com/lelu/engine/internal/audit/s3sink"
+//	import "github.com/lelu-auth/lelu/engine/internal/audit/s3sink"
 //
 //	sink, err := s3sink.New(s3sink.Config{
 //	    Bucket:    os.Getenv("AUDIT_S3_BUCKET"),

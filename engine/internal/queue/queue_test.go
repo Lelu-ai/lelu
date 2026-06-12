@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/lelu/engine/internal/queue"
+	"github.com/lelu-auth/lelu/engine/internal/queue"
 )
 
 // Tests use NewInMemory (no Redis required) to validate business logic.

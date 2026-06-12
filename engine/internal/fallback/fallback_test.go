@@ -3,7 +3,7 @@ package fallback_test
 import (
 	"testing"
 
-	"github.com/lelu/engine/internal/fallback"
+	"github.com/lelu-auth/lelu/engine/internal/fallback"
 )
 
 func TestParseMode(t *testing.T) {

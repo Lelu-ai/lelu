@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/lelu/engine/internal/fallback"
+	"github.com/lelu-auth/lelu/engine/internal/fallback"
 )
 
 const defaultTTL = 60 * time.Second

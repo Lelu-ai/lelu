@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/lelu/engine/internal/confidence"
+	"github.com/lelu-auth/lelu/engine/internal/confidence"
 )
 
 func TestGate_FullPermission(t *testing.T) {

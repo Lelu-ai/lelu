@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/lelu/engine/internal/confidence"
+	"github.com/lelu-auth/lelu/engine/internal/confidence"
 )
 
 type decisionOutcome int

@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/lelu/engine/internal/audit"
-	"github.com/lelu/engine/internal/confidence"
-	"github.com/lelu/engine/internal/evaluator"
-	"github.com/lelu/engine/internal/fallback"
-	"github.com/lelu/engine/internal/queue"
-	"github.com/lelu/engine/internal/ratelimit"
-	"github.com/lelu/engine/internal/server"
-	"github.com/lelu/engine/internal/tokens"
+	"github.com/lelu-auth/lelu/engine/internal/audit"
+	"github.com/lelu-auth/lelu/engine/internal/confidence"
+	"github.com/lelu-auth/lelu/engine/internal/evaluator"
+	"github.com/lelu-auth/lelu/engine/internal/fallback"
+	"github.com/lelu-auth/lelu/engine/internal/queue"
+	"github.com/lelu-auth/lelu/engine/internal/ratelimit"
+	"github.com/lelu-auth/lelu/engine/internal/server"
+	"github.com/lelu-auth/lelu/engine/internal/tokens"
 )
 
 var samplePolicy = []byte(`

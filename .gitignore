@@ -26,6 +26,7 @@ sdk/python/__pycache__/
 sdk/python/*.egg-info/
 sdk/python/.pytest_cache/
 sdk/python/.mypy_cache/
+sdk/python/dist/
 __pycache__/
 *.pyc
 

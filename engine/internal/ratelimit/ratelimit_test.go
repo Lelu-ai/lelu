@@ -3,7 +3,7 @@ package ratelimit_test
 import (
 	"testing"
 
-	"github.com/lelu/engine/internal/ratelimit"
+	"github.com/lelu-auth/lelu/engine/internal/ratelimit"
 )
 
 func TestLimiter_Nil_AlwaysAllows(t *testing.T) {

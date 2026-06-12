@@ -3,7 +3,7 @@ package shadow
 import (
     "testing"
 
-    "github.com/lelu/engine/internal/confidence"
+    "github.com/lelu-auth/lelu/engine/internal/confidence"
 )
 
 // TestShadowDetectionIntegration is an e2e test covering shadow detection + confidence auditing.

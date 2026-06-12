@@ -197,10 +197,10 @@ const CLI_TABS = ["Cursor", "Claude Code", "Open Code", "Manual"] as const;
 type CliTab = (typeof CLI_TABS)[number];
 
 const CLI_COMMANDS: Record<CliTab, string> = {
-  Cursor: "npx @lelu/mcp add --cursor",
-  "Claude Code": "npx @lelu/mcp add --claude",
-  "Open Code": "npx @lelu/mcp add --open-code",
-  Manual: "npx @lelu/mcp start --transport stdio",
+  Cursor: "npx lelu-mcp add --cursor",
+  "Claude Code": "npx lelu-mcp add --claude",
+  "Open Code": "npx lelu-mcp add --open-code",
+  Manual: "npx lelu-mcp start --transport stdio",
 };
 
 const MANUAL_TABS = ["Claude Code", "Open Code", "JSON"] as const;
@@ -493,14 +493,7 @@ export default function DocsPage() {
         >
           fastmcp
         </a>
-        . You can also use the community-maintained{" "}
-        <a
-          href="https://github.com/zckly/mcp-server-lelu"
-          className="underline hover:text-[#3B82F6] transition-colors"
-        >
-          zckly/mcp-server-lelu
-        </a>{" "}
-        and other MCP providers.
+        . The official MCP package is <code className="font-mono text-[12px] bg-[#F5F5F4] dark:bg-[#1A1A1C] px-1.5 py-0.5 rounded">lelu-mcp</code> on npm.
       </Callout>
 
       <h3

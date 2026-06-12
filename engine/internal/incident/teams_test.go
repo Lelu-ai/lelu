@@ -3,7 +3,7 @@ package incident_test
 import (
 	"testing"
 
-	"github.com/lelu/engine/internal/incident"
+	"github.com/lelu-auth/lelu/engine/internal/incident"
 )
 
 func TestFormatTeams_ReviewEvent_HasActions(t *testing.T) {

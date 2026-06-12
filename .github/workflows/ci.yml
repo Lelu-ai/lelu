@@ -246,13 +246,13 @@ jobs:
           version: v3.14.4
 
       - name: Helm lint
-        run: helm lint ./helm/prism
+        run: helm lint ./helm/lelu
 
       - name: Helm template (default values)
-        run: helm template lelu ./helm/prism > /tmp/lelu-default.yaml
+        run: helm template lelu ./helm/lelu > /tmp/lelu-default.yaml
 
       - name: Helm template (production values)
-        run: helm template lelu ./helm/prism -f ./helm/prism/values-production.yaml > /tmp/lelu-prod.yaml
+        run: helm template lelu ./helm/lelu -f ./helm/lelu/values-production.yaml > /tmp/lelu-prod.yaml
 
   # ── Security scan ────────────────────────────────────────────────────────────
   security:

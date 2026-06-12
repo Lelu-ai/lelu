@@ -59,6 +59,7 @@ const RIGHT_TABS: { label: string; href?: string }[] = [
   { label: "SDK", href: "/docs/quickstart" },
   { label: "AUDIT LOG", href: "/audit" },
   { label: "POLICIES", href: "/policies" },
+  { label: "ABOUT", href: "/about" },
 ];
 
 /* ── Dot-mesh decoration for left panel ───────────────────────────── */
@@ -227,7 +228,7 @@ export default function HomePage() {
           <span className="text-white/20">/</span>
           <Link href="/docs" className="hover:text-white/70 transition-colors">Legal</Link>
           <span className="text-white/20">/</span>
-          <Link href="/about" className="hover:text-white/70 transition-colors">Careers</Link>
+          <Link href="/about" className="hover:text-white/70 transition-colors">About</Link>
           {/* Social */}
           <div className="ml-auto flex items-center gap-3 text-white/30">
             <a href="https://x.com/lelu_auth" target="_blank" rel="noreferrer" className="hover:text-white/70 transition-colors" aria-label="X">
@@ -407,6 +408,7 @@ export default function HomePage() {
               { label: "Quickstart", href: "/docs/quickstart" },
               { label: "API Reference", href: "/docs/concepts/api" },
               { label: "SDK Docs", href: "/docs/installation" },
+              { label: "About", href: "/about" },
               { label: "GitHub", href: "https://github.com/lelu-auth/lelu" },
             ].map((l) => (
               <Link

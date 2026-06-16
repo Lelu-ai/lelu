@@ -114,6 +114,36 @@ export class LeluClient {
     anthropic(_response: unknown): null {
       return null;
     },
+
+    /**
+     * Derives confidence from an Amazon Bedrock model response, for the model
+     * families that expose token-level data — e.g. Cohere `token_likelihoods`,
+     * or any log-prob array you pass through as `logprobs`. Returns `null` when
+     * no token signal is present (notably Anthropic Claude on Bedrock, which has
+     * no log-probs): omit the signal and let the engine's MissingSignalMode
+     * decide rather than fabricating a value.
+     *
+     * @example
+     * ```ts
+     * // Cohere Command on Bedrock (InvokeModel response body)
+     * const score = LeluClient.confidenceFrom.bedrock(JSON.parse(body)); // null for Claude
+     * ```
+     */
+    bedrock(
+      response: {
+        generations?: Array<{
+          token_likelihoods?: Array<{ likelihood: number }> | null;
+        } | null> | null;
+        logprobs?: number[];
+      }
+    ): number | null {
+      const logprobs =
+        response?.logprobs ??
+        response?.generations?.[0]?.token_likelihoods?.map((t) => t.likelihood);
+      if (!logprobs?.length) return null;
+      const avg = logprobs.reduce((s, lp) => s + lp, 0) / logprobs.length;
+      return Math.max(0, Math.min(1, Math.exp(avg)));
+    },
   } as const;
 
   constructor(cfg: ClientConfig = {}) {

@@ -111,12 +111,14 @@ Every agent action flows through a layered pipeline:
 | 1. API auth | Bearer API key (constant-time check) + per-tenant rate limiting |
 | 2. Shadow agent detection | Fingerprints unregistered agents, fails closed |
 | 3. Prompt injection filter | 5-layer pipeline: exact → homoglyph → fuzzy → structural → entropy |
-| 4. Confidence gate | Reads LLM token log-probs (OpenAI / Anthropic) or local probabilities/entropy; low confidence → deny or downgrade |
+| 4. Confidence gate | Reads verified LLM token log-probs (OpenAI / Amazon Bedrock¹) or local probabilities/entropy; low confidence → deny or downgrade |
 | 5. Policy evaluator | YAML roles + OPA/Rego, deny-first, wildcard patterns |
 | 6. Risk model | `criticality × (1 − confidence) × reliability × anomaly_factor` |
 | 7. Most-restrictive merge | Strictest outcome across steps 4–6 wins |
 | 8. Human-review queue | Uncertain decisions wait for human approval (Slack / Teams / PagerDuty) |
 | 9. Behavioral analytics | Reputation scoring, anomaly detection, baseline drift alerts |
+
+¹ On Amazon Bedrock, token log-probs are available for some model families (e.g. Cohere, Llama). Anthropic Claude — on Bedrock or direct — exposes none; omit the signal and the engine applies its `MissingSignalMode` policy instead of trusting a fabricated score.
 
 ---
 

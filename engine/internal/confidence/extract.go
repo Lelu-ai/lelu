@@ -10,6 +10,7 @@ type Provider string
 const (
 	ProviderOpenAI    Provider = "openai"
 	ProviderAnthropic Provider = "anthropic"
+	ProviderBedrock   Provider = "bedrock"
 	ProviderLocal     Provider = "local"
 )
 
@@ -29,6 +30,20 @@ func ExtractScore(sig *Signal) (float64, error) {
 	switch sig.Provider {
 	case ProviderOpenAI, ProviderAnthropic:
 		return scoreFromLogProbs(sig.TokenLogProbs)
+	case ProviderBedrock:
+		// Amazon Bedrock fronts many model families; token-level signals are only
+		// exposed by some (e.g. Cohere token likelihoods, Llama/Titan logprobs).
+		// Accept whichever form the caller's model produced. Models without
+		// logprobs — notably Anthropic Claude on Bedrock — cannot yield a verified
+		// signal: omit the signal so MissingSignalMode decides, or derive one via
+		// self-consistency sampling.
+		if len(sig.TokenLogProbs) > 0 {
+			return scoreFromLogProbs(sig.TokenLogProbs)
+		}
+		if len(sig.TokenProbabilities) > 0 {
+			return scoreFromProbabilities(sig.TokenProbabilities)
+		}
+		return 0, fmt.Errorf("provider %q requires token_logprobs or token_probabilities; this Bedrock model may not expose them (e.g. Claude) — omit the signal to use MissingSignalMode", sig.Provider)
 	case ProviderLocal:
 		if len(sig.TokenProbabilities) > 0 {
 			return scoreFromProbabilities(sig.TokenProbabilities)

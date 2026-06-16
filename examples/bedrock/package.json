@@ -1,0 +1,13 @@
+{
+  "name": "lelu-bedrock-example",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gate an Amazon Bedrock agent's tool calls on verified model confidence with Lelu.",
+  "scripts": {
+    "start": "node authorize-with-bedrock.mjs"
+  },
+  "dependencies": {
+    "lelu-agent-auth": "^0.0.29"
+  }
+}

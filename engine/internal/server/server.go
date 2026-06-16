@@ -586,6 +586,187 @@ func payloadHash(v interface{}) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// checkShadowAgent runs shadow-agent detection for an agent authorize request.
+// It returns true when a response has already been written and the caller must
+// stop: on detector error it fails closed to human review. A detected-but-
+// functioning shadow agent is logged and reported (incident) but allowed to
+// continue down the pipeline, in which case it returns false.
+func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req agentAuthorizeRequest) bool {
+	if h.shadowDetector == nil {
+		return false
+	}
+
+	shadowReq := map[string]interface{}{
+		"user_agent":     r.Header.Get("User-Agent"),
+		"api_key_prefix": apiKeyPrefix(r),
+		"actor":          req.Actor,
+		"tenant_id":      req.TenantID,
+		"endpoint":       r.URL.Path,
+	}
+	res, err := h.shadowDetector.Detect(shadowReq)
+	if err != nil {
+		// Fail-closed: when the shadow detector errors, escalate to human review
+		// rather than silently allowing the request through.
+		log.Printf("shadow detection error (failing closed): %v", err)
+		traceID := audit.NewTraceID()
+		h.notifyIncident(r.Context(), incident.Event{
+			Type:                "shadow.detector.error",
+			Severity:            "high",
+			TenantID:            req.TenantID,
+			Actor:               req.Actor,
+			Action:              req.Action,
+			TraceID:             traceID,
+			Decision:            "human_review",
+			RequiresHumanReview: true,
+			Reason:              "shadow detector unavailable — request held for review",
+		}, false, true)
+		writeJSON(w, http.StatusOK, agentAuthorizeResponse{
+			Allowed:             false,
+			RequiresHumanReview: true,
+			Reason:              "shadow detection check failed — request escalated for safety",
+			TraceID:             traceID,
+			ConfidenceUsed:      0,
+		})
+		return true
+	}
+
+	if res.IsShadow {
+		shadowAgentsDetectedTotal.Inc()
+		h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource,
+			true, "shadow agent detected: "+res.Reason, 0, 0)
+		// Fire incident so operators are notified of the unregistered agent.
+		h.notifyIncident(r.Context(), incident.Event{
+			Type:     "shadow.agent.detected",
+			Severity: "medium",
+			TenantID: req.TenantID,
+			Actor:    req.Actor,
+			Action:   req.Action,
+			Decision: "shadow_detected",
+			Reason:   "shadow agent detected: " + res.Reason,
+		}, true, false)
+	}
+	return false
+}
+
+// checkPromptInjection runs the prompt-injection pre-filter. It returns true when
+// an injection is detected and a denial response has already been written (the
+// caller must stop); otherwise it returns false and the pipeline continues.
+func (h *Handler) checkPromptInjection(w http.ResponseWriter, r *http.Request, req agentAuthorizeRequest, span trace.Span, start time.Time) bool {
+	hit := injection.Detect(req.Action, req.Resource)
+	if !hit.Detected {
+		return false
+	}
+
+	traceID := audit.NewTraceID()
+	reason := fmt.Sprintf("prompt injection detected in %s: %q", hit.Source, hit.Pattern)
+	h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, false, reason, 0, ms(start))
+	injectionAttemptsTotal.Inc()
+
+	// Record enhanced metrics
+	observability.RecordAgentRequest(req.Actor, observability.AgentTypeAutonomous, req.Action, "injection_denied")
+
+	h.notifyIncident(r.Context(), incident.Event{
+		Type:     "security.injection_attempt",
+		Severity: "critical",
+		TenantID: req.TenantID,
+		Actor:    req.Actor,
+		Action:   req.Action,
+		TraceID:  traceID,
+		Reason:   reason,
+		Decision: "denied",
+		Resource: req.Resource,
+	}, false, false)
+
+	if h.agentTracer != nil && span != nil {
+		h.agentTracer.RecordDecision(span, false, false, 0, 1.0, "injection_denied")
+	}
+
+	writeJSON(w, http.StatusOK, agentAuthorizeResponse{
+		Allowed: false,
+		Reason:  reason,
+		TraceID: traceID,
+	})
+	return true
+}
+
+// recordAsyncAnalytics fires the post-decision observability work that must not
+// block the response: external confidence auditing and Phase-2 behavioral
+// analytics (reputation, baseline, anomaly, drift). Each runs in its own
+// goroutine and only when its dependencies are configured.
+func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, confidenceScore float64, allowed, requiresReview bool, outcome string, totalLatency float64) {
+	// ── External confidence audit (async — does not block response) ──────────
+	if h.extAuditor != nil {
+		auditActor := req.Actor
+		auditAction := req.Action
+		auditScore := confidenceScore
+		auditTenant := req.TenantID
+		auditActingFor := req.ActingFor
+		auditPromptCtx := req.Scope // use scope as proxy prompt context; real prompt not in request
+		go func() {
+			auditReq := &confidence.AuditRequest{
+				Prompt:          auditPromptCtx,
+				Action:          auditAction,
+				ActorConfidence: auditScore,
+				ActingForUserID: auditActingFor,
+				TenantID:        auditTenant,
+			}
+			result, err := h.extAuditor.Audit(auditReq)
+			if err != nil {
+				log.Printf("external auditor error for actor=%s: %v", auditActor, err)
+				return
+			}
+			severity := h.confScorer.AssessSeverity(result)
+			if _, err := h.confEscalator.EnqueueReview(context.Background(), auditReq, result, severity); err != nil {
+				log.Printf("escalator enqueue error for actor=%s: %v", auditActor, err)
+			}
+		}()
+	}
+
+	// ── Phase 2: Behavioral Analytics Integration ────────────────────────────
+	if h.reputationMgr != nil && h.anomalyDetector != nil && h.baselineMgr != nil && h.alertMgr != nil {
+		go func() {
+			// Run behavioral analytics in background to avoid blocking response
+			ctx := context.Background()
+
+			// 1. Record decision for reputation tracking
+			wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
+			if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
+				log.Printf("Failed to record decision for reputation: %v", err)
+			}
+
+			// 2. Update behavioral baseline
+			if err := h.baselineMgr.UpdateBaseline(ctx, req.Actor, req.Action, outcome, confidenceScore, time.Duration(totalLatency)*time.Millisecond); err != nil {
+				log.Printf("Failed to update behavioral baseline: %v", err)
+			}
+
+			// 3. Perform anomaly detection
+			anomalyResult, err := h.anomalyDetector.DetectAnomaly(ctx, req.Actor, "autonomous", req.Action, confidenceScore, time.Duration(totalLatency)*time.Millisecond, outcome)
+			if err != nil {
+				log.Printf("Failed to detect anomaly: %v", err)
+			} else if anomalyResult != nil && anomalyResult.IsAnomaly {
+				// 4. Check for anomaly alerts
+				if err := h.alertMgr.CheckAnomalyAlert(ctx, anomalyResult); err != nil {
+					log.Printf("Failed to check anomaly alert: %v", err)
+				}
+			}
+
+			// 5. Check reputation-based alerts
+			if reputation, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil {
+				if err := h.alertMgr.CheckReputationAlert(ctx, req.Actor, reputation); err != nil {
+					log.Printf("Failed to check reputation alert: %v", err)
+				}
+			}
+
+			// 6. Check for baseline drift
+			if driftAnalysis, err := h.baselineMgr.DetectDrift(ctx, req.Actor); err == nil && driftAnalysis != nil {
+				if err := h.alertMgr.CheckDriftAlert(ctx, driftAnalysis); err != nil {
+					log.Printf("Failed to check drift alert: %v", err)
+				}
+			}
+		}()
+	}
+}
+
 func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
@@ -633,87 +814,12 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ── Shadow agent detection ────────────────────────────────────────────────
-	if h.shadowDetector != nil {
-		shadowReq := map[string]interface{}{
-			"user_agent":     r.Header.Get("User-Agent"),
-			"api_key_prefix": apiKeyPrefix(r),
-			"actor":          req.Actor,
-			"tenant_id":      req.TenantID,
-			"endpoint":       r.URL.Path,
-		}
-		res, err := h.shadowDetector.Detect(shadowReq)
-		if err != nil {
-			// Fail-closed: when the shadow detector errors, escalate to human review
-			// rather than silently allowing the request through.
-			log.Printf("shadow detection error (failing closed): %v", err)
-			traceID := audit.NewTraceID()
-			h.notifyIncident(r.Context(), incident.Event{
-				Type:                "shadow.detector.error",
-				Severity:            "high",
-				TenantID:            req.TenantID,
-				Actor:               req.Actor,
-				Action:              req.Action,
-				TraceID:             traceID,
-				Decision:            "human_review",
-				RequiresHumanReview: true,
-				Reason:              "shadow detector unavailable — request held for review",
-			}, false, true)
-			writeJSON(w, http.StatusOK, agentAuthorizeResponse{
-				Allowed:             false,
-				RequiresHumanReview: true,
-				Reason:              "shadow detection check failed — request escalated for safety",
-				TraceID:             traceID,
-				ConfidenceUsed:      0,
-			})
-			return
-		} else if res.IsShadow {
-			shadowAgentsDetectedTotal.Inc()
-			h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource,
-				true, "shadow agent detected: "+res.Reason, 0, 0)
-			// Fire incident so operators are notified of the unregistered agent.
-			h.notifyIncident(r.Context(), incident.Event{
-				Type:     "shadow.agent.detected",
-				Severity: "medium",
-				TenantID: req.TenantID,
-				Actor:    req.Actor,
-				Action:   req.Action,
-				Decision: "shadow_detected",
-				Reason:   "shadow agent detected: " + res.Reason,
-			}, true, false)
-		}
+	if h.checkShadowAgent(w, r, req) {
+		return
 	}
 
 	// ── Prompt injection pre-filter (fastest path, before confidence gate) ──
-	if hit := injection.Detect(req.Action, req.Resource); hit.Detected {
-		traceID := audit.NewTraceID()
-		reason := fmt.Sprintf("prompt injection detected in %s: %q", hit.Source, hit.Pattern)
-		h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, false, reason, 0, ms(start))
-		injectionAttemptsTotal.Inc()
-
-		// Record enhanced metrics
-		observability.RecordAgentRequest(req.Actor, observability.AgentTypeAutonomous, req.Action, "injection_denied")
-
-		h.notifyIncident(r.Context(), incident.Event{
-			Type:     "security.injection_attempt",
-			Severity: "critical",
-			TenantID: req.TenantID,
-			Actor:    req.Actor,
-			Action:   req.Action,
-			TraceID:  traceID,
-			Reason:   reason,
-			Decision: "denied",
-			Resource: req.Resource,
-		}, false, false)
-
-		if h.agentTracer != nil && span != nil {
-			h.agentTracer.RecordDecision(span, false, false, 0, 1.0, "injection_denied")
-		}
-
-		writeJSON(w, http.StatusOK, agentAuthorizeResponse{
-			Allowed: false,
-			Reason:  reason,
-			TraceID: traceID,
-		})
+	if h.checkPromptInjection(w, r, req, span, start) {
 		return
 	}
 
@@ -975,77 +1081,7 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		observability.UpdateAgentAnomalyScore(req.Actor, 0.1)
 	}
 
-	// ── External confidence audit (async — does not block response) ──────────
-	if h.extAuditor != nil {
-		auditActor := req.Actor
-		auditAction := req.Action
-		auditScore := confidenceScore
-		auditTenant := req.TenantID
-		auditActingFor := req.ActingFor
-		auditPromptCtx := req.Scope // use scope as proxy prompt context; real prompt not in request
-		go func() {
-			auditReq := &confidence.AuditRequest{
-				Prompt:          auditPromptCtx,
-				Action:          auditAction,
-				ActorConfidence: auditScore,
-				ActingForUserID: auditActingFor,
-				TenantID:        auditTenant,
-			}
-			result, err := h.extAuditor.Audit(auditReq)
-			if err != nil {
-				log.Printf("external auditor error for actor=%s: %v", auditActor, err)
-				return
-			}
-			severity := h.confScorer.AssessSeverity(result)
-			if _, err := h.confEscalator.EnqueueReview(context.Background(), auditReq, result, severity); err != nil {
-				log.Printf("escalator enqueue error for actor=%s: %v", auditActor, err)
-			}
-		}()
-	}
-
-	// ── Phase 2: Behavioral Analytics Integration ────────────────────────────
-	if h.reputationMgr != nil && h.anomalyDetector != nil && h.baselineMgr != nil && h.alertMgr != nil {
-		go func() {
-			// Run behavioral analytics in background to avoid blocking response
-			ctx := context.Background()
-
-			// 1. Record decision for reputation tracking
-			wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
-			if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
-				log.Printf("Failed to record decision for reputation: %v", err)
-			}
-
-			// 2. Update behavioral baseline
-			if err := h.baselineMgr.UpdateBaseline(ctx, req.Actor, req.Action, outcome, confidenceScore, time.Duration(totalLatency)*time.Millisecond); err != nil {
-				log.Printf("Failed to update behavioral baseline: %v", err)
-			}
-
-			// 3. Perform anomaly detection
-			anomalyResult, err := h.anomalyDetector.DetectAnomaly(ctx, req.Actor, "autonomous", req.Action, confidenceScore, time.Duration(totalLatency)*time.Millisecond, outcome)
-			if err != nil {
-				log.Printf("Failed to detect anomaly: %v", err)
-			} else if anomalyResult != nil && anomalyResult.IsAnomaly {
-				// 4. Check for anomaly alerts
-				if err := h.alertMgr.CheckAnomalyAlert(ctx, anomalyResult); err != nil {
-					log.Printf("Failed to check anomaly alert: %v", err)
-				}
-			}
-
-			// 5. Check reputation-based alerts
-			if reputation, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil {
-				if err := h.alertMgr.CheckReputationAlert(ctx, req.Actor, reputation); err != nil {
-					log.Printf("Failed to check reputation alert: %v", err)
-				}
-			}
-
-			// 6. Check for baseline drift
-			if driftAnalysis, err := h.baselineMgr.DetectDrift(ctx, req.Actor); err == nil && driftAnalysis != nil {
-				if err := h.alertMgr.CheckDriftAlert(ctx, driftAnalysis); err != nil {
-					log.Printf("Failed to check drift alert: %v", err)
-				}
-			}
-		}()
-	}
+	h.recordAsyncAnalytics(req, confidenceScore, allowed, requiresReview, outcome, totalLatency)
 
 	writeJSON(w, http.StatusOK, h.applyShadowMode(resp))
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { detectInjection } from "@/lib/injection";
 
 type Decision = "allow" | "deny" | "human_review" | "compute";
 
@@ -164,6 +165,25 @@ export async function POST(req: NextRequest) {
       ...d,
       mode: "sandbox",
       engineUsed: true,
+    });
+  }
+
+  // Fallback path (engine unreachable): run the injection check FIRST, across
+  // every field, so the sandbox never silently allows an obvious attack.
+  const injection = detectInjection({ tool: toolName, context: contextStr, args: argsObj });
+  if (injection.detected) {
+    const latencyMs = Date.now() - start + Math.floor(Math.random() * 8 + 2);
+    return NextResponse.json({
+      requestId: `req_${randomBytes(8).toString("hex")}`,
+      tool: toolName,
+      ...(contextStr ? { context: contextStr } : {}),
+      ...(argsObj ? { args: argsObj } : {}),
+      decision: "deny",
+      reason: `prompt injection detected in ${injection.source}: "${injection.pattern}"`,
+      rule: "deny:prompt-injection",
+      latencyMs,
+      mode: "sandbox",
+      engineUsed: false,
     });
   }
 

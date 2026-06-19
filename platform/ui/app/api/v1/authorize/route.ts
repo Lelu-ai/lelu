@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "crypto";
 import { validateApiKey } from "@/lib/apikeys";
 import { getActivePoliciesForUser, evaluateWithPolicies } from "@/lib/policies";
 import { logAuditEvent } from "@/lib/audit";
+import { detectInjection } from "@/lib/injection";
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -153,7 +154,16 @@ export async function POST(req: NextRequest) {
   let result: { decision: Decision; reason: string; rule: string; safeTool?: string; safeArgs?: Record<string, unknown> };
   let policyName: string | undefined;
 
-  if (userId && !isSandbox) {
+  // Injection check runs FIRST, across every field — a deny here short-circuits
+  // policy and rule evaluation, mirroring the engine's pipeline ordering.
+  const injection = detectInjection({ tool: tool.trim(), context, args });
+  if (injection.detected) {
+    result = {
+      decision: "deny",
+      reason: `prompt injection detected in ${injection.source}: "${injection.pattern}"`,
+      rule: "deny:prompt-injection",
+    };
+  } else if (userId && !isSandbox) {
     try {
       const policies = await getActivePoliciesForUser(userId);
       const policyMatch = evaluateWithPolicies(tool.trim(), policies);

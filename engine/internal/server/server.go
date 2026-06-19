@@ -652,7 +652,7 @@ func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req a
 // an injection is detected and a denial response has already been written (the
 // caller must stop); otherwise it returns false and the pipeline continues.
 func (h *Handler) checkPromptInjection(w http.ResponseWriter, r *http.Request, req agentAuthorizeRequest, span trace.Span, start time.Time) bool {
-	hit := injection.Detect(req.Action, req.Resource)
+	hit := injection.DetectRequest(req.Action, req.Scope, req.Resource, req.Args)
 	if !hit.Detected {
 		return false
 	}

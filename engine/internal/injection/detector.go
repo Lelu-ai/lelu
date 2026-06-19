@@ -151,6 +151,82 @@ func Detect(action string, resource map[string]string) Result {
 	return Result{}
 }
 
+// DetectRequest runs the full pipeline across every field of an authorize
+// request — action, scope, resource values, and (recursively flattened) args —
+// with accurate source attribution. Detect only covers action + resource, which
+// let injection hidden in args or scope bypass the filter entirely.
+func DetectRequest(action, scope string, resource map[string]string, args map[string]interface{}) Result {
+	if r := fullScan(action, "action"); r.Detected {
+		return r
+	}
+	if r := fullScan(scope, "scope"); r.Detected {
+		return r
+	}
+	for _, v := range resource {
+		if r := fullScan(v, "resource"); r.Detected {
+			return r
+		}
+	}
+
+	argStrings := flattenArgs(args)
+	for _, v := range argStrings {
+		if r := fullScan(v, "args"); r.Detected {
+			return r
+		}
+	}
+
+	// Layers 4 + 5: structural + entropy over the combined text of all fields.
+	var b strings.Builder
+	b.WriteString(action)
+	b.WriteString(" ")
+	b.WriteString(scope)
+	for _, v := range resource {
+		b.WriteString(" ")
+		b.WriteString(v)
+	}
+	for _, v := range argStrings {
+		b.WriteString(" ")
+		b.WriteString(v)
+	}
+	combined := b.String()
+	if r := structuralAnalysis(combined); r.Detected {
+		return r
+	}
+	if r := entropyCheck(combined); r.Detected {
+		return r
+	}
+
+	return Result{}
+}
+
+// flattenArgs recursively collects string values from structured args so they
+// can be scanned. Non-string scalars are ignored — injection lives in text.
+func flattenArgs(args map[string]interface{}) []string {
+	if len(args) == 0 {
+		return nil
+	}
+	var out []string
+	var walk func(v interface{})
+	walk = func(v interface{}) {
+		switch t := v.(type) {
+		case string:
+			out = append(out, t)
+		case map[string]interface{}:
+			for _, vv := range t {
+				walk(vv)
+			}
+		case []interface{}:
+			for _, vv := range t {
+				walk(vv)
+			}
+		}
+	}
+	for _, v := range args {
+		walk(v)
+	}
+	return out
+}
+
 // fullScan runs layers 1, 2, and 3 on a single text field.
 func fullScan(text, source string) Result {
 	lower := strings.ToLower(text)

@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { tool, context, args } = (body as Record<string, unknown>) ?? {};
+  const { tool, context, args, resource } = (body as Record<string, unknown>) ?? {};
 
   if (typeof tool !== "string" || !tool.trim()) {
     return NextResponse.json({ error: "tool is required" }, { status: 400 });
@@ -152,6 +152,7 @@ export async function POST(req: NextRequest) {
   const toolName = tool.trim();
   const contextStr = typeof context === "string" ? context : undefined;
   const argsObj = args && typeof args === "object" ? (args as Record<string, unknown>) : undefined;
+  const resourceObj = resource && typeof resource === "object" ? (resource as Record<string, unknown>) : undefined;
 
   const start = Date.now();
 
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest) {
 
   // Fallback path (engine unreachable): run the injection check FIRST, across
   // every field, so the sandbox never silently allows an obvious attack.
-  const injection = detectInjection({ tool: toolName, context: contextStr, args: argsObj });
+  const injection = detectInjection({ tool: toolName, context: contextStr, args: argsObj, resource: resourceObj });
   if (injection.detected) {
     const latencyMs = Date.now() - start + Math.floor(Math.random() * 8 + 2);
     return NextResponse.json({

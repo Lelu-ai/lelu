@@ -98,7 +98,7 @@ npm install lelu-agent-auth          # TypeScript / Node.js
 pip install lelu-agent-auth-sdk      # Python
 ```
 
-Works with **OpenAI**, **Anthropic**, **LangChain**, **LangGraph**, **Vercel AI SDK**, and **MCP** out of the box.
+Works with **OpenAI**, **Anthropic**, **LangChain**, **LangGraph**, **CrewAI**, **Vercel AI SDK**, and **MCP** out of the box.
 
 ---
 

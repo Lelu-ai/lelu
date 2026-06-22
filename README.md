@@ -33,6 +33,21 @@ Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access. They ca
 
 ---
 
+## Contents
+
+- [Quickstart](#quickstart)
+- [Run it locally in 60 seconds](#run-it-locally-in-60-seconds)
+- [Install](#install)
+- [How it works](#how-it-works)
+- [Agent identity](#agent-identity)
+- [OAuth Token Vault](#oauth-token-vault)
+- [NHI Inventory (ISPM)](#nhi-inventory-ispm)
+- [Self-hosting](#self-hosting)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+
+---
+
 ## Quickstart
 
 ```typescript

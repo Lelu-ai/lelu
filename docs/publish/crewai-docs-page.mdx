@@ -1,0 +1,71 @@
+---
+title: "Securing tools with Lelu"
+description: "Gate CrewAI tool calls on the model's confidence and a policy — and catch prompt injection — before the tool runs."
+icon: "shield-check"
+---
+
+CrewAI agents act through tools. A tool with real side effects — a refund, an
+email, a deploy — will still be called with full conviction even when the agent
+has been prompt-injected or is simply unsure.
+
+[`LeluTool`](https://github.com/lelu-auth/lelu) is a `BaseTool` subclass that runs
+each call through an authorization check first: a confidence gate (from the
+model's verified score, not a self-reported number), a prompt-injection filter,
+and a policy. A confident, permitted call executes; a low-confidence or
+manipulated one is blocked — or held for a human — and the agent receives a
+refusal string it can self-correct on.
+
+## Install
+
+```bash
+pip install crewai lelu-agent-auth-sdk
+```
+
+## Define a gated tool
+
+Subclass `LeluTool` and implement `_execute()` instead of `_run()`:
+
+```python
+from lelu import LeluClient
+from lelu.crewai import LeluTool
+
+class RefundTool(LeluTool):
+    name: str = "process_refund"
+    description: str = "Issue a customer refund."
+    actor: str = "invoice_bot"        # an agent scope in your Lelu policy
+    action: str = "approve_refunds"   # the permission to authorize
+    confidence: float = 0.95          # the model's verified confidence for this call
+
+    def _execute(self, invoice_id: str) -> str:
+        return f"Refund issued for invoice {invoice_id}."
+
+tool = RefundTool(lelu_client=LeluClient(base_url="http://localhost:8088"))
+agent = Agent(role="Finance Assistant", tools=[tool], ...)
+```
+
+CrewAI calls `_run()`; `LeluTool` intercepts it, authorizes, and only then calls
+your `_execute()`.
+
+## What the agent receives
+
+| Decision | `LeluTool` returns |
+| --- | --- |
+| **allow** | the `_execute()` result |
+| **deny** | a refusal string the LLM can self-correct on (the tool never runs) |
+| **human review** | a "queued for approval" message |
+| `throw_on_deny=True` | raises `PermissionDeniedError` |
+
+So the same refund at `confidence=0.95` goes through, while at `0.30` it returns
+*"denied: confidence below threshold"* and the agent adapts instead of moving the
+money.
+
+<Note>
+The `actor` / `action` map to a Lelu policy that sets the confidence thresholds
+(e.g. allow ≥ 0.90, review 0.70–0.89, deny < 0.50). Lelu runs self-hosted; model
+outputs and decisions stay in your environment.
+</Note>
+
+## Full example
+
+A runnable agent + crew example is in the Lelu repo:
+[`examples/crewai`](https://github.com/lelu-auth/lelu/tree/main/examples/crewai).

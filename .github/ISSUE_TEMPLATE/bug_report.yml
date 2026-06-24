@@ -1,0 +1,44 @@
+name: 🐞 Bug report
+description: Something isn't working as expected
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for filing a bug! Please search existing issues first.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Engine (Go)
+        - Python SDK
+        - TypeScript SDK
+        - Platform / UI
+        - Docs
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps (plus code/policy if relevant) to reproduce.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: SDK version, engine image tag, or commit SHA.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / output
+      render: shell

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions (ideas, questions, show & tell)
+    url: https://github.com/lelu-auth/lelu/discussions
+    about: Design questions, ideas, and showing what you built. Start here if it's not a bug or a concrete request.
+  - name: 🔐 Report a security vulnerability
+    url: https://github.com/lelu-auth/lelu/security/policy
+    about: Please report security issues privately — do not open a public issue.

@@ -1,0 +1,39 @@
+name: 🔌 Framework integration
+description: Propose or request an integration (LangChain, LangGraph, MCP, CrewAI, ...)
+title: "integration: "
+labels: ["integration", "help wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Framework integrations are our **#1 contribution area**. If you use the framework, this is a great first PR — see [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) and the existing adapters in `sdk/`.
+  - type: input
+    id: framework
+    attributes:
+      label: Framework
+      description: e.g. LangChain, LangGraph, MCP, CrewAI, LlamaIndex, AutoGen, Vercel AI SDK
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use case
+      description: How do you want to gate tool calls in this framework? Where in the call path should the check run?
+    validations:
+      required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Python
+        - TypeScript / JS
+        - Both
+        - Other
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd like to build this integration
+        - label: I'd like guidance from a maintainer to get started

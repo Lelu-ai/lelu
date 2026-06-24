@@ -60,7 +60,7 @@ export default function DocsHumanInLoop() {
               <p className="text-zinc-600 dark:text-zinc-400 text-sm">
                 Lelu evaluates the request against your Rego policies. If the confidence score is
                 too low for automatic approval, the request is flagged as{" "}
-                <code>requires_approval</code>.
+                <code>human_review</code>.
               </p>
             </div>
 

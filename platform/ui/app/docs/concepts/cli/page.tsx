@@ -461,7 +461,7 @@ lelu policy eval ./policy.rego \\
   --confidence 0.85
 
 # Output:
-# Result: requires_approval
+# Result: human_review
 # Reason: Confidence 0.85 is below threshold 0.95 for action 'delete_db'`}
             </pre>
           </div>

@@ -93,7 +93,7 @@ export default function DocsConfidence() {
                 <code>{`package lelu.authz
 
 default allow = false
-default requires_approval = false
+default requires_human_review = false
 
 # Read actions are safe, require low confidence
 allow {
@@ -108,7 +108,7 @@ allow {
 }
 
 # If confidence is between 0.7 and 0.9 for a write, require human approval
-requires_approval {
+requires_human_review {
     input.action == "write"
     input.confidence >= 0.7
     input.confidence < 0.9
@@ -140,18 +140,14 @@ requires_approval {
 
 const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
-// The AI agent determines it is 85% confident in this action
+// The model's verified confidence for this action (e.g. derived from logprobs)
 const response = await lelu.authorize({
-  agentId: 'agent-123',
-  action: 'delete_user',
-  resource: 'user:456',
-  confidence: 0.85, // 85% confidence
-  context: {
-    reason: 'User requested account deletion via support ticket #9921'
-  }
+  tool: 'delete_user',
+  actor: 'agent-123',
+  context: { confidence: 0.85, actingFor: 'user:456' },
 });
 
-if (response.status === 'requires_approval') {
+if (response.decision === 'human_review') {
   console.log('Action queued for human review. Request ID:', response.requestId);
 }`}</code>
               </pre>

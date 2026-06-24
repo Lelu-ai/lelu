@@ -47,7 +47,7 @@ export const deleteRecord = new DynamicTool({
   name: "delete_record",
   description: "Permanently deletes a record from the database",
   func: async (input: string) => {
-    const decision = await lelu.authorize({ tool: "delete_record", context: input });
+    const decision = await lelu.authorize({ tool: "delete_record" });
 
     if (decision.decision === "deny") {
       return \`Blocked: \${decision.reason}\`;
@@ -68,17 +68,19 @@ export const deleteRecord = new DynamicTool({
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">tools/delete_record.py</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`from langchain.tools import BaseTool
-from lelu import Client
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import asyncio, os
+from langchain.tools import BaseTool
+from lelu import LeluClient, AuthorizeRequest
 
-lelu = Client(api_key=os.environ["LELU_API_KEY"])
+lelu = LeluClient(api_key=os.environ["LELU_API_KEY"])
 
 class DeleteRecordTool(BaseTool):
     name = "delete_record"
     description = "Permanently deletes a record"
 
     def _run(self, input: str) -> str:
-        decision = lelu.authorize(tool="delete_record", context=input)
+        # The SDK is async; bridge it from LangChain's sync _run.
+        decision = asyncio.run(lelu.authorize(AuthorizeRequest(tool="delete_record")))
 
         if decision.decision == "deny":
             return f"Blocked: {decision.reason}"

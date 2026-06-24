@@ -39,13 +39,10 @@ export default function DocsApiAuthorize() {
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
                 <code>{`{
-  "agent_id": "string",      // Required: Unique identifier for the AI agent
-  "action": "string",        // Required: The action the agent wants to perform
-  "resource": "string",      // Required: The target resource
-  "confidence": 0.85,        // Required: Float between 0.0 and 1.0
-  "context": {               // Optional: Additional context for policy evaluation
-    "reason": "string",
-    "user_id": "string"
+  "tool": "send_email",            // Required: the tool/action to authorize (≤128 chars)
+  "context": "optional context",   // Optional: free-form context string
+  "args": {                        // Optional: structured tool arguments
+    "to": "user@example.com"
   }
 }`}</code>
               </pre>
@@ -56,8 +53,13 @@ export default function DocsApiAuthorize() {
         <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Response</h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            The response indicates whether the action is allowed, denied, or requires human
-            approval.
+            Every call returns <span className="font-mono">200 OK</span> with the outcome in the{" "}
+            <span className="font-mono">decision</span> field — one of <span className="font-mono">allow</span>,{" "}
+            <span className="font-mono">deny</span>, <span className="font-mono">human_review</span>, or{" "}
+            <span className="font-mono">compute</span> (redirected to a safe alternative, with{" "}
+            <span className="font-mono">safeTool</span> / <span className="font-mono">safeArgs</span>). Each
+            decision carries tamper-evident <span className="font-mono">inputHash</span> /{" "}
+            <span className="font-mono">outputHash</span>.
           </p>
 
           <div className="space-y-6">
@@ -70,8 +72,16 @@ export default function DocsApiAuthorize() {
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                   <pre>
                     <code>{`{
-  "status": "allow",
-  "request_id": "req_12345abcde"
+  "requestId": "req_a1b2c3d4",
+  "tool": "list_invoices",
+  "decision": "allow",
+  "reason": "Read-only operations are permitted by the default policy.",
+  "rule": "allow:read-ops",
+  "latencyMs": 5,
+  "mode": "live",
+  "timestamp": "2026-06-23T12:00:00.000Z",
+  "inputHash": "9f2c…",
+  "outputHash": "4a7b…"
 }`}</code>
                   </pre>
                 </div>
@@ -81,15 +91,22 @@ export default function DocsApiAuthorize() {
             <div>
               <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-3 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                Requires Approval (202 Accepted)
+                Human review (200 OK)
               </h3>
               <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                   <pre>
                     <code>{`{
-  "status": "requires_approval",
-  "request_id": "req_67890fghij",
-  "message": "Action queued for human review."
+  "requestId": "req_5e6f7a8b",
+  "tool": "issue_refund",
+  "decision": "human_review",
+  "reason": "Financial operations require a human to approve before execution.",
+  "rule": "review:financial-ops",
+  "latencyMs": 6,
+  "mode": "live",
+  "timestamp": "2026-06-23T12:00:00.000Z",
+  "inputHash": "1b3d…",
+  "outputHash": "8c2e…"
 }`}</code>
                   </pre>
                 </div>
@@ -99,15 +116,22 @@ export default function DocsApiAuthorize() {
             <div>
               <h3 className="text-lg font-medium text-zinc-900 dark:text-white mb-3 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                Denied (403 Forbidden)
+                Denied (200 OK)
               </h3>
               <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
                 <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
                   <pre>
                     <code>{`{
-  "status": "deny",
-  "request_id": "req_13579klmno",
-  "message": "Confidence score too low for requested action."
+  "requestId": "req_9c0d1e2f",
+  "tool": "delete_all_records",
+  "decision": "deny",
+  "reason": "Destructive operations are blocked by the default safety policy.",
+  "rule": "deny:destructive-ops",
+  "latencyMs": 4,
+  "mode": "live",
+  "timestamp": "2026-06-23T12:00:00.000Z",
+  "inputHash": "2a4f…",
+  "outputHash": "6d9b…"
 }`}</code>
                   </pre>
                 </div>

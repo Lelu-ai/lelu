@@ -58,12 +58,14 @@ const lelu = createClient({
 export function leluGate(action: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const decision = await lelu.authorize({
-      action,
-      confidence: req.body.confidence ?? 1.0,
+      tool: action,
+      ...(req.body.confidence !== undefined
+        ? { context: { confidence: req.body.confidence } }
+        : {}),
     });
 
     if (decision.requiresHumanReview) {
-      await decision.wait(); // long-poll for approval
+      await lelu.waitForApproval(decision.requestId); // long-poll for approval
     }
 
     if (!decision.allowed) {
@@ -91,7 +93,7 @@ export function leluGate(action: string) {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">pip</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300">{`pip install auth-pe`}</pre>
+            <pre className="p-4 font-mono text-sm text-zinc-300">{`pip install lelu-agent-auth-sdk`}</pre>
           </div>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
@@ -99,7 +101,7 @@ export function leluGate(action: string) {
               <span className="text-xs text-zinc-500 font-mono">dependencies/lelu.py</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`from fastapi import HTTPException, Depends
-from auth_pe import LeluClient
+from lelu import LeluClient, AuthorizeRequest, AgentContext
 import os
 
 lelu = LeluClient(
@@ -108,12 +110,12 @@ lelu = LeluClient(
 )
 
 def require_lelu(action: str):
-    async def dependency(confidence: float = 1.0):
-        decision = lelu.authorize(action=action, confidence=confidence)
-        if decision.requires_human_review:
-            decision.wait()
+    async def dependency(confidence: float | None = None):
+        ctx = AgentContext(confidence=confidence) if confidence is not None else None
+        decision = await lelu.authorize(AuthorizeRequest(tool=action, context=ctx))
+        # deny and human_review both block here; review additionally enqueues for approval.
         if not decision.allowed:
-            raise HTTPException(status_code=403, detail="Action denied by Lelu")
+            raise HTTPException(status_code=403, detail=f"Action denied by Lelu: {decision.reason}")
     return Depends(dependency)
 
 # Usage:
@@ -145,17 +147,17 @@ import (
 )
 
 type AuthRequest struct {
-    Action     string  \`json:"action"\`
-    Confidence float64 \`json:"confidence"\`
+    Tool string \`json:"tool"\`
 }
 
 type AuthResponse struct {
-    Status    string \`json:"status"\`
-    RequestID string \`json:"request_id"\`
+    Decision  string \`json:"decision"\` // allow | deny | human_review | compute
+    RequestID string \`json:"requestId"\`
+    Reason    string \`json:"reason"\`
 }
 
-func Authorize(action string, confidence float64) (*AuthResponse, error) {
-    body, _ := json.Marshal(AuthRequest{Action: action, Confidence: confidence})
+func Authorize(tool string) (*AuthResponse, error) {
+    body, _ := json.Marshal(AuthRequest{Tool: tool})
     req, _ := http.NewRequest("POST", engineURL+"/api/v1/authorize", bytes.NewBuffer(body))
     req.Header.Set("Authorization", "Bearer "+apiKey)
     req.Header.Set("Content-Type", "application/json")

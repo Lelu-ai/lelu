@@ -1,7 +1,20 @@
 name: Vercel Deploy
 
 on:
-  workflow_dispatch:  # Only manual triggers, disable automatic deployment
+  push:
+    branches: [main]
+    paths:
+      - "platform/ui/**"
+      - ".github/workflows/vercel-deploy.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "platform/ui/**"
+  workflow_dispatch:  # allow manual deploys too
+
+concurrency:
+  group: vercel-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

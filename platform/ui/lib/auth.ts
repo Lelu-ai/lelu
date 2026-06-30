@@ -180,6 +180,48 @@ export async function consumeVerificationToken(
   return { userId: row.user_id as string };
 }
 
+// ── Password reset tokens ─────────────────────────────────────────────────────
+
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  await ensureSchema();
+  const sql = db();
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  // Invalidate any previous reset tokens for this user.
+  await sql`DELETE FROM lelu_password_reset_tokens WHERE user_id = ${userId}`;
+  await sql`
+    INSERT INTO lelu_password_reset_tokens (token, user_id, expires_at, created_at)
+    VALUES (${token}, ${userId}, ${expiresAt.toISOString()}, NOW())
+  `;
+
+  return token;
+}
+
+export async function consumePasswordResetToken(
+  token: string
+): Promise<{ userId: string } | null> {
+  const sql = db();
+  const rows = await sql`
+    SELECT user_id, expires_at FROM lelu_password_reset_tokens WHERE token = ${token}
+  `;
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  if (new Date(row.expires_at as string) < new Date()) {
+    await sql`DELETE FROM lelu_password_reset_tokens WHERE token = ${token}`;
+    return null;
+  }
+
+  await sql`DELETE FROM lelu_password_reset_tokens WHERE token = ${token}`;
+  return { userId: row.user_id as string };
+}
+
+export async function updateUserPassword(userId: string, newPassword: string): Promise<void> {
+  const sql = db();
+  await sql`UPDATE lelu_users SET password_hash = ${hashPassword(newPassword)} WHERE id = ${userId}`;
+}
+
 // ── Session helpers ───────────────────────────────────────────────────────────
 
 export function cookieOptions(maxAge: number) {

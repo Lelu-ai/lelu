@@ -41,8 +41,8 @@ export default function DocsQuickStart() {
               >
                 lelu-ai.com/api-key
               </a>{" "}
-              and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Generate Key</strong>. No signup, no email — instant anonymous key with 500
-              requests/day free.
+              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier includes 500
+              requests/day.
             </p>
             <div className="ml-[52px]">
               <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500">

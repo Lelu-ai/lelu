@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface ApiKey {
@@ -308,6 +309,7 @@ function RevokeModal({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ApiKeyPage() {
+  const router = useRouter();
   const [keys, setKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -317,11 +319,20 @@ export default function ApiKeyPage() {
 
   useEffect(() => {
     fetch("/api/dashboard/keys")
-      .then((r) => r.json())
-      .then((d) => setKeys(d.keys ?? []))
+      .then((r) => {
+        // API keys require an account — send anonymous visitors to sign in.
+        if (r.status === 401) {
+          router.replace("/login?next=/api-key");
+          return null;
+        }
+        return r.json();
+      })
+      .then((d) => {
+        if (d) setKeys(d.keys ?? []);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   function handleCreated(key: ApiKey, fullKey: string) {
     setShowCreate(false);

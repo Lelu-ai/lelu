@@ -33,7 +33,7 @@ export default function ApiKeysPage() {
             >
               lelu-ai.com/api-key
             </a>{" "}
-            and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Generate Key</strong>. No signup, no email — you get an API key in under five seconds.
+            , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. You get a key in seconds.
           </p>
 
           <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500 mb-6">

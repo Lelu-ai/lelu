@@ -277,11 +277,11 @@ export default function DocsPage() {
       </p>
 
       <Callout type="tip">
-        No signup required.{" "}
-        <a href="/api-key" className="underline hover:text-[#3B82F6] transition-colors">
-          Generate an anonymous API key
+        Free to start.{" "}
+        <a href="/register" className="underline hover:text-[#3B82F6] transition-colors">
+          Create an account
         </a>{" "}
-        and get 500 requests per day — instant access, privacy first.
+        to get an API key and 500 requests per day.
       </Callout>
 
       {/* ── Features ── */}
@@ -535,7 +535,7 @@ export default function DocsPage() {
       </h2>
       <ul className="space-y-2.5 text-[15px] mb-14">
         {[
-          { href: "/api-key", label: "Get your API key", desc: "No signup, instant access" },
+          { href: "/api-key", label: "Get your API key", desc: "Free account, 500 requests/day" },
           { href: "/docs/installation", label: "Installation", desc: "Add Lelu to an existing project" },
           { href: "/docs/quickstart", label: "Quickstart", desc: "Authorize your first agent action" },
           { href: "/docs/concepts/architecture", label: "Architecture", desc: "How Lelu works under the hood" },

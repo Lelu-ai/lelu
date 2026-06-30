@@ -44,6 +44,15 @@ export async function ensureSchema(): Promise<void> {
   `;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS lelu_password_reset_tokens (
+      token      TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
     CREATE INDEX IF NOT EXISTS idx_lelu_users_email ON lelu_users (email)
   `;
 

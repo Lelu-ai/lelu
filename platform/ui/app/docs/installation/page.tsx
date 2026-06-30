@@ -126,7 +126,7 @@ export default function DocsInstallation() {
               >
                 lelu-ai.com/api-key
               </a>{" "}
-              and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Generate Key</strong>. No signup, no email — instant anonymous key with 500 requests/day free.
+              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier includes 500 requests/day.
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">

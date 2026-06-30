@@ -8,47 +8,54 @@ import { LeluMark } from "@/components/ui/LeluMark";
 const inputCls =
   "w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all";
 
-function LoginForm() {
+function ResetForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/dashboard";
+  const token = params.get("token") || "";
 
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
-  const verified = params.get("verified") === "1";
-  const registered = params.get("registered") === "1";
-  const reset = params.get("reset") === "1";
-  const queryError = params.get("error");
-  const queryErrorMsg =
-    queryError === "token_expired"
-      ? "Verification link has expired. Please register again."
-      : queryError === "invalid_token"
-      ? "Invalid verification link."
-      : queryError === "verification_failed"
-      ? "Email verification failed. Please try again."
-      : null;
+  if (!token) {
+    return (
+      <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200/70 dark:border-red-800/40 text-[13px] text-red-700 dark:text-red-400">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 mt-0.5">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        This reset link is missing its token. Please request a new one from the{" "}
+        <Link href="/forgot-password" className="underline underline-offset-2 font-semibold">
+          forgot password
+        </Link>{" "}
+        page.
+      </div>
+    );
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (password !== confirm) {
+      setError("Passwords don't match.");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ token, password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Login failed");
+        setError(data.error || "Password reset failed. Please try again.");
         return;
       }
-      router.push(next);
-      router.refresh();
+      router.push("/login?reset=1");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -58,63 +65,31 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      {(verified || registered || reset) && (
-        <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200/70 dark:border-emerald-800/40 text-[13px] text-emerald-700 dark:text-emerald-400">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 mt-0.5">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-          {reset
-            ? "Password updated! Sign in with your new password."
-            : registered
-            ? "Account created! Sign in to continue."
-            : "Email verified! You can now sign in."}
-        </div>
-      )}
-      {(error || queryErrorMsg) && (
+      {error && (
         <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200/70 dark:border-red-800/40 text-[13px] text-red-700 dark:text-red-400">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 mt-0.5">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          {error || queryErrorMsg}
+          {error}
         </div>
       )}
 
       <div className="space-y-1.5">
-        <label className="block text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]" htmlFor="email">
-          Email address
+        <label className="block text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]" htmlFor="password">
+          New password
         </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          className={inputCls}
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]" htmlFor="password">
-            Password
-          </label>
-          <Link href="/forgot-password" className="text-[12px] text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors">
-            Forgot password?
-          </Link>
-        </div>
         <div className="relative">
           <input
             id="password"
             type={showPw ? "text" : "password"}
-            autoComplete="current-password"
+            autoComplete="new-password"
             required
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder="At least 8 characters"
             className={`${inputCls} pr-11`}
           />
           <button
@@ -140,30 +115,37 @@ function LoginForm() {
         </div>
       </div>
 
+      <div className="space-y-1.5">
+        <label className="block text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]" htmlFor="confirm">
+          Confirm new password
+        </label>
+        <input
+          id="confirm"
+          type={showPw ? "text" : "password"}
+          autoComplete="new-password"
+          required
+          minLength={8}
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          placeholder="Re-enter your new password"
+          className={inputCls}
+        />
+      </div>
+
       <button
         type="submit"
         disabled={loading}
         className="w-full h-11 mt-1 rounded-lg bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[14px] font-semibold hover:bg-zinc-800 dark:hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            Signing in…
-          </span>
-        ) : (
-          "Sign in"
-        )}
+        {loading ? "Resetting…" : "Reset password"}
       </button>
     </form>
   );
 }
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0B0B0C]">
-      {/* Subtle grid background */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"
         style={{
@@ -174,7 +156,6 @@ export default function LoginPage() {
       />
 
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative">
-        {/* Logo */}
         <Link href="/" className="flex items-center gap-2 mb-10 group">
           <LeluMark size={22} />
           <span
@@ -188,41 +169,28 @@ export default function LoginPage() {
         <div className="w-full max-w-[400px]">
           <div className="text-center mb-8">
             <h1 className="text-[28px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white mb-2">
-              Welcome back
+              Choose a new password
             </h1>
             <p className="text-[14px] text-[#737373]">
-              Sign in to your Lelu account
+              Pick a strong password you don&apos;t use elsewhere.
             </p>
           </div>
 
           <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-8 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] dark:shadow-none">
             <Suspense>
-              <LoginForm />
+              <ResetForm />
             </Suspense>
           </div>
 
           <p className="mt-5 text-center text-[13px] text-[#737373]">
-            Don&apos;t have an account?{" "}
             <Link
-              href="/register"
+              href="/login"
               className="text-[#0A0A0A] dark:text-white font-semibold hover:underline underline-offset-2"
             >
-              Create one
+              Back to sign in
             </Link>
           </p>
         </div>
-
-        {/* Footer */}
-        <p className="mt-10 text-center text-[12px] text-[#A3A3A3]">
-          By signing in, you agree to our{" "}
-          <a href="/terms" className="hover:text-[#737373] transition-colors underline underline-offset-2">
-            Terms
-          </a>{" "}
-          and{" "}
-          <a href="/privacy" className="hover:text-[#737373] transition-colors underline underline-offset-2">
-            Privacy Policy
-          </a>
-        </p>
       </div>
     </div>
   );

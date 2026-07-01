@@ -107,13 +107,13 @@ export async function createUser(name: string, email: string, password: string):
     name: name.trim(),
     email: norm,
     passwordHash: hashPassword(password),
-    emailVerified: false,
+    emailVerified: true,
     createdAt: new Date().toISOString(),
   };
 
   await sql`
     INSERT INTO lelu_users (id, name, email, password_hash, email_verified, created_at)
-    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, FALSE, NOW())
+    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, TRUE, NOW())
   `;
 
   return user;

@@ -100,9 +100,11 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 export async function sendPasswordResetEmail(
   to: string,
   name: string,
-  token: string
+  token: string,
+  baseUrl?: string
 ): Promise<void> {
-  const link = `${BASE_URL}/reset-password?token=${token}`;
+  const base = baseUrl ?? BASE_URL;
+  const link = `${base}/reset-password?token=${token}`;
   const firstName = name.split(" ")[0];
 
   await send(
@@ -170,9 +172,11 @@ export async function sendPasswordResetEmail(
 export async function sendVerificationEmail(
   to: string,
   name: string,
-  token: string
+  token: string,
+  baseUrl?: string
 ): Promise<void> {
-  const link = `${BASE_URL}/api/auth/verify-email?token=${token}`;
+  const base = baseUrl ?? BASE_URL;
+  const link = `${base}/api/auth/verify-email?token=${token}`;
   const firstName = name.split(" ")[0];
 
   await send(

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createUser, createVerificationToken } from "@/lib/auth";
-import { sendVerificationEmail } from "@/lib/email";
+import { createUser } from "@/lib/auth";
 
 const NAME_RE = /^[a-zA-Z\s'\-.]{2,80}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -31,9 +30,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Password too long" }, { status: 400 });
   }
 
-  let user;
   try {
-    user = await createUser(name.trim(), email.trim(), password);
+    await createUser(name.trim(), email.trim(), password);
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "EMAIL_TAKEN") {
       return NextResponse.json(
@@ -43,15 +41,6 @@ export async function POST(req: NextRequest) {
     }
     console.error("[auth/register] createUser failed:", err);
     return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
-  }
-
-  // Send the email-verification link. A delivery failure must not fail the
-  // registration itself — the user can request a new link later.
-  try {
-    const token = await createVerificationToken(user.id);
-    await sendVerificationEmail(user.email, user.name, token);
-  } catch (err) {
-    console.error("[auth/register] verification email failed:", err);
   }
 
   return NextResponse.json({ ok: true }, { status: 201 });

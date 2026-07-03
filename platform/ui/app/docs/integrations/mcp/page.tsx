@@ -16,6 +16,43 @@ export default function DocsMCP() {
 
       <div className="space-y-12">
         <section>
+          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Zero-config local server</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            The fastest way to try Lelu — no account, no Docker. On first run,{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">lelu-mcp</code>{" "}
+            downloads the engine binary (cached in <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">~/.lelu/bin</code>),
+            writes a starter policy to <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">~/.lelu/policy.yaml</code>,
+            starts the engine locally, and exposes the{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">lelu_agent_authorize</code>{" "}
+            tool to your agent.
+          </p>
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <span className="text-xs text-zinc-500 font-mono">Claude Code</span>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio`}</pre>
+          </div>
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <span className="text-xs text-zinc-500 font-mono">claude_desktop_config.json / .cursor/mcp.json</span>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`{
+  "mcpServers": {
+    "lelu": {
+      "command": "npx",
+      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio"]
+    }
+  }
+}`}</pre>
+          </div>
+          <p className="text-zinc-600 dark:text-zinc-400">
+            Already running an engine? Point at it instead with{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">--engine-url http://localhost:8082 --api-key &lt;key&gt;</code>{" "}
+            — no local engine is spawned when a URL is set.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">How it works</h2>
           <p className="text-zinc-600 dark:text-zinc-400">
             Lelu&apos;s MCP proxy sits between the client and your server. Every{" "}

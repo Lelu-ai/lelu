@@ -12,9 +12,52 @@ export default function DocsQuickStart() {
           Quickstart
         </h1>
         <p className="text-[15px] text-[#737373] leading-relaxed">
-          Authorize your first agent action in under 2 minutes — no Docker, no server setup.
+          Authorize your first agent action in under 2 minutes — no account, no Docker, no server setup.
         </p>
       </div>
+
+      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+
+      {/* Zero-setup path */}
+      <section className="mb-14">
+        <h2
+          id="zero-setup"
+          className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-3"
+        >
+          Fastest path: zero setup, no account
+        </h2>
+        <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+          One command downloads the Lelu engine, starts it on your machine with a starter
+          policy, and serves it over MCP. Everything runs locally — nothing is sent to our cloud.
+        </p>
+        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4">
+          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <span className="text-[12px] text-[#737373] font-mono">terminal</span>
+          </div>
+          <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`npx -y lelu-mcp start`}
+          </pre>
+        </div>
+        <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+          Or wire it straight into your agent host — Claude Code, Claude Desktop, or Cursor —
+          so every tool call is policy-gated:
+        </p>
+        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4">
+          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <span className="text-[12px] text-[#737373] font-mono">Claude Code</span>
+          </div>
+          <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio`}
+          </pre>
+        </div>
+        <p className="text-[14px] text-[#737373] leading-[1.65]">
+          The starter policy lands in{" "}
+          <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/policy.yaml</code>
+          {" "}— it denies destructive actions, routes payments to human review, allows reads,
+          and default-denies the rest. Edit it and restart to change the rules. When you want
+          cloud-managed policies and audit history, continue below.
+        </p>
+      </section>
 
       <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
 

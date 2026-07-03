@@ -320,6 +320,35 @@ LELU_API_KEY=your_key_here`}
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              To run the engine on your machine with no account and no Docker, install the
+              static binary — it downloads from GitHub Releases into{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/bin</code>:
+            </p>
+
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <span className="text-[12px] text-[#737373] font-mono">terminal</span>
+              </div>
+              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+{`curl -sSL https://raw.githubusercontent.com/Lelu-ai/lelu/main/scripts/install.sh | sh`}
+              </pre>
+              <CopyBtn text={`curl -sSL https://raw.githubusercontent.com/Lelu-ai/lelu/main/scripts/install.sh | sh`} id="install-sh" />
+            </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              Using an MCP host (Claude Code, Claude Desktop, Cursor)? Skip the install
+              entirely — <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
+              downloads and runs the engine for you. See the{" "}
+              <a
+                href="/docs/integrations/mcp"
+                className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
+              >
+                MCP integration
+              </a>
+              .
+            </p>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               To run the engine locally with Docker:
             </p>
 

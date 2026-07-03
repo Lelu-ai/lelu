@@ -17,6 +17,50 @@ export default function ApiKeysPage() {
       <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
 
       <div className="space-y-14">
+        {/* Key types */}
+        <section>
+          <h2
+            id="key-types"
+            className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-4"
+          >
+            Key types
+          </h2>
+          <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
+            Lelu has three kinds of keys. Only one of them requires an account — testing never does.
+          </p>
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm overflow-x-auto">
+            <table className="w-full text-[14px]">
+              <thead>
+                <tr className="bg-[#F5F5F4] dark:bg-[#141416] text-left">
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Key</th>
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Account?</th>
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Where it works</th>
+                </tr>
+              </thead>
+              <tbody className="text-[#737373]">
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_local_…</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3">
+                    Generated automatically by <code className="font-mono text-[13px]">npx lelu-mcp</code> for
+                    the local engine on your machine. Stored in <code className="font-mono text-[13px]">~/.lelu/engine.key</code>; you never handle it.
+                  </td>
+                </tr>
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_sandbox_…</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3">Hosted API in demo mode — try decisions without signing up.</td>
+                </tr>
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_…</td>
+                  <td className="px-4 py-3">Yes</td>
+                  <td className="px-4 py-3">Hosted API with your own policies, revocation, expiry, and audit history.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         {/* Get a key */}
         <section>
           <h2
@@ -42,7 +86,9 @@ export default function ApiKeysPage() {
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-              Free tier includes <strong>500 requests/day</strong> with no expiration. Keys are 64-character hex strings — no prefix, no environment suffix.
+              Free tier includes <strong>500 requests/day</strong>. Keys look like{" "}
+              <code className="font-mono text-[13px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> and are shown
+              once at creation — only a hash is stored. Optional expiry can be set when creating a key.
             </div>
           </div>
 

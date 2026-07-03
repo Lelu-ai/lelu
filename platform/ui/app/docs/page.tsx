@@ -277,11 +277,15 @@ export default function DocsPage() {
       </p>
 
       <Callout type="tip">
-        Free to start.{" "}
+        Free to start — no account needed. Run{" "}
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+          npx -y lelu-mcp start
+        </code>{" "}
+        to get a policy-gated engine on your machine in one command.{" "}
         <a href="/register" className="underline hover:text-[#3B82F6] transition-colors">
           Create an account
         </a>{" "}
-        to get an API key and 500 requests per day.
+        when you want cloud-managed policies, audit history, and a hosted API key (500 requests/day free).
       </Callout>
 
       {/* ── Features ── */}
@@ -535,7 +539,8 @@ export default function DocsPage() {
       </h2>
       <ul className="space-y-2.5 text-[15px] mb-14">
         {[
-          { href: "/api-key", label: "Get your API key", desc: "Free account, 500 requests/day" },
+          { href: "/docs/quickstart#zero-setup", label: "Try Lelu locally", desc: "npx -y lelu-mcp start — no account, all on your machine" },
+          { href: "/api-key", label: "Get your API key", desc: "Free account, 500 requests/day on the hosted API" },
           { href: "/docs/installation", label: "Installation", desc: "Add Lelu to an existing project" },
           { href: "/docs/quickstart", label: "Quickstart", desc: "Authorize your first agent action" },
           { href: "/docs/concepts/architecture", label: "Architecture", desc: "How Lelu works under the hood" },

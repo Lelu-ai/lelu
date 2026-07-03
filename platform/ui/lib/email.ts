@@ -59,6 +59,17 @@ function smtpTransporter(): Transporter | null {
   return _transporter;
 }
 
+// True when at least one delivery provider is configured. Callers use this to
+// decide whether email-dependent flows (verification) can actually complete.
+export function emailConfigured(): boolean {
+  return Boolean(
+    process.env.SES_REGION ||
+      process.env.AWS_SES_REGION ||
+      process.env.RESEND_API_KEY ||
+      (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+  );
+}
+
 async function send(to: string, subject: string, html: string): Promise<void> {
   // Priority: SES → Resend → SMTP → skip. The HTTPS providers (SES, Resend)
   // come first because Vercel/serverless blocks outbound SMTP; SMTP is only for

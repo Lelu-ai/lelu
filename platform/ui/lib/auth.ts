@@ -94,7 +94,12 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ── User management ───────────────────────────────────────────────────────────
 
-export async function createUser(name: string, email: string, password: string): Promise<User> {
+export async function createUser(
+  name: string,
+  email: string,
+  password: string,
+  opts: { emailVerified?: boolean } = {}
+): Promise<User> {
   await ensureSchema();
   const sql = db();
   const norm = email.toLowerCase().trim();
@@ -107,13 +112,13 @@ export async function createUser(name: string, email: string, password: string):
     name: name.trim(),
     email: norm,
     passwordHash: hashPassword(password),
-    emailVerified: true,
+    emailVerified: opts.emailVerified ?? false,
     createdAt: new Date().toISOString(),
   };
 
   await sql`
     INSERT INTO lelu_users (id, name, email, password_hash, email_verified, created_at)
-    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, TRUE, NOW())
+    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, ${user.emailVerified}, NOW())
   `;
 
   return user;

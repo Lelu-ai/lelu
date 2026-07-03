@@ -52,7 +52,7 @@ export default function RegisterPage() {
         setError(data.error || "Registration failed");
         return;
       }
-      router.push("/login?registered=1");
+      router.push(data.requiresVerification ? "/login?registered=1&verify=1" : "/login?registered=1");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

@@ -24,9 +24,11 @@ function hashKey(key: string): string {
 
 // Format: lelu_sk_<12-hex-prefix>_<43-char-base64url-secret>
 // Total length: ~64 chars. Prefix is stored plaintext for display; secret is hashed.
+// Pass expiresInDays to make the key expire; omit it for a non-expiring key.
 export async function createApiKey(
   userId: string,
-  name: string
+  name: string,
+  expiresInDays?: number
 ): Promise<CreateApiKeyResult> {
   await ensureSchema();
   const sql = db();
@@ -37,9 +39,14 @@ export async function createApiKey(
   const keyHash = hashKey(fullKey);
   const id = randomBytes(16).toString("hex");
 
+  const expiresAt =
+    expiresInDays && expiresInDays > 0
+      ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+      : null;
+
   await sql`
-    INSERT INTO lelu_api_keys (id, user_id, name, key_prefix, key_hash, created_at)
-    VALUES (${id}, ${userId}, ${name}, ${prefix}, ${keyHash}, NOW())
+    INSERT INTO lelu_api_keys (id, user_id, name, key_prefix, key_hash, created_at, expires_at)
+    VALUES (${id}, ${userId}, ${name}, ${prefix}, ${keyHash}, NOW(), ${expiresAt})
   `;
 
   return {
@@ -50,7 +57,7 @@ export async function createApiKey(
       keyPrefix: prefix,
       createdAt: new Date().toISOString(),
       lastUsedAt: null,
-      expiresAt: null,
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
       revoked: false,
       revokedAt: null,
     },
@@ -71,17 +78,19 @@ export async function listApiKeys(userId: string): Promise<ApiKey[]> {
   return rows.map(rowToKey);
 }
 
+// Returns true only if a matching, not-already-revoked key belonging to the
+// user was actually revoked; false if nothing matched.
 export async function revokeApiKey(id: string, userId: string): Promise<boolean> {
   const sql = db();
-  await sql`
+  const result = await sql`
     UPDATE lelu_api_keys
     SET revoked = TRUE, revoked_at = NOW()
     WHERE id = ${id} AND user_id = ${userId} AND revoked = FALSE
   `;
-  return true;
+  return result.count > 0;
 }
 
-// Used by the engine to validate incoming API requests.
+// Validates an incoming API key for the public /api/v1/* routes.
 export async function validateApiKey(
   fullKey: string
 ): Promise<{ userId: string; keyId: string } | null> {

@@ -1,0 +1,99 @@
+# Builds static Lelu engine binaries for every platform and attaches them to a
+# GitHub Release. These binaries power two zero-registration install paths:
+#
+#   1. npx lelu-mcp          — downloads the right binary on first run
+#   2. scripts/install.sh    — curl | sh installer
+#
+# Trigger: push a tag like engine-v0.1.0 (or run manually via workflow_dispatch).
+#
+# CGO note: the engine uses mattn/go-sqlite3 (CGO) for behavioral analytics.
+# Linux/macOS builds run on native runners with CGO enabled so analytics work.
+# The Windows build uses CGO_ENABLED=0 — the engine detects the missing SQLite
+# driver at startup and runs with analytics disabled (a logged warning, not an error).
+
+name: engine-release
+
+on:
+  push:
+    tags:
+      - "engine-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            cgo: "1"
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            cgo: "1"
+          - runner: macos-13
+            goos: darwin
+            goarch: amd64
+            cgo: "1"
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            cgo: "1"
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            cgo: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: engine/go.mod
+          cache-dependency-path: engine/go.sum
+
+      - name: Build
+        shell: bash
+        working-directory: engine
+        env:
+          CGO_ENABLED: ${{ matrix.cgo }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          EXT=""
+          [ "$GOOS" = "windows" ] && EXT=".exe"
+          go build -trimpath -ldflags "-s -w" \
+            -o "lelu-engine-${GOOS}-${GOARCH}${EXT}" ./cmd/engine
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lelu-engine-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: engine/lelu-engine-*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: binaries
+        run: sha256sum lelu-engine-* > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: binaries/*
+          generate_release_notes: true
+          # workflow_dispatch runs (no tag) publish a draft you can name yourself
+          draft: ${{ github.ref_type != 'tag' }}

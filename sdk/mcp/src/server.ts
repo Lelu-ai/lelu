@@ -102,7 +102,8 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
       }>("/v1/agent/authorize", {
         actor,
         action,
-        resource,
+        // Engine expects resource as a string map, not a bare string.
+        ...(resource ? { resource: { id: resource } } : {}),
         acting_for: actingFor,
         scope,
         ...(confidence !== undefined ? { confidence } : {}),
@@ -152,7 +153,11 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
         allowed: boolean;
         reason: string;
         trace_id: string;
-      }>("/v1/authorize", { user_id: userId, action, resource });
+      }>("/v1/authorize", {
+        user_id: userId,
+        action,
+        ...(resource ? { resource: { id: resource } } : {}),
+      });
 
       return {
         content: [

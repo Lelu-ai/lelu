@@ -75,8 +75,8 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
   server.tool(
     "lelu_agent_authorize",
     "Ask the Lelu Engine whether an AI agent is allowed to perform an action. " +
-    "Lelu evaluates the action against your policy using behavioral signals — do NOT pass a confidence score; " +
-    "the engine derives trust from verified provider signals, not agent self-reports. " +
+    "Lelu evaluates the action against your policy using behavioral signals. " +
+    "In production, confidence comes from verified provider signals (logprobs/entropy), never agent self-reports. " +
     "Returns allowed/denied/requires_human_review along with a request ID for HITL polling.",
     {
       actor:     z.string().describe("The agent or bot performing the action, e.g. 'invoice_bot'"),
@@ -84,8 +84,14 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
       resource:  z.string().optional().describe("Optional resource the action targets, e.g. 'invoice:42'"),
       actingFor: z.string().optional().describe("User ID the agent is acting on behalf of"),
       scope:     z.string().optional().describe("Requested permission scope, e.g. 'read:invoices'"),
+      confidence: z.number().min(0).max(1).optional().describe(
+        "Self-reported confidence (0–1) that this action is correct. Dev-mode only: honored when " +
+        "the engine runs with CONFIDENCE_ALLOW_UNVERIFIED=true (the zero-config local default). " +
+        "Production engines require a verified provider signal instead; when omitted, the engine's " +
+        "CONFIDENCE_MISSING_MODE decides (local default: route to human review)."
+      ),
     },
-    async ({ actor, action, resource, actingFor, scope }) => {
+    async ({ actor, action, resource, actingFor, scope, confidence }) => {
       const data = await post<{
         allowed: boolean;
         reason: string;
@@ -99,6 +105,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
         resource,
         acting_for: actingFor,
         scope,
+        ...(confidence !== undefined ? { confidence } : {}),
       });
 
       const status = data.requires_human_review

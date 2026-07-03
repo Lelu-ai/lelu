@@ -6,17 +6,27 @@
  *   npx lelu-mcp start [options]
  *   npx lelu-mcp add [target] [options]
  *
+ * Zero-config: with no --engine-url / LELU_ENGINE_URL, lelu-mcp downloads the
+ * engine binary on first run (cached in ~/.lelu/bin), starts it locally with a
+ * starter policy (~/.lelu/policy.yaml), and connects to it. No account needed.
+ *
  * Options:
- *   --engine-url  <url>   Lelu Engine base URL (default: http://localhost:8082)
+ *   --engine-url  <url>   Lelu Engine base URL (default: run a local engine)
  *   --api-key     <key>   Lelu Engine API key  (or set LELU_API_KEY env var)
  *   --timeout     <ms>    Request timeout in ms  (default: 10000)
+ *   --no-local            Never spawn a local engine; use http://localhost:8082
  *
  * Environment variables:
- *   LELU_ENGINE_URL   Lelu Engine base URL
- *   LELU_API_KEY      Lelu Engine API key
+ *   LELU_ENGINE_URL      Lelu Engine base URL (disables local mode)
+ *   LELU_API_KEY         Lelu Engine API key
+ *   LELU_HOME            Local data dir (default ~/.lelu)
+ *   LELU_ENGINE_BINARY   Use a locally built engine binary (skips download)
+ *   LELU_ENGINE_VERSION  Pin an engine release version (default: latest)
+ *   LELU_POLICY_PATH     Policy file for the local engine (default ~/.lelu/policy.yaml)
  */
 
 import { runStdio, runHttp } from "./server.js";
+import { startLocalEngine } from "./local-engine.js";
 
 // ─── Minimal arg parser ───────────────────────────────────────────────────────
 
@@ -46,12 +56,17 @@ Usage:
   npx lelu-mcp start [options]
   npx lelu-mcp add [target] [options]
 
+Zero-config: with no --engine-url, lelu-mcp downloads the Lelu engine on first
+run (cached in ~/.lelu/bin), starts it locally with a starter policy at
+~/.lelu/policy.yaml, and connects to it. No account or registration needed.
+
 Options:
-  --engine-url <url>    Lelu Engine base URL (default: http://localhost:8082)
+  --engine-url <url>    Lelu Engine base URL (default: run a local engine)
   --api-key    <key>    Lelu Engine API key  (or LELU_API_KEY env var)
   --timeout    <ms>     Request timeout in ms  (default: 10000)
   --transport  <mode>   Transport mode: stdio | http  (default: stdio)
   --port       <port>   HTTP port when --transport=http  (default: 3001)
+  --no-local            Never spawn a local engine; expect one on localhost:8082
 
 Add command options:
   --cursor             Print Cursor MCP config snippet
@@ -70,7 +85,7 @@ Tools exposed to the AI agent:
   lelu_health            Check Engine health
 
 Examples:
-  # Start with defaults (Engine on localhost:8082, no auth)
+  # Zero-config: download + run a local engine, no account needed
   npx lelu-mcp start
 
   # Start with a custom Engine URL and API key
@@ -112,18 +127,20 @@ function detectAddTarget(flags: Record<string, string>): AddTarget {
 
 function buildMcpServerConfig(flags: Record<string, string>): Record<string, unknown> {
   const mode = flags["mode"] ?? "sse";
-  const engineUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"] ?? "http://localhost:8082";
-  const apiKey = flags["api-key"] ?? process.env["LELU_API_KEY"] ?? "YOUR_API_KEY";
+  const engineUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
+  const apiKey = flags["api-key"] ?? process.env["LELU_API_KEY"];
   const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
 
   if (mode === "stdio") {
+    // Only pin env vars the user explicitly provided — with no LELU_ENGINE_URL,
+    // lelu-mcp runs a local engine automatically (zero-config mode).
+    const env: Record<string, string> = {};
+    if (engineUrl) env["LELU_ENGINE_URL"] = engineUrl;
+    if (apiKey) env["LELU_API_KEY"] = apiKey;
     return {
       command: "npx",
-      args: ["lelu-mcp", "start", "--transport", "stdio"],
-      env: {
-        LELU_ENGINE_URL: engineUrl,
-        LELU_API_KEY: apiKey,
-      },
+      args: ["-y", "lelu-mcp", "start", "--transport", "stdio"],
+      ...(Object.keys(env).length > 0 ? { env } : {}),
     };
   }
 
@@ -147,7 +164,7 @@ async function runAdd(flags: Record<string, string>): Promise<void> {
   if (target === "claude") {
     const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
     if (mode === "stdio") {
-      console.log("npx lelu-mcp start --transport stdio --engine-url http://localhost:8082 --api-key YOUR_API_KEY");
+      console.log("claude mcp add lelu -- npx -y lelu-mcp start --transport stdio");
       return;
     }
     console.log(`claude mcp add --transport http lelu ${sseUrl}`);
@@ -196,8 +213,9 @@ async function main() {
     return;
   }
 
-  const engineUrl  = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"] ?? "http://localhost:8082";
-  const apiKey     = flags["api-key"]    ?? process.env["LELU_API_KEY"];
+  const explicitUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
+  let engineUrl     = explicitUrl ?? "http://localhost:8082";
+  let apiKey       = flags["api-key"]    ?? process.env["LELU_API_KEY"];
   const timeoutMs  = flags["timeout"]    ? parseInt(flags["timeout"], 10) : 10_000;
   const transport  = flags["transport"]  ?? process.env["MCP_TRANSPORT"] ?? "stdio";
   const port       = flags["port"]       ? parseInt(flags["port"], 10)
@@ -212,6 +230,21 @@ async function main() {
   if (transport !== "stdio" && transport !== "http") {
     console.error(`--transport must be 'stdio' or 'http', got: ${transport}`);
     process.exit(1);
+  }
+
+  // Zero-config mode: no engine URL given → download (once) and run a local
+  // engine with the starter policy. Everything stays on this machine.
+  if (!explicitUrl && flags["no-local"] !== "true") {
+    try {
+      const local = await startLocalEngine();
+      engineUrl = local.url;
+      // The launcher starts the engine with a generated per-install key —
+      // use it unless the user supplied their own.
+      apiKey = apiKey ?? local.apiKey;
+    } catch (err) {
+      console.error(`[lelu-mcp] Could not start a local engine: ${err instanceof Error ? err.message : err}`);
+      console.error(`[lelu-mcp] Falling back to ${engineUrl} — start an engine there or pass --engine-url.`);
+    }
   }
 
   // Log to stderr so it doesn't pollute the MCP stdio stream

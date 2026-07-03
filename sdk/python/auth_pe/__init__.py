@@ -16,6 +16,11 @@ Quick start::
 """
 
 from .client import LeluClient, LELU_CLOUD_URL
+from .langchain import (
+    SecuredTool,
+    LangChainPermissionDeniedError,
+    create_secured_tool,
+)
 from .autogpt_plugin import LeluAutoGPTPlugin
 from .middleware import AgentMiddleware
 from .storage import LocalStorage
@@ -80,6 +85,10 @@ __all__ = [
     "LeluAutoGPTPlugin",
     "AgentMiddleware",
     "LocalStorage",
+    # LangChain
+    "SecuredTool",
+    "LangChainPermissionDeniedError",
+    "create_secured_tool",
     # Primary request
     "AuthorizeRequest",
     # Legacy requests

@@ -44,7 +44,7 @@ try:  # pragma: no cover - exercised through the fake module in tests
     from langchain_core.tools import BaseTool as LangChainBaseTool
 except ImportError:  # pragma: no cover - fallback when langchain is absent
     try:
-        from langchain.tools import BaseTool as LangChainBaseTool  # type: ignore[assignment]
+        from langchain.tools import BaseTool as LangChainBaseTool  # type: ignore[assignment, unused-ignore]
     except ImportError:  # pragma: no cover - lightweight local fallback
 
         class LangChainBaseTool(BaseModel):  # type: ignore[no-redef]
@@ -63,6 +63,12 @@ except ImportError:  # pragma: no cover - fallback when langchain is absent
             response_format: str = "content"
 
             model_config = {"arbitrary_types_allowed": True}
+
+            def _run(self, *args: Any, **kwargs: Any) -> Any:
+                raise NotImplementedError
+
+            async def _arun(self, *args: Any, **kwargs: Any) -> Any:
+                raise NotImplementedError
 
             def run(self, *args: Any, **kwargs: Any) -> Any:
                 return self._run(*args, **kwargs)

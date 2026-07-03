@@ -207,12 +207,12 @@ const MANUAL_TABS = ["Claude Code", "Open Code", "JSON"] as const;
 type ManualTab = (typeof MANUAL_TABS)[number];
 
 const MANUAL_COMMANDS: Record<ManualTab, string> = {
-  "Claude Code": "claude mcp add --transport http lelu http://localhost:3003/sse",
-  "Open Code": "open-code mcp add --transport http lelu http://localhost:3003/sse",
+  "Claude Code": "claude mcp add --transport http lelu http://localhost:3001/sse",
+  "Open Code": "open-code mcp add --transport http lelu http://localhost:3001/sse",
   JSON: `{
   "mcpServers": {
     "lelu": {
-      "url": "http://localhost:3003/sse"
+      "url": "http://localhost:3001/sse"
     }
   }
 }`,
@@ -285,7 +285,7 @@ export default function DocsPage() {
         <a href="/register" className="underline hover:text-[#3B82F6] transition-colors">
           Create an account
         </a>{" "}
-        when you want cloud-managed policies, audit history, and a hosted API key (500 requests/day free).
+        when you want cloud-managed policies, audit history, and a hosted API key (free tier).
       </Callout>
 
       {/* ── Features ── */}
@@ -540,7 +540,7 @@ export default function DocsPage() {
       <ul className="space-y-2.5 text-[15px] mb-14">
         {[
           { href: "/docs/quickstart#zero-setup", label: "Try Lelu locally", desc: "npx -y lelu-mcp start — no account, all on your machine" },
-          { href: "/api-key", label: "Get your API key", desc: "Free account, 500 requests/day on the hosted API" },
+          { href: "/api-key", label: "Get your API key", desc: "Free account for the hosted API and dashboard" },
           { href: "/docs/installation", label: "Installation", desc: "Add Lelu to an existing project" },
           { href: "/docs/quickstart", label: "Quickstart", desc: "Authorize your first agent action" },
           { href: "/docs/concepts/architecture", label: "Architecture", desc: "How Lelu works under the hood" },

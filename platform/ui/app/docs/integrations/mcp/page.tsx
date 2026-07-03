@@ -67,9 +67,10 @@ export default function DocsMCP() {
         </section>
 
         <section>
-          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Using the hosted proxy</h2>
+          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Hosted proxy <span className="text-sm font-medium text-zinc-500 align-middle">(coming soon)</span></h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-            Point your MCP client at the Lelu-managed proxy URL instead of your server directly.
+            A Lelu-managed proxy you point your MCP client at is planned but not yet generally
+            available. Today, use the zero-config local server above or the self-hosted middleware below.
           </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">

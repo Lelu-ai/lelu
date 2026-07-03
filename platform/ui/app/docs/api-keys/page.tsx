@@ -86,7 +86,7 @@ export default function ApiKeysPage() {
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-              Free tier includes <strong>500 requests/day</strong>. Keys look like{" "}
+              The free tier has fair-use limits while Lelu is in beta. Keys look like{" "}
               <code className="font-mono text-[13px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> and are shown
               once at creation — only a hash is stored. Optional expiry can be set when creating a key.
             </div>
@@ -101,7 +101,7 @@ export default function ApiKeysPage() {
               <span className="text-[12px] text-[#737373] font-mono">.env</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
-              LELU_API_KEY=your_64_char_hex_key_here
+              LELU_API_KEY=lelu_sk_...
             </pre>
           </div>
         </section>
@@ -116,7 +116,7 @@ export default function ApiKeysPage() {
           </h2>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
-            Pass the key to <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">createClient</code>. The SDK routes to the cloud engine automatically — no <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> required:
+            The key authenticates requests to the hosted API. With the SDK, point <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> at your engine (self-hosted binary, Docker, or the one lelu-mcp runs for you):
           </p>
 
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
@@ -127,13 +127,14 @@ export default function ApiKeysPage() {
 {`import { createClient } from "lelu-agent-auth";
 
 const lelu = createClient({
+  baseUrl: process.env.LELU_ENGINE_URL ?? "http://localhost:8080",
   apiKey: process.env.LELU_API_KEY,
 });`}
             </pre>
           </div>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-            Or directly via the REST API using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">Authorization: Bearer</code>:
+            Or call the hosted API directly using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">Authorization: Bearer</code>:
           </p>
 
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
@@ -141,10 +142,10 @@ const lelu = createClient({
               <span className="text-[12px] text-[#737373] font-mono">bash</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`curl -X POST https://lelu-ai.com/v1/agent/authorize \\
+{`curl -X POST https://lelu-ai.com/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
-  -d '{"actor":"billing-agent","action":"refund:process","confidence":0.85}'`}
+  -d '{"tool":"refund_payment"}'`}
             </pre>
           </div>
         </section>
@@ -168,9 +169,9 @@ const lelu = createClient({
               </thead>
               <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
                 {[
-                  { prop: "Format", val: "64-character lowercase hex" },
-                  { prop: "Free tier limit", val: "500 requests / day" },
-                  { prop: "Expiration", val: "None (stays active while used)" },
+                  { prop: "Format", val: "lelu_sk_<prefix>_<secret> — shown once, hash-stored" },
+                  { prop: "Free tier limit", val: "Fair-use while in beta" },
+                  { prop: "Expiration", val: "Optional — set an expiry when creating the key" },
                   { prop: "Auth header", val: "Authorization: Bearer <key>" },
                   { prop: "Env variable", val: "LELU_API_KEY" },
                 ].map((r) => (

@@ -15,7 +15,7 @@ INSTALL_DIR="${LELU_INSTALL_DIR:-$HOME/.lelu/bin}"
 case "$(uname -s)" in
   Linux)  OS="linux" ;;
   Darwin) OS="darwin" ;;
-  *) echo "Unsupported OS: $(uname -s). Use Docker instead: docker run ghcr.io/lelu-ai/engine" >&2; exit 1 ;;
+  *) echo "Unsupported OS: $(uname -s). Use Docker instead: docker run ghcr.io/lelu-ai/lelu-engine" >&2; exit 1 ;;
 esac
 
 case "$(uname -m)" in

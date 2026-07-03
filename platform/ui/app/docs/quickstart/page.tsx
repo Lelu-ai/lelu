@@ -84,8 +84,8 @@ export default function DocsQuickStart() {
               >
                 lelu-ai.com/api-key
               </a>{" "}
-              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier includes 500
-              requests/day.
+              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier has fair-use limits
+              while Lelu is in beta.
             </p>
             <div className="ml-[52px]">
               <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500">
@@ -159,7 +159,7 @@ export default function DocsQuickStart() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Pass your API key to <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">createClient</code>. The SDK routes to the live cloud engine automatically — no server to start.
+              The SDK talks to a Lelu engine — the one <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-mcp</code> started for you, a Docker container, or a binary install:
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
@@ -169,43 +169,37 @@ export default function DocsQuickStart() {
 {`import { createClient } from "lelu-agent-auth";
 
 const lelu = createClient({
-  apiKey: process.env.LELU_API_KEY,  // routes to cloud automatically
+  baseUrl: process.env.LELU_ENGINE_URL ?? "http://localhost:8080",
+  apiKey: process.env.LELU_API_KEY,
 });
 
-const decision = await lelu.agentAuthorize({
-  actor: "billing-agent",
-  action: "refund:process",
-  resource: { orderId: "ord_123" },
+const result = await lelu.authorize({
+  tool: "refund_payment",
   context: { confidence: 0.85 },
 });
 
-if (decision.allowed) {
+if (result.decision === "allow") {
   // proceed with the action
-} else if (decision.requiresHumanReview) {
+} else if (result.decision === "human_review") {
   // queued — agent pauses, awaiting human approval
 } else {
-  throw new Error(\`Denied: \${decision.reason}\`);
+  throw new Error(\`Denied: \${result.reason}\`);
 }`}
               </pre>
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
-              Or call the REST API directly:
+              Or try the hosted API directly with your key:
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">bash</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`curl -X POST ${CLOUD_URL}/v1/agent/authorize \\
+{`curl -X POST ${CLOUD_URL}/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
-  -d '{
-    "actor":      "billing-agent",
-    "action":     "refund:process",
-    "resource":   { "orderId": "ord_123" },
-    "confidence": 0.85
-  }'`}
+  -d '{ "tool": "refund_payment" }'`}
               </pre>
             </div>
           </div>
@@ -226,7 +220,7 @@ if (decision.allowed) {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              The engine evaluates the request against your policy and returns one of three outcomes:
+              The hosted API evaluates the request against your policies and returns one of four decisions:
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
@@ -234,24 +228,30 @@ if (decision.allowed) {
               </div>
               <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`{
-  "allowed":              true,
-  "requires_human_review": false,
-  "confidence_used":       0.85,
-  "reason":               "Confidence threshold met",
-  "trace_id":             "tr_7f30c2a4e1b8"
+  "requestId": "req_7f30c2a4e1b8",
+  "tool":      "refund_payment",
+  "decision":  "human_review",
+  "reason":    "Financial operations require a human to approve before execution.",
+  "rule":      "review:financial-ops",
+  "latencyMs": 6,
+  "mode":      "live"
 }`}
               </pre>
             </div>
             <dl className="space-y-3 text-[14px]">
               {[
-                { field: "allowed: true", desc: "Action is permitted — proceed immediately." },
+                { field: 'decision: "allow"', desc: "Action is permitted — proceed immediately." },
                 {
-                  field: "requires_human_review: true",
-                  desc: "Confidence too low — action queued. Agent should poll /v1/queue/pending until approved or denied.",
+                  field: 'decision: "human_review"',
+                  desc: "Action queued for a human. On a self-hosted engine, poll /v1/queue/pending until approved or denied.",
                 },
                 {
-                  field: "allowed: false",
+                  field: 'decision: "deny"',
                   desc: "Blocked by policy — do not proceed. Inspect reason for details.",
+                },
+                {
+                  field: 'decision: "compute"',
+                  desc: "Redirected to a safe alternative — use safeTool and safeArgs instead of the original call.",
                 },
               ].map((r) => (
                 <div key={r.field} className="flex gap-3">

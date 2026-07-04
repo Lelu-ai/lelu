@@ -29,6 +29,19 @@
 
 ---
 
+## What is Lelu?
+
+**Lelu is an open-source authorization engine that sits between your AI agent and the real world.** Before the agent takes any action — issuing a refund, sending an email, deleting a record — it asks Lelu first, and Lelu returns one of four decisions:
+
+- ✅ **`allow`** — the action runs
+- ⛔ **`deny`** — blocked, with a reason
+- 🙋 **`human_review`** — the agent pauses until a human approves
+- 🧪 **`compute`** — redirected to a safer alternative or sandbox
+
+It's one HTTP call from any language or framework, every decision is written to an audit log, and the engine runs entirely on your own machine or infrastructure.
+
+## Why Lelu?
+
 **Give your agent a permission system it can't talk its way around.**
 
 Okta tells you **who can do what**. Lelu tells you **when they're doing it wrong**. Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access — they can't detect when a *legitimately authorized* agent is being manipulated by prompt injection, acting on low confidence, or behaving anomalously. Lelu closes that gap.
@@ -173,6 +186,10 @@ Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20fir
 
 **If Lelu is useful to you, [a ⭐ star](https://github.com/lelu-ai/lelu/stargazers) helps more people find it — and tells us to keep going.**
 
+## Contributors
+
+Thanks to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)) — contributions of any kind are welcome:
+
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable -->
@@ -188,6 +205,10 @@ Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20fir
 <!-- prettier-ignore-end -->
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
+
+<a href="https://github.com/lelu-ai/lelu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lelu-ai/lelu" alt="Contributor avatars" />
+</a>
 
 <a href="https://www.star-history.com/#lelu-ai/lelu&Date">
   <img src="https://api.star-history.com/svg?repos=lelu-ai/lelu&type=Date" alt="Star history chart" width="600" />

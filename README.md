@@ -10,12 +10,22 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/lelu-ai/lelu/stargazers"><img src="https://img.shields.io/github/stars/lelu-ai/lelu?style=flat-square&color=f5c518" alt="GitHub stars" /></a>
   <a href="https://github.com/lelu-ai/lelu/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lelu-ai/lelu/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
   <a href="#contributors"><img src="https://img.shields.io/github/all-contributors/lelu-ai/lelu?style=flat-square&color=ee8449" alt="All Contributors" /></a>
   <a href="https://github.com/lelu-ai/lelu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" /></a>
   <a href="https://pypi.org/project/lelu-agent-auth-sdk/"><img src="https://img.shields.io/pypi/v/lelu-agent-auth-sdk?style=flat-square&label=PyPI" alt="PyPI" /></a>
   <a href="https://www.npmjs.com/package/lelu-agent-auth"><img src="https://img.shields.io/npm/v/lelu-agent-auth?style=flat-square&label=npm" alt="npm" /></a>
   <a href="https://lelu-ai.com/sandbox"><img src="https://img.shields.io/badge/try%20it-sandbox-10b981?style=flat-square" alt="Sandbox" /></a>
+</p>
+
+<p align="center">
+  <a href="https://lelu-ai.com/sandbox"><b>Live Sandbox</b></a> ·
+  <a href="#try-it-in-one-command"><b>One-Command Start</b></a> ·
+  <a href="examples/"><b>Examples</b></a> ·
+  <a href="sdk/mcp"><b>MCP Server</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
+  <a href="https://github.com/lelu-ai/lelu/discussions"><b>Discussions</b></a>
 </p>
 
 <br/>
@@ -28,9 +38,21 @@
 
 ---
 
+**Give your agent a permission system it can't talk its way around.**
+
 Okta tells you **who can do what**. Lelu tells you **when they're doing it wrong**.
 
 Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access. They can't detect when a *legitimately authorized* agent is being manipulated — through prompt injection, low-confidence decisions, or anomalous behavior — into doing something dangerous. Lelu closes that gap.
+
+|  | OPA / Casbin / AWS AVP | **Lelu** |
+|---|:---:|:---:|
+| Role & permission checks | ✅ | ✅ YAML + Rego |
+| Prompt-injection detection | ❌ | ✅ 5-layer filter |
+| LLM confidence gating (verified log-probs) | ❌ | ✅ |
+| Human-in-the-loop pause → approve → resume | ❌ | ✅ Slack / Teams / PagerDuty |
+| Behavioral anomaly & reputation scoring | ❌ | ✅ |
+| Redirect risky actions to a safe alternative | ❌ | ✅ `compute` outcome |
+| Audit log of every decision | partial | ✅ |
 
 <p align="center">
   <a href="https://lelu-ai.com/sandbox">
@@ -44,20 +66,51 @@ Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access. They ca
 
 ## Contents
 
-- [Quickstart](#quickstart)
+- [Try it in one command](#try-it-in-one-command)
+- [Quickstart (SDK)](#quickstart-sdk)
 - [Run it locally in 60 seconds](#run-it-locally-in-60-seconds)
 - [Install](#install)
 - [How it works](#how-it-works)
+- [Examples](#examples)
 - [Agent identity](#agent-identity)
 - [OAuth Token Vault](#oauth-token-vault)
 - [NHI Inventory (ISPM)](#nhi-inventory-ispm)
 - [Self-hosting](#self-hosting)
 - [Architecture](#architecture)
+- [FAQ](#faq)
 - [Contributing](#contributing)
 
 ---
 
-## Quickstart
+## Try it in one command
+
+No account, no Docker, no config — the real engine runs on your machine:
+
+```bash
+npx -y lelu-mcp start
+```
+
+Give **Claude Code** guardrails right now:
+
+```bash
+claude mcp add lelu -- npx -y lelu-mcp start --transport stdio
+```
+
+Or **Claude Desktop / Cursor** (`claude_desktop_config.json` / `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "lelu": { "command": "npx", "args": ["-y", "lelu-mcp", "start", "--transport", "stdio"] }
+  }
+}
+```
+
+Your agent now gets a `lelu_agent_authorize` tool: destructive actions are denied, payments and outbound email go to human review, production writes are redirected to a sandbox, and everything else is default-denied. Edit `~/.lelu/policy.yaml` to change the rules. Details → [sdk/mcp](sdk/mcp)
+
+---
+
+## Quickstart (SDK)
 
 ```typescript
 import { createClient } from "lelu-agent-auth";
@@ -146,6 +199,19 @@ Every agent action flows through a layered pipeline:
 
 ---
 
+## Examples
+
+| Example | What it shows |
+|---|---|
+| [quickstart](examples/quickstart) | The real engine on SQLite, one request per outcome, live prompt-injection catch |
+| [crewai](examples/crewai) | Gate CrewAI tool calls — a prompt-injected refund agent gets stopped |
+| [bedrock](examples/bedrock) | Gate Amazon Bedrock agents on the model's *own verified* confidence |
+| [agentgateway](examples/agentgateway) | Lelu as the decision brain behind agentgateway (ext-authz PEP) |
+
+SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp)
+
+---
+
 ## Agent identity
 
 - Stable UUID per agent, survives deployments and API key rotations
@@ -209,15 +275,63 @@ audit log         HITL queue → Slack/Teams/PagerDuty
 
 ---
 
+## FAQ
+
+<details>
+<summary><b>Is it really free?</b></summary>
+
+Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start` or Docker. The hosted sandbox at lelu-ai.com is just a convenience.
+</details>
+
+<details>
+<summary><b>Can't the agent just lie about its confidence?</b></summary>
+
+No. Production engines only accept **verified** confidence signals — token log-probs read from the LLM provider (OpenAI, some Bedrock model families), never a number the agent self-reports. When no verified signal exists (e.g. Anthropic Claude exposes no log-probs), the engine applies its `MissingSignalMode` policy instead of trusting a fabricated score.
+</details>
+
+<details>
+<summary><b>Does this replace OPA / Casbin / my IAM?</b></summary>
+
+No — it sits on top. Lelu evaluates OPA/Rego and YAML policies as one step of its pipeline, then adds what those tools can't see: prompt-injection detection, confidence gating, behavioral anomaly scoring, and a human-review queue.
+</details>
+
+<details>
+<summary><b>What happens when a decision is <code>human_review</code>?</b></summary>
+
+The agent pauses, a reviewer gets pinged (Slack / Teams / PagerDuty), and the action resumes or dies with their verdict. Every decision — including the human's — lands in the audit log.
+</details>
+
+<details>
+<summary><b>Which frameworks does it work with?</b></summary>
+
+OpenAI, Anthropic, LangChain, LangGraph, CrewAI, Vercel AI SDK, and any MCP host (Claude Code, Claude Desktop, Cursor). It's one HTTP call — if your agent can `POST`, it works.
+</details>
+
+---
+
 ## Contributing
 
-MIT licensed. PRs welcome.
+Lelu is MIT licensed and built in the open — contributions of every size are welcome, from a typo fix to a new framework integration.
+
+**Where help is most wanted right now:**
+
+- 🔌 **Framework integrations** — LangChain, OpenAI Agents SDK, LlamaIndex, AutoGen middleware ([details](CONTRIBUTING.md#high-priority--framework-integrations))
+- 📜 **Rego policy templates** — SOC 2, HIPAA, GDPR patterns alongside [config/auth.rego](config/auth.rego)
+- ⚡ **Engine performance** — help push decision latency to p99 < 5ms
+- 📚 **Docs & examples** — add your framework to [examples/](examples/)
+
+**Getting started:**
 
 ```bash
 git clone https://github.com/lelu-ai/lelu
-cd lelu/platform/ui && npm install && npm run dev   # dashboard
+cd lelu && docker compose up -d                      # engine + UI + Redis + Postgres
 cd lelu/engine && go test ./...                      # engine tests
+cd lelu/platform/ui && npm install && npm run dev    # dashboard
 ```
+
+Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20first%20issue), grab a [`help wanted`](https://github.com/lelu-ai/lelu/labels/help%20wanted) task, or start a thread in [Discussions](https://github.com/lelu-ai/lelu/discussions). Full guide → [CONTRIBUTING.md](CONTRIBUTING.md)
+
+**If Lelu is useful to you, [a ⭐ star](https://github.com/lelu-ai/lelu/stargazers) helps more people find it — and tells us to keep going.**
 
 ---
 
@@ -241,7 +355,19 @@ Thanks to these wonderful people ([emoji key](https://allcontributors.org/docs/e
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
+<a href="https://github.com/lelu-ai/lelu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lelu-ai/lelu" alt="Contributor avatars" />
+</a>
+
 This project follows the [all-contributors](https://allcontributors.org) specification.
+
+---
+
+## Star history
+
+<a href="https://www.star-history.com/#lelu-ai/lelu&Date">
+  <img src="https://api.star-history.com/svg?repos=lelu-ai/lelu&type=Date" alt="Star history chart" width="600" />
+</a>
 
 ---
 

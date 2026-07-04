@@ -210,10 +210,6 @@ Thanks to these wonderful people ([emoji key](https://allcontributors.org/docs/e
   <img src="https://contrib.rocks/image?repo=lelu-ai/lelu" alt="Contributor avatars" />
 </a>
 
-<a href="https://www.star-history.com/#lelu-ai/lelu&Date">
-  <img src="https://api.star-history.com/svg?repos=lelu-ai/lelu&type=Date" alt="Star history chart" width="600" />
-</a>
-
 ---
 
 MIT © [Lelu](https://lelu-ai.com)

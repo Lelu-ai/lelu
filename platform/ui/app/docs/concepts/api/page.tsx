@@ -87,7 +87,7 @@ export default function DocsConceptApi() {
               <span className="text-xs text-zinc-500 font-mono">Engine authorize example</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-              {`curl -X POST https://lelu-ai.com/v1/authorize \
+              {`curl -X POST http://localhost:8080/v1/authorize \
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{

@@ -14,6 +14,19 @@ export default function ApiKeysPage() {
         </p>
       </div>
 
+      <div className="flex gap-3 p-4 rounded-md bg-blue-50 dark:bg-blue-900/10 border-l-[3px] border-blue-500 mb-10">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 shrink-0 mt-0.5">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 16v-4M12 8h.01" />
+        </svg>
+        <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
+          <strong>Running Lelu locally? You don&apos;t need an account or a key from this site.</strong>{" "}
+          <code className="font-mono text-[12px] px-1 py-0.5 bg-white dark:bg-[#141416] border border-blue-200 dark:border-blue-800/40 rounded">npx -y lelu-mcp start</code>{" "}
+          handles auth automatically, and a self-hosted engine accepts any <code className="font-mono text-[12px] px-1 py-0.5 bg-white dark:bg-[#141416] border border-blue-200 dark:border-blue-800/40 rounded">API_KEY</code> you choose at startup.
+          The keys on this page are only for the <strong>hosted engine</strong> at lelu-ai.com.
+        </div>
+      </div>
+
       <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
 
       <div className="space-y-14">
@@ -42,7 +55,7 @@ export default function ApiKeysPage() {
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-              Free tier includes <strong>500 requests/day</strong> with no expiration. Keys are 64-character hex strings — no prefix, no environment suffix.
+              Free tier includes <strong>500 requests/day</strong> with no expiration. Keys look like <code className="font-mono text-[12px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> — the secret is shown once at creation and only a hash is stored.
             </div>
           </div>
 
@@ -55,7 +68,7 @@ export default function ApiKeysPage() {
               <span className="text-[12px] text-[#737373] font-mono">.env</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
-              LELU_API_KEY=your_64_char_hex_key_here
+              LELU_API_KEY=lelu_sk_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
             </pre>
           </div>
         </section>
@@ -95,10 +108,10 @@ const lelu = createClient({
               <span className="text-[12px] text-[#737373] font-mono">bash</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`curl -X POST https://lelu-ai.com/v1/agent/authorize \\
+{`curl -X POST https://lelu-ai.com/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
-  -d '{"actor":"billing-agent","action":"refund:process","confidence":0.85}'`}
+  -d '{"tool":"refund_process","context":{"confidence":0.85,"actingFor":"user_42"}}'`}
             </pre>
           </div>
         </section>
@@ -122,7 +135,7 @@ const lelu = createClient({
               </thead>
               <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
                 {[
-                  { prop: "Format", val: "64-character lowercase hex" },
+                  { prop: "Format", val: "lelu_sk_<12-hex-prefix>_<43-char-secret>" },
                   { prop: "Free tier limit", val: "500 requests / day" },
                   { prop: "Expiration", val: "None (stays active while used)" },
                   { prop: "Auth header", val: "Authorization: Bearer <key>" },
@@ -177,7 +190,7 @@ const lelu = createClient({
                 401 unauthorized: invalid or missing API key
               </p>
               <p className="text-[14px] text-[#737373] leading-relaxed">
-                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key is 64 hex characters — make sure you copied it in full.
+                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu_sk_</code> — make sure you copied it in full; it is shown only once at creation. Also check the key wasn&apos;t revoked at lelu-ai.com/api-key.
               </p>
             </div>
             <div>

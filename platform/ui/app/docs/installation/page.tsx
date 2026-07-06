@@ -127,6 +127,7 @@ export default function DocsInstallation() {
                 lelu-ai.com/api-key
               </a>{" "}
               , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier includes 500 requests/day.
+              Running the engine locally instead? Skip this step — a self-hosted engine accepts any <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">API_KEY</code> you choose at startup, no account needed.
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">

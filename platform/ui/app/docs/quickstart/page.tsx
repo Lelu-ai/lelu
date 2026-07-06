@@ -44,6 +44,19 @@ export default function DocsQuickStart() {
               , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier includes 500
               requests/day.
             </p>
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
+              Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
+              runs the engine on your machine, and a self-hosted engine accepts any key you set at startup. See the{" "}
+              <a href="/docs/integrations/mcp" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
+                MCP guide
+              </a>{" "}
+              or{" "}
+              <a href="/docs/installation" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
+                self-hosting
+              </a>
+              .
+            </p>
             <div className="ml-[52px]">
               <div className="flex gap-3 p-4 rounded-md bg-emerald-50 dark:bg-emerald-900/10 border-l-[3px] border-emerald-500">
                 <svg

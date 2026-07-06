@@ -92,6 +92,8 @@ npm install lelu-agent-auth          # TypeScript — or: pip install lelu-agent
 ```typescript
 import { createClient } from "lelu-agent-auth";
 
+// Local engine? Any self-chosen key works (whatever API_KEY you started it with) — no account needed.
+// A lelu_sk_ key from lelu-ai.com is only required for the hosted engine.
 const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
 
 const decision = await lelu.authorize({

@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdminEmail } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -8,7 +8,12 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 401 });
     }
     return NextResponse.json({
-      user: { email: session.email, name: session.name, userId: session.userId },
+      user: {
+        email: session.email,
+        name: session.name,
+        userId: session.userId,
+        isAdmin: isAdminEmail(session.email),
+      },
     });
   } catch (err) {
     console.error("[auth/me]", err);

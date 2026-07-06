@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { resolveUserId } from "@/lib/request-auth";
 import { listPolicies, createPolicy } from "@/lib/policies";
 import { pushPolicyToEngine } from "@/lib/policy-sync";
 
-export async function GET() {
-  const session = await getCurrentUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: NextRequest) {
+  const userId = await resolveUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const policies = await listPolicies(session.userId);
+    const policies = await listPolicies(userId);
     return NextResponse.json({ policies });
   } catch (err) {
     console.error("[policies/GET]", err);
@@ -17,8 +17,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getCurrentUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await resolveUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let body: unknown;
   try { body = await req.json(); } catch {
@@ -36,13 +36,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const policy = await createPolicy(
-      session.userId,
+      userId,
       name.trim(),
       typeof description === "string" ? description.trim() : "",
       Array.isArray(rules) ? rules : [],
     );
 
-    pushPolicyToEngine(session.userId).then((result) => {
+    pushPolicyToEngine(userId).then((result) => {
       if (!result.ok) console.warn("[policies/POST] engine sync failed:", result.error);
     }).catch((err) => console.warn("[policies/POST] engine sync error:", err));
 

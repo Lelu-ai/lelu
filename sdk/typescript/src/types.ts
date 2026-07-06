@@ -2,11 +2,39 @@ import { z } from "zod";
 
 // ─── Request schemas ──────────────────────────────────────────────────────────
 
+/**
+ * Verified confidence signal — raw token-level data from your LLM provider's
+ * response. The engine extracts the score itself, so agents cannot self-report.
+ * Build one with LeluClient.signalFrom.openai(response) / .bedrock(response),
+ * or construct it directly for local models.
+ */
+export const ConfidenceSignalSchema = z.object({
+  provider: z.enum(["openai", "anthropic", "bedrock", "local"]),
+  /** Token log-probs (OpenAI/Bedrock log-prob families). */
+  tokenLogProbs: z.array(z.number()).optional(),
+  /** Token probabilities in [0,1] (Bedrock/local). */
+  tokenProbabilities: z.array(z.number()).optional(),
+  /** Output-distribution entropy (local models). */
+  entropy: z.number().optional(),
+  /** Max entropy used to normalise `entropy` (local models). */
+  entropyMax: z.number().optional(),
+});
+
+export type ConfidenceSignal = z.infer<typeof ConfidenceSignalSchema>;
+
 export const AgentContextSchema = z.object({
   /**
-   * LLM confidence score (0.0–1.0). Omit to let the engine apply its
-   * MissingSignalMode policy (default: deny). Never pass a hardcoded default —
-   * use LeluClient.confidenceFrom to derive from your provider's response.
+   * Verified confidence signal derived from your LLM provider's response.
+   * Preferred over `confidence`: the engine extracts the score from the raw
+   * token data, so it works against production engines with unverified
+   * confidence disabled.
+   */
+  signal: ConfidenceSignalSchema.optional(),
+  /**
+   * Self-reported confidence score (0.0–1.0). Dev-mode only: honored when the
+   * engine runs with CONFIDENCE_ALLOW_UNVERIFIED=true; production engines
+   * ignore it. Prefer `signal`. Omit both to let the engine apply its
+   * MissingSignalMode policy (default: deny).
    */
   confidence: z.number().min(0).max(1).optional(),
   /** User the agent is acting on behalf of */

@@ -30,8 +30,14 @@ export async function ensureSchema(): Promise<void> {
       email          TEXT UNIQUE NOT NULL,
       password_hash  TEXT NOT NULL,
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_login_at  TIMESTAMPTZ
     )
+  `;
+
+  // Backfill for databases created before last_login_at existed.
+  await sql`
+    ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
   `;
 
   await sql`

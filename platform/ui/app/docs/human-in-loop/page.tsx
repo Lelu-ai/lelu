@@ -154,7 +154,7 @@ export default function DocsHumanInLoop() {
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`# Approve a request (against your engine, e.g. http://localhost:8080)
+                <code>{`# Approve a request
 curl -X POST $LELU_ENGINE_URL/v1/queue/req_12345/approve \\
   -H "Authorization: Bearer YOUR_API_KEY"
 

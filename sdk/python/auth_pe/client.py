@@ -177,6 +177,10 @@ class LeluClient:
             policy_digest=data.get("policy_digest"),
         )
 
+    async def authorize_tool(self, req: AuthorizeRequest) -> AuthDecision:
+        """Alias for :meth:`authorize` kept for tool-wrapper integrations."""
+        return await self.authorize(req)
+
     # ── Agent authorization (backward compat) ─────────────────────────────────
 
     async def agent_authorize(self, req: AgentAuthRequest) -> AgentAuthDecision:

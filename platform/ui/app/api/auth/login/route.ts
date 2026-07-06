@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findUserByEmail, verifyPassword, signJWT, SESSION_COOKIE, cookieOptions } from "@/lib/auth";
+import { findUserByEmail, verifyPassword, signJWT, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
 
 // Constant-time dummy hash to prevent timing-based email enumeration
 const DUMMY_HASH =
@@ -34,6 +34,23 @@ export async function POST(req: NextRequest) {
 
     if (!user || !valid) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    }
+
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email before signing in. Check your inbox for the verification link.",
+          code: "EMAIL_NOT_VERIFIED",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Stamp last login for activity analytics; never block login on this.
+    try {
+      await recordLogin(user.id);
+    } catch (err) {
+      console.error("[auth/login] recordLogin failed", err);
     }
 
     const jwt = signJWT({

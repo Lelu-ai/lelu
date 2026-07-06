@@ -38,10 +38,13 @@ jobs:
             goos: linux
             goarch: arm64
             cgo: "1"
-          - runner: macos-13
+          # Intel macOS runners (macos-13) are retired; cross-compile the
+          # amd64 binary on the arm64 runner via Apple clang's -arch flag.
+          - runner: macos-latest
             goos: darwin
             goarch: amd64
             cgo: "1"
+            cc: "clang -arch x86_64"
           - runner: macos-latest
             goos: darwin
             goarch: arm64
@@ -65,6 +68,7 @@ jobs:
           CGO_ENABLED: ${{ matrix.cgo }}
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc || '' }}
         run: |
           EXT=""
           [ "$GOOS" = "windows" ] && EXT=".exe"

@@ -51,6 +51,7 @@ import {
   type NHIScanResult,
   type NHIStats,
   type ToolOutputScanResult,
+  type ConfidenceSignal,
 } from "./types.js";
 import { agentTracer } from "./observability/tracer.js";
 
@@ -74,7 +75,11 @@ export class LeluClient {
   private readonly timeoutMs: number;
   private readonly apiKey: string | undefined;
 
-  /** Lelu cloud — no self-hosting required. */
+  /**
+   * Lelu platform URL. Serves the platform API (audit via /api/v1/*) — it does
+   * NOT serve the engine's /v1/* endpoints; authorize/tokens/queue calls need a
+   * running engine (self-hosted or the one `npx lelu-mcp` starts for you).
+   */
   static readonly CLOUD_URL = "https://lelu-ai.com";
 
   /**
@@ -146,13 +151,93 @@ export class LeluClient {
     },
   } as const;
 
+  /**
+   * Builds a verified `confidence_signal` from an LLM provider response.
+   * Pass the result as `context.signal` in authorize calls — the engine
+   * extracts the score from the raw token data itself, so this works against
+   * production engines where self-reported confidence is disabled.
+   *
+   * @example
+   * ```ts
+   * const resp = await openai.chat.completions.create({ logprobs: true, ... });
+   * const signal = LeluClient.signalFrom.openai(resp);   // null if no logprobs
+   * const result = await lelu.authorize({
+   *   tool: "refund_payment",
+   *   context: signal ? { signal } : {},                  // omit → MissingSignalMode
+   * });
+   * ```
+   */
+  static readonly signalFrom = {
+    /** OpenAI chat completions with `logprobs: true`. Returns null without logprobs. */
+    openai(
+      response: {
+        choices?: Array<{
+          logprobs?: { content?: Array<{ logprob: number }> | null } | null;
+        }>;
+      }
+    ): ConfidenceSignal | null {
+      const tokens = response?.choices?.[0]?.logprobs?.content;
+      if (!tokens?.length) return null;
+      return { provider: "openai", tokenLogProbs: tokens.map((t) => t.logprob) };
+    },
+
+    /**
+     * Anthropic does not expose token-level log-probs — always returns null.
+     * Omit the signal and let the engine's MissingSignalMode decide.
+     */
+    anthropic(_response: unknown): null {
+      return null;
+    },
+
+    /**
+     * Amazon Bedrock model families that expose token-level data (e.g. Cohere
+     * `token_likelihoods`, or a raw `logprobs` array). Returns null when the
+     * model exposes none (notably Anthropic Claude on Bedrock).
+     */
+    bedrock(
+      response: {
+        generations?: Array<{
+          token_likelihoods?: Array<{ likelihood: number }> | null;
+        } | null> | null;
+        logprobs?: number[];
+      }
+    ): ConfidenceSignal | null {
+      const logprobs =
+        response?.logprobs ??
+        response?.generations?.[0]?.token_likelihoods?.map((t) => t.likelihood);
+      if (!logprobs?.length) return null;
+      return { provider: "bedrock", tokenLogProbs: logprobs };
+    },
+
+    /** Local models: pass token probabilities in [0,1], or entropy (+ max). */
+    local(
+      data: { tokenProbabilities?: number[]; entropy?: number; entropyMax?: number }
+    ): ConfidenceSignal | null {
+      if (data.tokenProbabilities?.length) {
+        return { provider: "local", tokenProbabilities: data.tokenProbabilities };
+      }
+      if (data.entropy !== undefined) {
+        return {
+          provider: "local",
+          entropy: data.entropy,
+          ...(data.entropyMax !== undefined ? { entropyMax: data.entropyMax } : {}),
+        };
+      }
+      return null;
+    },
+  } as const;
+
   constructor(cfg: ClientConfig = {}) {
     const envBaseUrl =
       typeof process !== "undefined" && process.env
         ? process.env["LELU_BASE_URL"]
         : undefined;
 
-    const defaultUrl = cfg.apiKey ? LeluClient.CLOUD_URL : "http://localhost:8080";
+    // Engine endpoints (/v1/*) are only served by a Lelu engine — the
+    // hosted platform does not proxy them yet, so an apiKey alone must not
+    // silently target the cloud. Set baseUrl (or LELU_BASE_URL) explicitly
+    // to point anywhere other than a local engine.
+    const defaultUrl = "http://localhost:8080";
 
     this.baseUrl = (cfg.baseUrl ?? envBaseUrl ?? defaultUrl).replace(/\/$/, "");
     this.timeoutMs = cfg.timeoutMs ?? 5_000;
@@ -177,6 +262,16 @@ export class LeluClient {
 
     const body: Record<string, unknown> = { action: validated.tool };
     if (validated.actor)               body.actor       = validated.actor;
+    if (ctx?.signal) {
+      const sig = ctx.signal;
+      body.confidence_signal = {
+        provider: sig.provider,
+        ...(sig.tokenLogProbs      ? { token_logprobs:      sig.tokenLogProbs      } : {}),
+        ...(sig.tokenProbabilities ? { token_probabilities: sig.tokenProbabilities } : {}),
+        ...(sig.entropy    !== undefined ? { entropy:     sig.entropy    } : {}),
+        ...(sig.entropyMax !== undefined ? { entropy_max: sig.entropyMax } : {}),
+      };
+    }
     if (ctx?.confidence !== undefined) body.confidence = ctx.confidence;
     if (ctx?.actingFor)                body.acting_for = ctx.actingFor;
     if (ctx?.scope)                    body.scope       = ctx.scope;

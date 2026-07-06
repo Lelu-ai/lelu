@@ -94,7 +94,12 @@ export function verifyPassword(password: string, stored: string): boolean {
 
 // ── User management ───────────────────────────────────────────────────────────
 
-export async function createUser(name: string, email: string, password: string): Promise<User> {
+export async function createUser(
+  name: string,
+  email: string,
+  password: string,
+  opts: { emailVerified?: boolean } = {}
+): Promise<User> {
   await ensureSchema();
   const sql = db();
   const norm = email.toLowerCase().trim();
@@ -107,13 +112,13 @@ export async function createUser(name: string, email: string, password: string):
     name: name.trim(),
     email: norm,
     passwordHash: hashPassword(password),
-    emailVerified: true,
+    emailVerified: opts.emailVerified ?? false,
     createdAt: new Date().toISOString(),
   };
 
   await sql`
     INSERT INTO lelu_users (id, name, email, password_hash, email_verified, created_at)
-    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, TRUE, NOW())
+    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, ${user.emailVerified}, NOW())
   `;
 
   return user;
@@ -141,6 +146,11 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 export async function markEmailVerified(userId: string): Promise<void> {
   const sql = db();
   await sql`UPDATE lelu_users SET email_verified = TRUE WHERE id = ${userId}`;
+}
+
+export async function recordLogin(userId: string): Promise<void> {
+  const sql = db();
+  await sql`UPDATE lelu_users SET last_login_at = NOW() WHERE id = ${userId}`;
 }
 
 // ── Email verification tokens ─────────────────────────────────────────────────
@@ -243,4 +253,29 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
   } catch {
     return null;
   }
+}
+
+// ── Admin access ──────────────────────────────────────────────────────────────
+// Allowlist of emails permitted to see the internal analytics dashboard.
+// Configure via ADMIN_EMAILS (comma-separated); falls back to the owner account.
+const DEFAULT_ADMIN_EMAILS = ["abenezerg@lelu-ai.com"];
+
+export function adminEmails(): string[] {
+  const raw = process.env.ADMIN_EMAILS;
+  const list = raw
+    ? raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+    : DEFAULT_ADMIN_EMAILS;
+  return list;
+}
+
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return adminEmails().includes(email.toLowerCase().trim());
+}
+
+/** Returns the current session only if it belongs to an admin, else null. */
+export async function getAdminUser(): Promise<SessionPayload | null> {
+  const session = await getCurrentUser();
+  if (!session || !isAdminEmail(session.email)) return null;
+  return session;
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createUser } from "@/lib/auth";
+import { createUser, createVerificationToken, markEmailVerified } from "@/lib/auth";
+import { emailConfigured, sendVerificationEmail } from "@/lib/email";
 
 const NAME_RE = /^[a-zA-Z\s'\-.]{2,80}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -30,8 +31,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Password too long" }, { status: 400 });
   }
 
+  // Without a configured email provider a verification link could never arrive,
+  // so the account is created pre-verified instead of locking the user out.
+  const requiresVerification = emailConfigured();
+
+  let userId: string;
+  let userName: string;
+  let userEmail: string;
   try {
-    await createUser(name.trim(), email.trim(), password);
+    const user = await createUser(name.trim(), email.trim(), password, {
+      emailVerified: !requiresVerification,
+    });
+    userId = user.id;
+    userName = user.name;
+    userEmail = user.email;
   } catch (err: unknown) {
     if (err instanceof Error && err.message === "EMAIL_TAKEN") {
       return NextResponse.json(
@@ -43,5 +56,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Registration failed. Please try again." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true }, { status: 201 });
+  if (requiresVerification) {
+    try {
+      const token = await createVerificationToken(userId);
+      await sendVerificationEmail(userEmail, userName, token);
+    } catch (err) {
+      // The account exists but the email never left — verify it directly rather
+      // than stranding the user behind a link they'll never receive.
+      console.error("[auth/register] verification email failed:", err);
+      try {
+        await markEmailVerified(userId);
+      } catch (markErr) {
+        console.error("[auth/register] markEmailVerified fallback failed:", markErr);
+      }
+      return NextResponse.json({ ok: true, requiresVerification: false }, { status: 201 });
+    }
+  }
+
+  return NextResponse.json({ ok: true, requiresVerification }, { status: 201 });
 }

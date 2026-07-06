@@ -116,6 +116,7 @@ type Handler struct {
 	extAuditor     *confidence.ExternalAuditor
 	confScorer     *confidence.Scorer
 	confEscalator  *confidence.Escalator
+	confCalibrator *confidence.GateCalibrator // calibrate stage: raw score → calibrated confidence
 
 	// OAuth Token Vault
 	vaultSvc *vault.Service
@@ -318,22 +319,23 @@ func New(
 	}
 
 	return &Handler{
-		eval:      eval,
-		tokenSvc:  tokenSvc,
-		confGate:  confGate,
-		riskModel: newRiskModel(NewRiskConfigFromEnv()),
-		actorStat: newActorStats(),
-		audit:     auditWriter,
-		queue:     q,
-		apiKey:    apiKey,
-		confCfg:   confCfg.withDefaults(),
-		mode:      mode,
-		shadow:    newShadowStats(),
-		incident:  incidentNotifier,
-		anomaly:   newAnomalyTracker(5, 60*time.Second),
-		rateLimit: rl,
-		fallback:  fb,
-		tracer:    tracer,
+		eval:           eval,
+		tokenSvc:       tokenSvc,
+		confGate:       confGate,
+		confCalibrator: confidence.NewGateCalibrator(),
+		riskModel:      newRiskModel(NewRiskConfigFromEnv()),
+		actorStat:      newActorStats(),
+		audit:          auditWriter,
+		queue:          q,
+		apiKey:         apiKey,
+		confCfg:        confCfg.withDefaults(),
+		mode:           mode,
+		shadow:         newShadowStats(),
+		incident:       incidentNotifier,
+		anomaly:        newAnomalyTracker(5, 60*time.Second),
+		rateLimit:      rl,
+		fallback:       fb,
+		tracer:         tracer,
 
 		// Phase 1: Enhanced Observability
 		agentTracer:    agentTracer,
@@ -830,9 +832,16 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		return agentDecisionResult{}, true
 	}
 
-	// 1. Confidence gate with timing
+	// 1. Confidence gate with timing.
+	// Pipeline (paper Fig. 1): extract → calibrate → gate. Calibrate maps the
+	// raw score to a calibrated confidence learned from human-review outcomes; it
+	// is a no-op (returns the raw score) until the calibrator has been fitted, so
+	// this never changes behavior until real ground-truth data exists. The raw
+	// score continues to flow to analytics and the review queue so calibrator
+	// feedback trains on raw confidences, not already-calibrated ones.
 	confStart := time.Now()
-	confDec, err := h.confGate.Evaluate(r.Context(), confidenceScore, nil)
+	calibratedScore := h.confCalibrator.Calibrate(confidenceScore)
+	confDec, err := h.confGate.Evaluate(r.Context(), calibratedScore, nil)
 	confLatency := ms(confStart)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
@@ -1586,7 +1595,8 @@ func (h *Handler) evaluateTraceForSimulator(ctx context.Context, eval *evaluator
 			return simulatorDecision{}, err
 		}
 
-		confDec, err := h.confGate.Evaluate(ctx, confidenceScore, nil)
+		// extract → calibrate → gate (no-op until the calibrator is fitted).
+		confDec, err := h.confGate.Evaluate(ctx, h.confCalibrator.Calibrate(confidenceScore), nil)
 		if err != nil {
 			return simulatorDecision{}, err
 		}
@@ -1900,6 +1910,16 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Capture the flagged action's confidence before resolving so the calibrate
+	// stage can train on this real reviewer outcome (approved ⇒ the action was
+	// safe). This is the ground-truth feedback the calibration layer relies on.
+	var rawConfidence float64
+	haveConfidence := false
+	if item, gerr := h.queue.Get(r.Context(), id); gerr == nil {
+		rawConfidence = item.ConfidenceScore
+		haveConfidence = true
+	}
+
 	var err error
 	if approve {
 		err = h.queue.Approve(r.Context(), id, req.ResolvedBy, req.Note)
@@ -1909,6 +1929,9 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if haveConfidence {
+		h.confCalibrator.RecordReview(rawConfidence, approve)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
 }

@@ -30,6 +30,50 @@ export default function ApiKeysPage() {
       <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
 
       <div className="space-y-14">
+        {/* Key types */}
+        <section>
+          <h2
+            id="key-types"
+            className="text-[22px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-4"
+          >
+            Key types
+          </h2>
+          <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
+            Lelu has three kinds of keys. Only one of them requires an account — testing never does.
+          </p>
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm overflow-x-auto">
+            <table className="w-full text-[14px]">
+              <thead>
+                <tr className="bg-[#F5F5F4] dark:bg-[#141416] text-left">
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Key</th>
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Account?</th>
+                  <th className="px-4 py-2.5 font-semibold text-[#0A0A0A] dark:text-white">Where it works</th>
+                </tr>
+              </thead>
+              <tbody className="text-[#737373]">
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_local_…</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3">
+                    Generated automatically by <code className="font-mono text-[13px]">npx lelu-mcp</code> for
+                    the local engine on your machine. Stored in <code className="font-mono text-[13px]">~/.lelu/engine.key</code>; you never handle it.
+                  </td>
+                </tr>
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_sandbox_…</td>
+                  <td className="px-4 py-3">No</td>
+                  <td className="px-4 py-3">Hosted API in demo mode — try decisions without signing up.</td>
+                </tr>
+                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                  <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_…</td>
+                  <td className="px-4 py-3">Yes</td>
+                  <td className="px-4 py-3">Hosted API with your own policies, revocation, expiry, and audit history.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         {/* Get a key */}
         <section>
           <h2
@@ -55,7 +99,9 @@ export default function ApiKeysPage() {
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-              Free tier includes <strong>500 requests/day</strong> with no expiration. Keys look like <code className="font-mono text-[12px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> — the secret is shown once at creation and only a hash is stored.
+              The free tier has fair-use limits while Lelu is in beta. Keys look like{" "}
+              <code className="font-mono text-[13px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> and are shown
+              once at creation — only a hash is stored. Optional expiry can be set when creating a key.
             </div>
           </div>
 
@@ -68,7 +114,7 @@ export default function ApiKeysPage() {
               <span className="text-[12px] text-[#737373] font-mono">.env</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
-              LELU_API_KEY=lelu_sk_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+              LELU_API_KEY=lelu_sk_...
             </pre>
           </div>
         </section>
@@ -83,7 +129,7 @@ export default function ApiKeysPage() {
           </h2>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
-            Pass the key to <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">createClient</code>. The SDK routes to the cloud engine automatically — no <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> required:
+            The key authenticates requests to the hosted API. With the SDK, point <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> at your engine (self-hosted binary, Docker, or the one lelu-mcp runs for you):
           </p>
 
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
@@ -94,13 +140,14 @@ export default function ApiKeysPage() {
 {`import { createClient } from "lelu-agent-auth";
 
 const lelu = createClient({
+  baseUrl: process.env.LELU_ENGINE_URL ?? "http://localhost:8080",
   apiKey: process.env.LELU_API_KEY,
 });`}
             </pre>
           </div>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-            Or directly via the REST API using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">Authorization: Bearer</code>:
+            Or call the hosted API directly using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">Authorization: Bearer</code>:
           </p>
 
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
@@ -111,7 +158,7 @@ const lelu = createClient({
 {`curl -X POST https://lelu-ai.com/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
-  -d '{"tool":"refund_process","context":{"confidence":0.85,"actingFor":"user_42"}}'`}
+  -d '{"tool":"refund_payment"}'`}
             </pre>
           </div>
         </section>
@@ -135,9 +182,9 @@ const lelu = createClient({
               </thead>
               <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
                 {[
-                  { prop: "Format", val: "lelu_sk_<12-hex-prefix>_<43-char-secret>" },
-                  { prop: "Free tier limit", val: "500 requests / day" },
-                  { prop: "Expiration", val: "None (stays active while used)" },
+                  { prop: "Format", val: "lelu_sk_<prefix>_<secret> — shown once, hash-stored" },
+                  { prop: "Free tier limit", val: "Fair-use while in beta" },
+                  { prop: "Expiration", val: "Optional — set an expiry when creating the key" },
                   { prop: "Auth header", val: "Authorization: Bearer <key>" },
                   { prop: "Env variable", val: "LELU_API_KEY" },
                 ].map((r) => (
@@ -190,7 +237,7 @@ const lelu = createClient({
                 401 unauthorized: invalid or missing API key
               </p>
               <p className="text-[14px] text-[#737373] leading-relaxed">
-                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu_sk_</code> — make sure you copied it in full; it is shown only once at creation. Also check the key wasn&apos;t revoked at lelu-ai.com/api-key.
+                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu_sk_</code> and is shown only once at creation — make sure you copied it in full.
               </p>
             </div>
             <div>

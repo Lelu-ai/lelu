@@ -21,6 +21,20 @@ sdk/typescript/dist/
 platform/ui/node_modules/
 platform/ui/.next/
 
+# Benchmark dataset cache (downloaded on demand, never commit)
+benchmark/.dataset/
+benchmark/RESULTS.json
+
+# LaTeX build artifacts
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+paper/main.pdf
+paper/build.log
+
 # Python
 sdk/python/__pycache__/
 sdk/python/*.egg-info/

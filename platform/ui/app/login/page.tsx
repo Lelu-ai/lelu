@@ -18,19 +18,24 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [notVerified, setNotVerified] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sending" | "sent">("idle");
 
   const verified = params.get("verified") === "1";
   const registered = params.get("registered") === "1";
+  const verifyPending = params.get("verify") === "1";
   const reset = params.get("reset") === "1";
   const queryError = params.get("error");
   const queryErrorMsg =
     queryError === "token_expired"
-      ? "Verification link has expired. Please register again."
+      ? "Verification link has expired. Enter your email below and resend it."
       : queryError === "invalid_token"
       ? "Invalid verification link."
       : queryError === "verification_failed"
       ? "Email verification failed. Please try again."
       : null;
+
+  const showResend = notVerified || queryError === "token_expired";
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -45,6 +50,10 @@ function LoginForm() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Login failed");
+        if (data.code === "EMAIL_NOT_VERIFIED") {
+          setNotVerified(true);
+          setResendState("idle");
+        }
         return;
       }
       router.push(next);
@@ -53,6 +62,21 @@ function LoginForm() {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function resendVerification() {
+    if (!email.trim() || resendState === "sending") return;
+    setResendState("sending");
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResendState("sent");
+    } catch {
+      setResendState("idle");
     }
   }
 
@@ -65,6 +89,8 @@ function LoginForm() {
           </svg>
           {reset
             ? "Password updated! Sign in with your new password."
+            : registered && verifyPending
+            ? "Account created! Check your inbox for a verification link before signing in."
             : registered
             ? "Account created! Sign in to continue."
             : "Email verified! You can now sign in."}
@@ -78,6 +104,26 @@ function LoginForm() {
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
           {error || queryErrorMsg}
+        </div>
+      )}
+      {showResend && (
+        <div className="px-3.5 py-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200/70 dark:border-amber-800/40 text-[13px] text-amber-700 dark:text-amber-400">
+          {resendState === "sent" ? (
+            "Verification email sent — check your inbox."
+          ) : (
+            <>
+              Didn&apos;t get the email?{" "}
+              <button
+                type="button"
+                onClick={resendVerification}
+                disabled={!email.trim() || resendState === "sending"}
+                className="font-semibold underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resendState === "sending" ? "Sending…" : "Resend verification link"}
+              </button>
+              {!email.trim() && " (enter your email above first)"}
+            </>
+          )}
         </div>
       )}
 

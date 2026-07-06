@@ -10,6 +10,7 @@ import { FaGithub } from "react-icons/fa6";
 interface User {
   name: string;
   email: string;
+  isAdmin?: boolean;
 }
 
 const NAV_LINKS = [
@@ -168,6 +169,7 @@ export function SiteNav() {
                     <div className="py-1">
                       {[
                         { label: "Dashboard", href: "/dashboard" },
+                        ...(user.isAdmin ? [{ label: "Admin Analytics", href: "/admin" }] : []),
                         { label: "Agent Registry", href: "/agents" },
                         { label: "NHI Security", href: "/nhi" },
                         { label: "API Keys", href: "/api-key" },

@@ -59,6 +59,17 @@ function smtpTransporter(): Transporter | null {
   return _transporter;
 }
 
+// True when at least one delivery provider is configured. Callers use this to
+// decide whether email-dependent flows (verification) can actually complete.
+export function emailConfigured(): boolean {
+  return Boolean(
+    process.env.SES_REGION ||
+      process.env.AWS_SES_REGION ||
+      process.env.RESEND_API_KEY ||
+      (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS)
+  );
+}
+
 async function send(to: string, subject: string, html: string): Promise<void> {
   // Priority: SES → Resend → SMTP → skip. The HTTPS providers (SES, Resend)
   // come first because Vercel/serverless blocks outbound SMTP; SMTP is only for
@@ -100,9 +111,11 @@ async function send(to: string, subject: string, html: string): Promise<void> {
 export async function sendPasswordResetEmail(
   to: string,
   name: string,
-  token: string
+  token: string,
+  baseUrl?: string
 ): Promise<void> {
-  const link = `${BASE_URL}/reset-password?token=${token}`;
+  const base = baseUrl ?? BASE_URL;
+  const link = `${base}/reset-password?token=${token}`;
   const firstName = name.split(" ")[0];
 
   await send(
@@ -170,9 +183,11 @@ export async function sendPasswordResetEmail(
 export async function sendVerificationEmail(
   to: string,
   name: string,
-  token: string
+  token: string,
+  baseUrl?: string
 ): Promise<void> {
-  const link = `${BASE_URL}/api/auth/verify-email?token=${token}`;
+  const base = baseUrl ?? BASE_URL;
+  const link = `${base}/api/auth/verify-email?token=${token}`;
   const firstName = name.split(" ")[0];
 
   await send(

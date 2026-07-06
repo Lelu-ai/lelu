@@ -224,7 +224,7 @@ const lelu = createClient({
                 401 unauthorized: invalid or missing API key
               </p>
               <p className="text-[14px] text-[#737373] leading-relaxed">
-                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key is 64 hex characters — make sure you copied it in full.
+                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu_sk_</code> and is shown only once at creation — make sure you copied it in full.
               </p>
             </div>
             <div>

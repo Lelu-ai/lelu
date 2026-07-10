@@ -40,13 +40,13 @@ export default function ActorsPage() {
             Actor identifiers
           </h2>
           <p className="text-[15px] text-[#737373] leading-[1.7] mb-5">
-            Pass any stable string as the <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">actor</code> field.
+            Pass any stable string as the <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">actor</code> field.
             Conventional formats that work well:
           </p>
           <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden mb-6">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#141416]">
+                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#0D0E13]">
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Format</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Example</th>
                 </tr>
@@ -59,7 +59,7 @@ export default function ActorsPage() {
                   ["Service account", "svc:data-pipeline"],
                   ["Sub-agent", "parent-agent/child-agent"],
                 ].map(([format, example], i) => (
-                  <tr key={format} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0B0B0C]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
+                  <tr key={format} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0A0B10]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
                     <td className="px-4 py-3 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">{format}</td>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{example}</td>
                   </tr>
@@ -74,11 +74,11 @@ export default function ActorsPage() {
             Using actors in policies
           </h2>
           <p className="text-[15px] text-[#737373] leading-[1.7] mb-4">
-            Inside a Rego policy the actor is available as <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">input.actor</code>.
+            Inside a Rego policy the actor is available as <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">input.actor</code>.
           </p>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A]">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`allow {
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`allow {
   input.actor == "billing-agent"
   input.action == "refund:process"
   input.context.confidence >= 0.9
@@ -95,7 +95,7 @@ deny {
           <Link href="/docs/concepts/actions" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:opacity-80 transition-opacity">
             Next: Actions →
           </Link>
-          <Link href="/docs/concepts/decisions" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors">
+          <Link href="/docs/concepts/decisions" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors">
             Decisions
           </Link>
         </section>

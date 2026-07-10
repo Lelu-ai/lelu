@@ -14,7 +14,7 @@ export default function DecisionsPage() {
           Decisions
         </h1>
         <p className="text-[15px] text-[#737373] leading-relaxed">
-          Every call to <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded">agentAuthorize</code> returns
+          Every call to <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded">agentAuthorize</code> returns
           a decision object your agent uses to branch its behavior.
         </p>
       </div>
@@ -28,8 +28,8 @@ export default function DecisionsPage() {
             Decision shape
           </h2>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] mb-6">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`interface Decision {
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`interface Decision {
   allowed: boolean;
   requiresHumanReview: boolean;
   reason?: string;       // policy-provided explanation
@@ -42,7 +42,7 @@ export default function DecisionsPage() {
           <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#141416]">
+                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#0D0E13]">
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Field</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Type</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Description</th>
@@ -57,7 +57,7 @@ export default function DecisionsPage() {
                   ["decisionId", "string", "Unique identifier for this evaluation, usable in audit queries"],
                   ["evaluatedAt", "string", "ISO-8601 timestamp of when the decision was made"],
                 ].map(([field, type, desc], i) => (
-                  <tr key={field as string} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0B0B0C]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
+                  <tr key={field as string} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0A0B10]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{field}</td>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#737373]">{type}</td>
                     <td className="px-4 py-3 text-[13px] text-[#737373]">{desc}</td>
@@ -73,8 +73,8 @@ export default function DecisionsPage() {
             Branching on a decision
           </h2>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A]">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`const decision = await lelu.agentAuthorize({
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`const decision = await lelu.agentAuthorize({
   actor: "billing-agent",
   action: "refund:process",
   resource: "order/ord_abc123",
@@ -114,7 +114,7 @@ if (decision.allowed) {
               <li key={row.n} className="flex items-start gap-3 text-[14px]">
                 <span className="flex-none w-6 h-6 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[12px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">{row.n}</span>
                 <span>
-                  <code className="text-[12px] font-mono font-bold text-[#0A0A0A] dark:text-[#E4E4E7] bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded">{row.label}</code>
+                  <code className="text-[12px] font-mono font-bold text-[#0A0A0A] dark:text-[#E4E4E7] bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded">{row.label}</code>
                   <span className="text-[#737373] ml-2">{row.desc}</span>
                 </span>
               </li>
@@ -126,7 +126,7 @@ if (decision.allowed) {
           <Link href="/docs/concepts/api" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:opacity-80 transition-opacity">
             Next: Agent Authorize API →
           </Link>
-          <Link href="/docs/concepts/policies" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors">
+          <Link href="/docs/concepts/policies" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors">
             ← Policies
           </Link>
         </section>

@@ -73,7 +73,7 @@ export function SiteNav() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/80 dark:bg-[#0B0B0C]/90 backdrop-blur-md">
+      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/80 dark:bg-[#0A0B10]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-4">
 
           {/* Logo */}
@@ -119,7 +119,7 @@ export function SiteNav() {
 
             {/* Auth: loading skeleton */}
             {user === "loading" && (
-              <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#141416] animate-pulse" />
+              <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#0D0E13] animate-pulse" />
             )}
 
             {/* Auth: logged out */}
@@ -220,13 +220,13 @@ export function SiteNav() {
 
       {/* Mobile dropdown menu */}
       {mobileOpen && (
-        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0B0B0C] border-b border-[#E7E5E4] dark:border-[#27272A] shadow-md md:hidden">
+        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#27272A] shadow-md md:hidden">
           <nav className="flex flex-col px-4 py-3 gap-0.5">
             {NAV_LINKS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors"
+                className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors"
               >
                 {item.name}
               </Link>
@@ -236,13 +236,13 @@ export function SiteNav() {
               href="https://github.com/lelu-ai/lelu"
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors flex items-center gap-2"
+              className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors flex items-center gap-2"
             >
               <FaGithub className="h-4 w-4" /> GitHub
             </a>
             {user === null && (
               <>
-                <Link href="/login" className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors">
+                <Link href="/login" className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors">
                   Sign in
                 </Link>
                 <Link href="/register" className="mx-3 mt-1 py-2.5 text-[14px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md text-center hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">

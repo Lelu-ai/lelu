@@ -73,7 +73,7 @@ const WHAT_WE_BUILT = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10]">
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-16">
 
         {/* ── Header ─────────────────────────────────────────────────── */}

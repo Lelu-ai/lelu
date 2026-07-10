@@ -93,7 +93,7 @@ const CodeShowcase = () => {
             </div>
 
             {/* Language tabs */}
-            <div className="flex border-b border-[#E7E5E4] dark:border-[#222224] overflow-x-auto scrollbar-hide bg-[#F5F5F4] dark:bg-[#141416]">
+            <div className="flex border-b border-[#E7E5E4] dark:border-[#222224] overflow-x-auto scrollbar-hide bg-[#F5F5F4] dark:bg-[#0D0E13]">
               {langs.map((l) => (
                 <button
                   key={l.id}
@@ -111,7 +111,7 @@ const CodeShowcase = () => {
             </div>
 
             {/* Code content */}
-            <pre className="p-5 text-[12.5px] leading-relaxed font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto scrollbar-hide max-h-[340px] bg-[#F5F5F4] dark:bg-[#0B0B0C]">
+            <pre className="p-5 text-[12.5px] leading-relaxed font-mono text-zinc-700 dark:text-zinc-300 overflow-x-auto scrollbar-hide max-h-[340px] bg-[#F5F5F4] dark:bg-[#0A0B10]">
               <code>{codeSnippets[activeLang]}</code>
             </pre>
           </motion.div>

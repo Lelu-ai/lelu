@@ -40,7 +40,7 @@ export function UserMenu() {
 
   if (pathname === "/login" || pathname === "/register") return null;
 
-  if (user === "loading") return <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#141416] animate-pulse" />;
+  if (user === "loading") return <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#0D0E13] animate-pulse" />;
 
   if (!user) {
     return (

@@ -261,7 +261,7 @@ function SandboxContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10]">
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"
         style={{
@@ -616,7 +616,7 @@ function SandboxContent() {
 
 export default function SandboxPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10]" />}>
       <SandboxContent />
     </Suspense>
   );

@@ -27,7 +27,7 @@ const QuickstartStrip = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: i * 0.1 }}
-            className="rounded-lg border border-[#E7E5E4] dark:border-[#222224] bg-[#F5F5F4] dark:bg-[#141416] p-4"
+            className="rounded-lg border border-[#E7E5E4] dark:border-[#222224] bg-[#F5F5F4] dark:bg-[#0D0E13] p-4"
           >
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-[10px] font-mono text-zinc-300 dark:text-zinc-600">

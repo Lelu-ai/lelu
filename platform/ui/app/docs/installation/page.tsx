@@ -72,19 +72,19 @@ export default function DocsInstallation() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
+              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
             </p>
 
             {/* Tabbed package manager */}
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4 relative">
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 {(["npm", "pnpm", "yarn", "bun"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setPkgTab(t)}
                     className={`px-2.5 py-1 text-[12px] rounded transition-colors ${
                       pkgTab === t
-                        ? "bg-white dark:bg-[#0B0B0C] text-[#0A0A0A] dark:text-white font-medium border border-[#E7E5E4] dark:border-[#27272A]"
+                        ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white font-medium border border-[#E7E5E4] dark:border-[#27272A]"
                         : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white"
                     }`}
                   >
@@ -92,14 +92,14 @@ export default function DocsInstallation() {
                   </button>
                 ))}
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
                 {pkgCmd[pkgTab]}
               </pre>
               <CopyBtn text={pkgCmd[pkgTab]} id="pkg" />
             </div>
 
             <p className="text-[14px] text-[#737373]">
-              Supports Node.js 18+. TypeScript types are included — no separate <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">@types</code> package needed.
+              Supports Node.js 18+. TypeScript types are included — no separate <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">@types</code> package needed.
             </p>
           </div>
         </section>
@@ -130,14 +130,14 @@ export default function DocsInstallation() {
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file:
+              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file:
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">.env</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
                 LELU_API_KEY=your_key_here
               </pre>
               <CopyBtn text="LELU_API_KEY=your_key_here" id="env" />
@@ -150,7 +150,7 @@ export default function DocsInstallation() {
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-                Never commit your API key to version control. Add <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> to <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.gitignore</code>.
+                Never commit your API key to version control. Add <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> to <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.gitignore</code>.
               </p>
             </div>
           </div>
@@ -175,10 +175,10 @@ export default function DocsInstallation() {
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">lib/lelu.ts</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`import { createClient } from "lelu-agent-auth";
 
 export const lelu = createClient({
@@ -197,10 +197,10 @@ export const lelu = createClient({
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`import { lelu } from "@/lib/lelu";
 
 const decision = await lelu.agentAuthorize({
@@ -288,14 +288,14 @@ if (decision.allowed) {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              If you need to run the engine on your own infrastructure, pass a <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> to the client or set the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_BASE_URL</code> environment variable:
+              If you need to run the engine on your own infrastructure, pass a <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> to the client or set the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_BASE_URL</code> environment variable:
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`const lelu = createClient({
   baseUrl: "https://your-engine.example.com",
   apiKey: process.env.LELU_API_KEY,
@@ -309,10 +309,10 @@ if (decision.allowed) {
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">.env</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
 {`LELU_BASE_URL=https://your-engine.example.com
 LELU_API_KEY=your_key_here`}
               </pre>
@@ -322,14 +322,14 @@ LELU_API_KEY=your_key_here`}
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               To run the engine on your machine with no account and no Docker, install the
               static binary — it downloads from GitHub Releases into{" "}
-              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/bin</code>:
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/bin</code>:
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
 {`curl -sSL https://raw.githubusercontent.com/Lelu-ai/lelu/main/scripts/install.sh | sh`}
               </pre>
               <CopyBtn text={`curl -sSL https://raw.githubusercontent.com/Lelu-ai/lelu/main/scripts/install.sh | sh`} id="install-sh" />
@@ -337,7 +337,7 @@ LELU_API_KEY=your_key_here`}
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               Using an MCP host (Claude Code, Claude Desktop, Cursor)? Skip the install
-              entirely — <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
+              entirely — <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
               downloads and runs the engine for you. See the{" "}
               <a
                 href="/docs/integrations/mcp"
@@ -353,10 +353,10 @@ LELU_API_KEY=your_key_here`}
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                 <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
 {`git clone https://github.com/lelu-ai/lelu.git
 cd lelu
 docker-compose up -d`}
@@ -401,7 +401,7 @@ docker-compose up -d`}
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-[13px]">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                  <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
                     <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Situation</th>
                     <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Engine used</th>
                   </tr>
@@ -413,7 +413,7 @@ docker-compose up -d`}
                     { sit: "baseUrl passed to createClient", eng: "That URL" },
                     { sit: "No apiKey, no env var, no baseUrl", eng: "http://localhost:8080 (self-hosted dev)" },
                   ].map((row) => (
-                    <tr key={row.sit} className="bg-white dark:bg-[#0B0B0C]">
+                    <tr key={row.sit} className="bg-white dark:bg-[#0A0B10]">
                       <td className="px-4 py-2.5 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{row.sit}</td>
                       <td className="px-4 py-2.5 text-[#737373]">{row.eng}</td>
                     </tr>

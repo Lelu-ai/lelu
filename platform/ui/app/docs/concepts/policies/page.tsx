@@ -34,7 +34,7 @@ export default function PoliciesConceptPage() {
             </a>{" "}
             — the same language as Open Policy Agent — for its policy engine. Policies are
             stored server-side, versioned, and evaluated on every{" "}
-            <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">agentAuthorize</code> call.
+            <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">agentAuthorize</code> call.
             Your application code never needs to change when policy rules change.
           </p>
         </section>
@@ -76,8 +76,8 @@ export default function PoliciesConceptPage() {
             Policy structure
           </h2>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A]">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`package lelu
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`package lelu
 
 # Allow billing agent to process small refunds with high confidence
 allow {
@@ -110,7 +110,7 @@ deny {
           <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#141416]">
+                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#0D0E13]">
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Field</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Type</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Description</th>
@@ -124,7 +124,7 @@ deny {
                   ["input.context", "object", "Arbitrary key-value metadata including confidence"],
                   ["input.context.confidence", "number", "0.0–1.0 confidence score from the agent"],
                 ].map(([field, type, desc], i) => (
-                  <tr key={field as string} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0B0B0C]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
+                  <tr key={field as string} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0A0B10]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{field}</td>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#737373]">{type}</td>
                     <td className="px-4 py-3 text-[13px] text-[#737373]">{desc}</td>
@@ -139,7 +139,7 @@ deny {
           <Link href="/docs/concepts/decisions" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:opacity-80 transition-opacity">
             Next: Decisions →
           </Link>
-          <Link href="/docs/concepts/resources" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors">
+          <Link href="/docs/concepts/resources" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors">
             ← Resources
           </Link>
         </section>

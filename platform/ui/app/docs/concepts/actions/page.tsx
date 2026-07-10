@@ -29,7 +29,7 @@ export default function ActionsPage() {
           <p className="text-[15px] text-[#737373] leading-[1.7]">
             Actions are arbitrary strings that describe what an agent is about to do. They carry no
             implicit semantics — your policies define what each action means. A common convention is
-            to use a <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">resource:verb</code> format,
+            to use a <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">resource:verb</code> format,
             but any consistent scheme works.
           </p>
         </section>
@@ -41,7 +41,7 @@ export default function ActionsPage() {
           <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden mb-6">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#141416]">
+                <tr className="border-b border-[#E7E5E4] dark:border-[#27272A] bg-[#F5F5F4] dark:bg-[#0D0E13]">
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Style</th>
                   <th className="px-4 py-3 text-[12px] font-semibold tracking-[0.04em] uppercase text-[#737373]">Examples</th>
                 </tr>
@@ -53,7 +53,7 @@ export default function ActionsPage() {
                   ["dotted path", "billing.refund.process"],
                   ["free-form", "send_customer_email"],
                 ].map(([style, examples], i) => (
-                  <tr key={style} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0B0B0C]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
+                  <tr key={style} className={`border-b border-[#E7E5E4] dark:border-[#27272A] last:border-0 ${i % 2 === 0 ? "bg-white dark:bg-[#0A0B10]" : "bg-[#FAFAFA] dark:bg-[#0D0D0F]"}`}>
                     <td className="px-4 py-3 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{style}</td>
                     <td className="px-4 py-3 text-[13px] text-[#737373]">{examples}</td>
                   </tr>
@@ -61,7 +61,7 @@ export default function ActionsPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex gap-3 p-4 rounded-md bg-[#F5F5F4] dark:bg-[#141416] border-l-[3px] border-[#0A0A0A] dark:border-white text-[13px] text-[#737373]">
+          <div className="flex gap-3 p-4 rounded-md bg-[#F5F5F4] dark:bg-[#0D0E13] border-l-[3px] border-[#0A0A0A] dark:border-white text-[13px] text-[#737373]">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5 text-[#0A0A0A] dark:text-white"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Pick one convention and stick with it across your entire policy set. Mixed formats make
             wildcard rules harder to write.
@@ -73,8 +73,8 @@ export default function ActionsPage() {
             Passing an action
           </h2>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A]">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`const decision = await lelu.agentAuthorize({
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">TypeScript</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`const decision = await lelu.agentAuthorize({
   actor: "billing-agent",
   action: "refund:process",       // <-- the action
   resource: "order/ord_abc123",
@@ -88,11 +88,11 @@ export default function ActionsPage() {
             Matching actions in policies
           </h2>
           <p className="text-[15px] text-[#737373] leading-[1.7] mb-4">
-            Use <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#141416] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">input.action</code> in Rego to match exactly or with prefix checks.
+            Use <code className="text-[13px] font-mono bg-[#F5F5F4] dark:bg-[#0D0E13] px-1.5 py-0.5 rounded text-[#0A0A0A] dark:text-[#E4E4E7]">input.action</code> in Rego to match exactly or with prefix checks.
           </p>
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A]">
-            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
-            <pre className="p-5 bg-white dark:bg-[#0B0B0C] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`# Exact match
+            <div className="px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A] text-[11px] font-semibold text-[#737373] tracking-[0.06em] uppercase">policy.rego</div>
+            <pre className="p-5 bg-white dark:bg-[#0A0B10] text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">{`# Exact match
 allow {
   input.action == "refund:process"
 }
@@ -114,7 +114,7 @@ require_human_review {
           <Link href="/docs/concepts/resources" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:opacity-80 transition-opacity">
             Next: Resources →
           </Link>
-          <Link href="/docs/concepts/actors" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors">
+          <Link href="/docs/concepts/actors" className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium border border-[#E7E5E4] dark:border-[#27272A] text-[#0A0A0A] dark:text-white rounded-md hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors">
             ← Actors
           </Link>
         </section>

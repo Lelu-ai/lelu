@@ -3,7 +3,7 @@
 export function AskAIPill() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded-full shadow-md hover:shadow-lg transition-shadow text-sm font-medium text-[#0A0A0A] dark:text-white">
+      <button className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded-full shadow-md hover:shadow-lg transition-shadow text-sm font-medium text-[#0A0A0A] dark:text-white">
         <svg
           width="14"
           height="14"

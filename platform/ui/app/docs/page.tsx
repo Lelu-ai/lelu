@@ -39,7 +39,7 @@ function CodeBlock({
   return (
     <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] mb-8 text-sm">
       {/* Tab strip */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -47,7 +47,7 @@ function CodeBlock({
             className={[
               "px-2.5 py-1 text-[12px] font-medium rounded transition-colors",
               active === tab
-                ? "bg-white dark:bg-[#0B0B0C] text-[#0A0A0A] dark:text-white border border-[#E7E5E4] dark:border-[#27272A]"
+                ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white border border-[#E7E5E4] dark:border-[#27272A]"
                 : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white",
             ].join(" ")}
           >
@@ -56,7 +56,7 @@ function CodeBlock({
         ))}
       </div>
       {/* Code area */}
-      <div className="relative bg-[#F5F5F4] dark:bg-[#0B0B0C] p-4">
+      <div className="relative bg-[#F5F5F4] dark:bg-[#0A0B10] p-4">
         <pre className="font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
           {code[active]}
         </pre>
@@ -231,6 +231,9 @@ export default function DocsPage() {
     <div className="w-full">
       {/* ── Title block ── */}
       <div className="mb-8">
+        <span className="inline-block mb-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[#737373] dark:text-[#8B8D98] font-mono">
+          Documentation
+        </span>
         <div className="flex items-start justify-between gap-4 mb-3">
           <h1
             id="introduction"
@@ -278,7 +281,7 @@ export default function DocsPage() {
 
       <Callout type="tip">
         Free to start — no account needed. Run{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
           npx -y lelu-mcp start
         </code>{" "}
         to get a policy-gated engine on your machine in one command.{" "}
@@ -372,7 +375,7 @@ export default function DocsPage() {
           Write authorization rules in Rego that branch on the AI's self-reported certainty. A high-confidence
           action is allowed; a borderline one routes to a human. No binary allow/deny.
         </p>
-        <div className="mt-4 rounded-md bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] p-4 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">
+        <div className="mt-4 rounded-md bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] p-4 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">
           <div className="mb-1">
             <span className="text-rose-600 dark:text-rose-400">allow</span>{" "}
             <span className="text-[#737373">{"{"}</span>
@@ -427,27 +430,27 @@ export default function DocsPage() {
       </h2>
       <p className="text-[15px] text-[#737373] leading-relaxed mb-6">
         Lelu runs as a sidecar or standalone service. Your agents make a single{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
           POST /v1/agent/authorize
         </code>{" "}
         call before every tool invocation. The engine evaluates your Rego policies — sub-50ms — and
         returns{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
           allow
         </code>
         ,{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
           deny
         </code>
         , or{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
           require_approval
         </code>
         .
       </p>
 
       <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden mb-14">
-        <div className="bg-[#F5F5F4] dark:bg-[#141416] p-5 space-y-2 text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7]">
+        <div className="bg-[#F5F5F4] dark:bg-[#0D0E13] p-5 space-y-2 text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7]">
           <div className="flex items-center gap-2">
             <span className="text-[#737373]">AI Agent</span>
             <span className="flex-1 border-t border-dashed border-[#E7E5E4] dark:border-[#27272A]" />

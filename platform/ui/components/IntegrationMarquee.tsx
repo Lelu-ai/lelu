@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { marqueeRow1, marqueeRow2 } from "@/data";
 
 const Pill = ({ label }: { label: string }) => (
-  <span className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#141416] text-[13px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap select-none mx-1.5">
+  <span className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#0D0E13] text-[13px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap select-none mx-1.5">
     {label}
   </span>
 );

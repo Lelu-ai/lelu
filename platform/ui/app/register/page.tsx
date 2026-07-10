@@ -64,7 +64,7 @@ export default function RegisterPage() {
     "w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all";
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0A0B10]">
       {/* Subtle grid background */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"

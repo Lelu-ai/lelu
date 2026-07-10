@@ -208,7 +208,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-screen flex flex-col bg-[#FAFAFA] dark:bg-[#0A0B10]">
       {/* Subtle grid background */}
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.06]"

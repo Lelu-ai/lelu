@@ -383,13 +383,13 @@ export default function ApiKeyPage() {
         />
       )}
 
-      <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C] pt-24 md:pt-32 pb-20 px-4">
+      <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10] pt-24 md:pt-32 pb-20 px-4">
         <div className="max-w-2xl mx-auto">
 
           {/* Header */}
           <div className="flex items-start justify-between mb-10 gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#141416] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#0D0E13] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-5">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#0A0A0A] dark:bg-white" />
                 API Keys
               </div>
@@ -496,7 +496,7 @@ if (!decision.allowed) throw new Error(decision.reason);`}</pre>
                 </Link>
                 <Link
                   href="/docs"
-                  className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-[13px] font-medium hover:bg-zinc-50 dark:hover:bg-[#141416] transition-colors"
+                  className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-[13px] font-medium hover:bg-zinc-50 dark:hover:bg-[#0D0E13] transition-colors"
                 >
                   View examples
                 </Link>

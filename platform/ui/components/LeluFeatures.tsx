@@ -38,7 +38,7 @@ const LeluFeatures = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.07 }}
-              className="group relative bg-[#FAFAFA] dark:bg-[#0B0B0C] p-6 flex flex-col gap-4 hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors duration-200"
+              className="group relative bg-[#FAFAFA] dark:bg-[#0A0B10] p-6 flex flex-col gap-4 hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors duration-200"
             >
               <span className="text-xs font-mono text-zinc-300 dark:text-zinc-600 tracking-widest">
                 {feat.num}

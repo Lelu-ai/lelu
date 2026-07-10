@@ -342,6 +342,15 @@ export default function HomePage() {
             Authorization that lives <strong>inside your agent</strong>. Confidence-aware, policy-driven, and built to scale — from weekend AI projects to production agent swarms.
           </p>
 
+          {/* How it works — animated flow */}
+          <img
+            src="/lelu-flow.svg"
+            alt="Agents built with LangChain, CrewAI, Claude Code (MCP), or plain REST call Lelu and receive allow, deny, human_review, or compute decisions — every decision written to the audit log"
+            width={760}
+            height={330}
+            className="w-full h-auto rounded-xl mb-10"
+          />
+
           {/* Code block with tabs */}
           <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] mb-10">
             <div className="flex items-center justify-between px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
@@ -381,6 +390,16 @@ export default function HomePage() {
               {CODE[codeTab]}
             </pre>
           </div>
+
+          {/* Zero-config local engine — animated terminal */}
+          <p className="text-[11px] font-bold tracking-[0.1em] uppercase text-[#A3A3A3] mb-4">Try it in one command</p>
+          <img
+            src="/lelu-terminal.svg"
+            alt="Terminal demo: npx -y lelu-mcp start launches the zero-config local engine, then a curl to /v1/agent/authorize asking to delete_all_records is denied by policy"
+            width={760}
+            height={272}
+            className="w-full h-auto rounded-xl mb-10"
+          />
 
           {/* Divider */}
           <div className="border-t border-[#E7E5E4] dark:border-[#27272A] mb-10" />

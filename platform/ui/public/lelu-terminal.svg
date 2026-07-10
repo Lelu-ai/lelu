@@ -1,0 +1,101 @@
+<svg width="760" height="272" viewBox="0 0 760 272" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lt-title lt-desc">
+  <title id="lt-title">Lelu terminal demo</title>
+  <desc id="lt-desc">Terminal session: npx -y lelu-mcp start launches the zero-config local engine, then a curl call to /v1/agent/authorize asking to delete_all_records is denied by policy.</desc>
+
+  <style>
+    .tm      { font: 400 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #E4E4E7; }
+    .tm-dim  { font: 400 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #9A9AA3; }
+    .tm-bar  { font: 400 11px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: #6B6B76; }
+    .p  { fill: #10B981; }
+    .tag{ fill: #06B6D4; }
+
+    .grow1 { transform-box: fill-box; transform-origin: left center; animation: lt-w1 18s linear infinite; }
+    .grow2 { transform-box: fill-box; transform-origin: left center; animation: lt-w2 18s linear infinite; }
+    .grow3 { transform-box: fill-box; transform-origin: left center; animation: lt-w3 18s linear infinite; }
+    .grow4 { transform-box: fill-box; transform-origin: left center; animation: lt-w4 18s linear infinite; }
+    .cm1 { animation: lt-m1 18s linear infinite; }
+    .cm2 { animation: lt-m2 18s linear infinite; }
+    .cm3 { animation: lt-m3 18s linear infinite; }
+    .cm4 { animation: lt-m4 18s linear infinite; }
+    .cg1 { animation: lt-cg1 18s linear infinite; }
+    .cg2 { animation: lt-cg2 18s linear infinite; }
+    .cg3 { animation: lt-cg3 18s linear infinite; }
+    .cg4 { animation: lt-cg4 18s linear infinite; }
+    .o1 { animation: lt-o1 18s linear infinite; }
+    .o2 { animation: lt-o2 18s linear infinite; }
+    .o3 { animation: lt-o3 18s linear infinite; }
+    .o4 { animation: lt-o4 18s linear infinite; }
+    .o5 { animation: lt-o5 18s linear infinite; }
+    .blink { animation: lt-blink 1.1s steps(1) infinite; }
+
+    @keyframes lt-w1 { 0%, 2.8% { transform: scaleX(0); } 12.8%, 100% { transform: scaleX(1); } }
+    @keyframes lt-w2 { 0%, 28.9% { transform: scaleX(0); } 37.8%, 100% { transform: scaleX(1); } }
+    @keyframes lt-w3 { 0%, 37.8% { transform: scaleX(0); } 45.6%, 100% { transform: scaleX(1); } }
+    @keyframes lt-w4 { 0%, 45.6% { transform: scaleX(0); } 54.4%, 100% { transform: scaleX(1); } }
+
+    @keyframes lt-m1 { 0%, 2.8% { transform: translateX(0); } 12.8%, 100% { transform: translateX(152px); } }
+    @keyframes lt-m2 { 0%, 28.9% { transform: translateX(0); } 37.8%, 100% { transform: translateX(310px); } }
+    @keyframes lt-m3 { 0%, 37.8% { transform: translateX(0); } 45.6%, 100% { transform: translateX(303px); } }
+    @keyframes lt-m4 { 0%, 45.6% { transform: translateX(0); } 54.4%, 100% { transform: translateX(541px); } }
+
+    @keyframes lt-cg1 { 0% { opacity: 1; } 13.3%, 100% { opacity: 0; } }
+    @keyframes lt-cg2 { 0%, 27.5% { opacity: 0; } 27.8% { opacity: 1; } 38.1%, 100% { opacity: 0; } }
+    @keyframes lt-cg3 { 0%, 38.1% { opacity: 0; } 38.4% { opacity: 1; } 45.9%, 100% { opacity: 0; } }
+    @keyframes lt-cg4 { 0%, 45.9% { opacity: 0; } 46.2% { opacity: 1; } 55%, 100% { opacity: 0; } }
+
+    @keyframes lt-o1 { 0%, 15.6% { opacity: 0; } 16.2%, 100% { opacity: 1; } }
+    @keyframes lt-o2 { 0%, 22.2% { opacity: 0; } 22.8%, 100% { opacity: 1; } }
+    @keyframes lt-o3 { 0%, 27.8% { opacity: 0; } 28.4%, 100% { opacity: 1; } }
+    @keyframes lt-o4 { 0%, 58.9% { opacity: 0; } 59.5%, 100% { opacity: 1; } }
+    @keyframes lt-o5 { 0%, 64% { opacity: 0; } 64.6%, 100% { opacity: 1; } }
+
+    @keyframes lt-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .grow1, .grow2, .grow3, .grow4, .cm1, .cm2, .cm3, .cm4, .cg1, .cg2, .cg3, .cg4, .o1, .o2, .o3, .o4, .o5, .blink { animation: none; }
+    }
+  </style>
+
+  <defs>
+    <clipPath id="lt-c1"><rect x="38" y="52" width="152" height="19" class="grow1"/></clipPath>
+    <clipPath id="lt-c2"><rect x="38" y="138" width="310" height="19" class="grow2"/></clipPath>
+    <clipPath id="lt-c3"><rect x="53" y="160" width="303" height="19" class="grow3"/></clipPath>
+    <clipPath id="lt-c4"><rect x="53" y="182" width="541" height="19" class="grow4"/></clipPath>
+  </defs>
+
+  <!-- window -->
+  <rect x="0.5" y="0.5" width="759" height="271" rx="14" fill="#0A0A0E" stroke="#26262E"/>
+  <path d="M0.5 14.5 a14 14 0 0 1 14 -14 h731 a14 14 0 0 1 14 14 v21.5 h-759 Z" fill="#131318"/>
+  <line x1="0.5" y1="36" x2="759.5" y2="36" stroke="#26262E"/>
+  <circle cx="26" cy="18" r="5" fill="#EF4444" opacity="0.7"/>
+  <circle cx="44" cy="18" r="5" fill="#F59E0B" opacity="0.7"/>
+  <circle cx="62" cy="18" r="5" fill="#10B981" opacity="0.7"/>
+  <text x="380" y="22" class="tm-bar" text-anchor="middle">lelu — zero-config local engine</text>
+
+  <!-- $ npx -y lelu-mcp start -->
+  <text x="24" y="66" class="tm"><tspan class="p">$</tspan></text>
+  <text x="38" y="66" class="tm" clip-path="url(#lt-c1)">npx -y lelu-mcp start</text>
+  <g class="cg1" opacity="0"><rect x="39" y="55" width="7" height="14" fill="#D4D4D8" class="cm1"/></g>
+
+  <!-- engine output -->
+  <text x="24" y="88" class="tm-dim o1" opacity="1"><tspan class="tag">[lelu-mcp]</tspan> First run: downloading Lelu engine…</text>
+  <text x="24" y="110" class="tm-dim o2" opacity="1"><tspan class="tag">[lelu-mcp]</tspan> Local Lelu engine ready on http://localhost:8082 (policy: ~/.lelu/policy.yaml)</text>
+
+  <!-- curl command -->
+  <text x="24" y="152" class="tm o3" opacity="1"><tspan class="p">$</tspan></text>
+  <text x="38" y="152" class="tm" clip-path="url(#lt-c2)">curl -s localhost:8082/v1/agent/authorize \</text>
+  <g class="cg2" opacity="0"><rect x="39" y="141" width="7" height="14" fill="#D4D4D8" class="cm2"/></g>
+  <text x="53" y="174" class="tm" clip-path="url(#lt-c3)">-H "Authorization: Bearer $LELU_API_KEY" \</text>
+  <g class="cg3" opacity="0"><rect x="54" y="163" width="7" height="14" fill="#D4D4D8" class="cm3"/></g>
+  <text x="53" y="196" class="tm" clip-path="url(#lt-c4)">-d '{"actor":"support-bot","action":"delete_all_records","confidence":0.92}'</text>
+  <g class="cg4" opacity="0"><rect x="54" y="185" width="7" height="14" fill="#D4D4D8" class="cm4"/></g>
+
+  <!-- response -->
+  <text x="24" y="224" class="tm-dim o4" opacity="1">{"allowed": <tspan fill="#EF4444" font-weight="600">false</tspan>, "reason": <tspan fill="#F59E0B">"destructive action blocked by policy"</tspan>, "trace_id": "tr_7f3a9c"}</text>
+
+  <!-- idle prompt -->
+  <g class="o5" opacity="1">
+    <text x="24" y="250" class="tm"><tspan class="p">$</tspan></text>
+    <rect x="39" y="239" width="7" height="14" fill="#D4D4D8" class="blink"/>
+  </g>
+</svg>

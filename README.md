@@ -77,6 +77,10 @@ No account, no Docker, no config — the real engine runs on your machine:
 npx -y lelu-mcp start
 ```
 
+<p align="center">
+  <img src="docs/assets/lelu-terminal.svg" alt="Terminal demo: npx -y lelu-mcp start launches the zero-config local engine, then a curl to /v1/agent/authorize asking to delete_all_records returns allowed: false — blocked by policy" width="760" />
+</p>
+
 Give **Claude Code** guardrails right now:
 
 ```bash

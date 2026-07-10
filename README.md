@@ -40,6 +40,10 @@
 
 It's one HTTP call from any language or framework, every decision is written to an audit log, and the engine runs entirely on your own machine or infrastructure.
 
+<p align="center">
+  <img src="docs/assets/lelu-flow.svg" alt="Animated diagram: an AI agent's tool calls flow through the Lelu authorization engine and receive allow, deny, human_review, or compute decisions — every decision written to the audit log" width="760" />
+</p>
+
 ## Why Lelu?
 
 **Give your agent a permission system it can't talk its way around.**

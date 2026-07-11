@@ -64,8 +64,16 @@ function Mono({ children, className = "" }: { children: React.ReactNode; classNa
   return <span className={`font-mono ${className}`}>{children}</span>;
 }
 
-export default function WorkflowDiagram() {
-  const [scenarioIdx, setScenarioIdx] = useState(0);
+export default function WorkflowDiagram({
+  lock,
+  hideControls = false,
+}: {
+  /** Pin the diagram to one scenario (it replays instead of cycling). */
+  lock?: "legit" | "malicious";
+  /** Hide the scenario toggle and pause button (for embedding in demos). */
+  hideControls?: boolean;
+} = {}) {
+  const [scenarioIdx, setScenarioIdx] = useState(lock === "malicious" ? 1 : 0);
   const [step, setStep] = useState(0); // 0 = nothing yet, 1..steps.length revealed
   const [paused, setPaused] = useState(false);
 
@@ -79,12 +87,12 @@ export default function WorkflowDiagram() {
     const t = setInterval(() => {
       setStep((s) => {
         if (s < total + HOLD_TICKS) return s + 1;
-        setScenarioIdx((i) => (i + 1) % SCENARIOS.length);
+        if (!lock) setScenarioIdx((i) => (i + 1) % SCENARIOS.length);
         return 0;
       });
     }, TICK_MS);
     return () => clearInterval(t);
-  }, [paused, total, scenarioIdx]);
+  }, [paused, total, scenarioIdx, lock]);
 
   function pick(i: number) {
     setScenarioIdx(i);
@@ -106,7 +114,7 @@ export default function WorkflowDiagram() {
       `}</style>
 
       {/* Scenario toggle */}
-      <div className="flex items-center justify-center gap-3 flex-wrap">
+      <div className={`items-center justify-center gap-3 flex-wrap ${hideControls ? "hidden" : "flex"}`}>
         <button
           onClick={() => pick(0)}
           className={`rounded-md border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors ${
@@ -296,7 +304,7 @@ export default function WorkflowDiagram() {
       {/* Pause */}
       <button
         onClick={() => setPaused((p) => !p)}
-        className="mt-5 inline-flex items-center gap-1.5 rounded-md border border-[#E7E5E4] dark:border-white/[0.08] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#8E8E93] dark:text-[#5A5C66] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+        className={`${hideControls ? "hidden" : "inline-flex"} mt-5 items-center gap-1.5 rounded-md border border-[#E7E5E4] dark:border-white/[0.08] px-3 py-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#8E8E93] dark:text-[#5A5C66] hover:text-[#0A0A0A] dark:hover:text-white transition-colors`}
       >
         {paused ? (
           <><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Play</>

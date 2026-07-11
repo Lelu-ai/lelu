@@ -65,7 +65,7 @@ export function SiteNav() {
   }
 
   // Home and auth pages manage their own nav/logo
-  if (pathname === "/" || AUTH_ROUTES.includes(pathname)) return null;
+  if (pathname === "/" || pathname === "/demo" || AUTH_ROUTES.includes(pathname)) return null;
 
   const initials = typeof user === "object" && user
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()

@@ -23,7 +23,7 @@ export default function DocsInstallation() {
   const CopyBtn = ({ text, id }: { text: string; id: string }) => (
     <button
       onClick={() => copy(text, id)}
-      className="absolute top-3 right-3 p-1.5 rounded bg-[#F5F5F4] dark:bg-[#222224] border border-[#E7E5E4] dark:border-[#27272A] hover:bg-[#E7E5E4] dark:hover:bg-[#27272A] transition-colors"
+      className="absolute top-3 right-3 p-1.5 rounded bg-[#F5F5F4] dark:bg-[#20222B] border border-[#E7E5E4] dark:border-[#20222B] hover:bg-[#E7E5E4] dark:hover:bg-[#20222B] transition-colors"
       title="Copy"
     >
       {copied === id ? (
@@ -54,13 +54,13 @@ export default function DocsInstallation() {
         </p>
       </div>
 
-      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+      <hr className="border-[#E7E5E4] dark:border-[#20222B] mb-10" />
 
       <div className="space-y-14">
         {/* Step 1 — Install */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               1
             </div>
             <h2
@@ -72,19 +72,19 @@ export default function DocsInstallation() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
+              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-agent-auth</code> to your project:
             </p>
 
             {/* Tabbed package manager */}
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4 relative">
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-4 relative">
+              <div className="flex items-center gap-1 px-3 py-1.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 {(["npm", "pnpm", "yarn", "bun"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setPkgTab(t)}
                     className={`px-2.5 py-1 text-[12px] rounded transition-colors ${
                       pkgTab === t
-                        ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white font-medium border border-[#E7E5E4] dark:border-[#27272A]"
+                        ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white font-medium border border-[#E7E5E4] dark:border-[#20222B]"
                         : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white"
                     }`}
                   >
@@ -99,7 +99,7 @@ export default function DocsInstallation() {
             </div>
 
             <p className="text-[14px] text-[#737373]">
-              Supports Node.js 18+. TypeScript types are included — no separate <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">@types</code> package needed.
+              Supports Node.js 18+. TypeScript types are included — no separate <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">@types</code> package needed.
             </p>
           </div>
         </section>
@@ -107,7 +107,7 @@ export default function DocsInstallation() {
         {/* Step 2 — API key */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               2
             </div>
             <h2
@@ -130,11 +130,11 @@ export default function DocsInstallation() {
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file:
+              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">.env</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
@@ -150,7 +150,7 @@ export default function DocsInstallation() {
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
               <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-                Never commit your API key to version control. Add <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> to <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.gitignore</code>.
+                Never commit your API key to version control. Add <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> to <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.gitignore</code>.
               </p>
             </div>
           </div>
@@ -159,7 +159,7 @@ export default function DocsInstallation() {
         {/* Step 3 — Configure client */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               3
             </div>
             <h2
@@ -174,8 +174,8 @@ export default function DocsInstallation() {
               Create a shared client instance and import it wherever you need to authorize actions:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">lib/lelu.ts</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
@@ -196,8 +196,8 @@ export const lelu = createClient({
               Then use it anywhere in your app:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
@@ -226,7 +226,7 @@ if (decision.allowed) {
         {/* Step 4 — Done */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               4
             </div>
             <h2
@@ -271,7 +271,7 @@ if (decision.allowed) {
         {/* Self-hosting (advanced) */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center shrink-0 mt-0.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#737373]">
                 <path d="M20 7h-9" />
                 <path d="M14 17H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h9" />
@@ -288,11 +288,11 @@ if (decision.allowed) {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              If you need to run the engine on your own infrastructure, pass a <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> to the client or set the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_BASE_URL</code> environment variable:
+              If you need to run the engine on your own infrastructure, pass a <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">baseUrl</code> to the client or set the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL</code> environment variable:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
@@ -308,8 +308,8 @@ if (decision.allowed) {
               Or without any code change:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">.env</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
@@ -322,11 +322,11 @@ LELU_API_KEY=your_key_here`}
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               To run the engine on your machine with no account and no Docker, install the
               static binary — it downloads from GitHub Releases into{" "}
-              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/bin</code>:
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu/bin</code>:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5 relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
@@ -337,7 +337,7 @@ LELU_API_KEY=your_key_here`}
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               Using an MCP host (Claude Code, Claude Desktop, Cursor)? Skip the install
-              entirely — <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
+              entirely — <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx -y lelu-mcp start</code>{" "}
               downloads and runs the engine for you. See the{" "}
               <a
                 href="/docs/integrations/mcp"
@@ -352,8 +352,8 @@ LELU_API_KEY=your_key_here`}
               To run the engine locally with Docker:
             </p>
 
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm relative">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm relative">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
@@ -380,7 +380,7 @@ docker-compose up -d`}
         {/* URL resolution table */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center shrink-0 mt-0.5">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#737373]">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="16" x2="12" y2="12" />
@@ -398,15 +398,15 @@ docker-compose up -d`}
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               The SDK picks the engine URL automatically:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-[13px]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-[13px]">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                  <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                     <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Situation</th>
                     <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Engine used</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
+                <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#20222B]">
                   {[
                     { sit: "apiKey provided, no baseUrl", eng: "Lelu cloud (GCP)" },
                     { sit: "LELU_BASE_URL env var set", eng: "That URL" },
@@ -426,7 +426,7 @@ docker-compose up -d`}
       </div>
 
       {/* Prev / Next */}
-      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#20222B]">
         <a
           href="/docs/quickstart"
           className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"

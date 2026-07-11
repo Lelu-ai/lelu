@@ -275,7 +275,7 @@ function SandboxContent() {
         {/* Header */}
         <div className="mb-8">
           <p className="text-[12px] text-[#A3A3A3] mb-3">Sandbox</p>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] text-[11px] font-semibold text-[#737373] uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F4F4F5] dark:bg-[#20222B] text-[11px] font-semibold text-[#737373] uppercase tracking-widest mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live — no account required
           </div>
@@ -291,7 +291,7 @@ function SandboxContent() {
             </div>
             <button
               onClick={copyShareLink}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-[#E7E5E4] dark:border-[#27272A] text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:border-[#0A0A0A] dark:hover:border-white transition-colors"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg border border-[#E7E5E4] dark:border-[#20222B] text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:border-[#0A0A0A] dark:hover:border-white transition-colors"
               title="Copy shareable link"
             >
               {copiedShare ? (
@@ -304,7 +304,7 @@ function SandboxContent() {
         </div>
 
         {/* Sandbox API key banner */}
-        <div className="mb-8 bg-[#0A0A0A] dark:bg-[#111113] rounded-xl px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
+        <div className="mb-8 bg-[#0A0A0A] dark:bg-[#0D0E13] rounded-xl px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white">
@@ -346,7 +346,7 @@ function SandboxContent() {
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-all ${
                   activeScenario === i
                     ? "bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] border-transparent"
-                    : "bg-white dark:bg-[#111113] border-[#E7E5E4] dark:border-[#222224] text-[#0A0A0A] dark:text-white hover:border-[#0A0A0A]/30 dark:hover:border-white/20"
+                    : "bg-white dark:bg-[#0D0E13] border-[#E7E5E4] dark:border-[#20222B] text-[#0A0A0A] dark:text-white hover:border-[#0A0A0A]/30 dark:hover:border-white/20"
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
@@ -362,9 +362,9 @@ function SandboxContent() {
           {/* LEFT: Request builder */}
           <div className="space-y-4">
             {/* Request form */}
-            <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
               {/* Method + endpoint */}
-              <div className="flex items-center gap-0 border-b border-[#E7E5E4] dark:border-[#222224] px-4 py-3">
+              <div className="flex items-center gap-0 border-b border-[#E7E5E4] dark:border-[#20222B] px-4 py-3">
                 <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded mr-3 shrink-0">POST</span>
                 <span className="text-[12px] font-mono text-[#737373] truncate">/api/v1/authorize</span>
               </div>
@@ -378,7 +378,7 @@ function SandboxContent() {
                     onChange={(e) => { setTool(e.target.value); setActiveScenario(-1); }}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                     placeholder="e.g. send_email"
-                    className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-[#FAFAFA] dark:bg-[#18181B] text-[#0A0A0A] dark:text-white font-mono text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all"
+                    className="w-full h-10 px-3 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-[#FAFAFA] dark:bg-[#13151C] text-[#0A0A0A] dark:text-white font-mono text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all"
                   />
                 </div>
 
@@ -389,7 +389,7 @@ function SandboxContent() {
                     onChange={(e) => setContext(e.target.value)}
                     placeholder="What is the agent trying to do?"
                     rows={2}
-                    className="w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-[#FAFAFA] dark:bg-[#18181B] text-[#0A0A0A] dark:text-white text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all resize-none"
+                    className="w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-[#FAFAFA] dark:bg-[#13151C] text-[#0A0A0A] dark:text-white text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all resize-none"
                   />
                 </div>
 
@@ -400,7 +400,7 @@ function SandboxContent() {
                     onChange={(e) => { setArgsText(e.target.value); setArgsError(""); }}
                     rows={4}
                     spellCheck={false}
-                    className={`w-full px-3 py-2 rounded-lg border font-mono text-[12px] text-[#0A0A0A] dark:text-white bg-[#FAFAFA] dark:bg-[#18181B] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 transition-all resize-none ${
+                    className={`w-full px-3 py-2 rounded-lg border font-mono text-[12px] text-[#0A0A0A] dark:text-white bg-[#FAFAFA] dark:bg-[#13151C] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 transition-all resize-none ${
                       argsError
                         ? "border-red-300 dark:border-red-800 focus:ring-red-500/10"
                         : "border-[#E7E5E4] dark:border-[#2A2A2C] focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20"
@@ -561,8 +561,8 @@ function SandboxContent() {
                 </div>
               </>
             ) : (
-              <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-10 flex flex-col items-center justify-center text-center min-h-[240px]">
-                <div className="w-12 h-12 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] flex items-center justify-center mb-4">
+              <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-10 flex flex-col items-center justify-center text-center min-h-[240px]">
+                <div className="w-12 h-12 rounded-full bg-[#F4F4F5] dark:bg-[#20222B] flex items-center justify-center mb-4">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#A3A3A3]">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
@@ -574,8 +574,8 @@ function SandboxContent() {
 
             {/* History */}
             {history.length > 0 && (
-              <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#222224]">
+              <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#20222B]">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#A3A3A3]">Request history</span>
                 </div>
                 <div className="divide-y divide-[#F4F4F5] dark:divide-[#1C1C1E]">
@@ -597,7 +597,7 @@ function SandboxContent() {
         </div>
 
         {/* CTA */}
-        <div className="mt-10 bg-[#0A0A0A] dark:bg-[#111113] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="mt-10 bg-[#0A0A0A] dark:bg-[#0D0E13] rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h3 className="text-[18px] font-bold text-white mb-1">Ready to protect your agents?</h3>
             <p className="text-[13px] text-[#737373]">Get a real API key and configure custom policies for your stack.</p>

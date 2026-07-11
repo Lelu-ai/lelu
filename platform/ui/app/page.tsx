@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LeluMark } from "@/components/ui/LeluMark";
 import IntegrationMarquee from "@/components/IntegrationMarquee";
+import WorkflowDiagram from "@/components/WorkflowDiagram";
 
 interface User { name: string; email: string; }
 
@@ -351,6 +352,26 @@ export default function HomePage() {
               <span className="text-[12px] font-medium">{t}</span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── LIVE WORKFLOW ───────────────────────────────────────────── */}
+      <section className="relative px-4 py-16 sm:py-24" aria-label="Live request flow">
+        <div className="mx-auto max-w-6xl">
+          <SectionHead
+            kicker="Inside a request"
+            title="Legitimate requests pass. Attacks don't."
+            sub="Watch a request travel from your agent through Lelu's policy, confidence, and injection checks — and see what happens when a prompt injection tries the same path."
+          />
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.6 }}
+            className="mt-12"
+          >
+            <WorkflowDiagram />
+          </motion.div>
         </div>
       </section>
 

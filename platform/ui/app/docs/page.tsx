@@ -37,9 +37,9 @@ function CodeBlock({
   };
 
   return (
-    <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] mb-8 text-sm">
+    <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] mb-8 text-sm">
       {/* Tab strip */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -47,7 +47,7 @@ function CodeBlock({
             className={[
               "px-2.5 py-1 text-[12px] font-medium rounded transition-colors",
               active === tab
-                ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white border border-[#E7E5E4] dark:border-[#27272A]"
+                ? "bg-white dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-white border border-[#E7E5E4] dark:border-[#20222B]"
                 : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white",
             ].join(" ")}
           >
@@ -180,7 +180,7 @@ function Step({
 }) {
   return (
     <div className="flex gap-5 mb-10">
-      <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+      <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
         {n}
       </div>
       <div className="flex-1 min-w-0">
@@ -270,7 +270,7 @@ export default function DocsPage() {
         </p>
       </div>
 
-      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+      <hr className="border-[#E7E5E4] dark:border-[#20222B] mb-10" />
 
       {/* ── What is Lelu ── */}
       <p className="text-[15px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-[1.7] mb-6">
@@ -281,7 +281,7 @@ export default function DocsPage() {
 
       <Callout type="tip">
         Free to start — no account needed. Run{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           npx -y lelu-mcp start
         </code>{" "}
         to get a policy-gated engine on your machine in one command.{" "}
@@ -375,7 +375,7 @@ export default function DocsPage() {
           Write authorization rules in Rego that branch on the AI's self-reported certainty. A high-confidence
           action is allowed; a borderline one routes to a human. No binary allow/deny.
         </p>
-        <div className="mt-4 rounded-md bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] p-4 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">
+        <div className="mt-4 rounded-md bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] p-4 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">
           <div className="mb-1">
             <span className="text-rose-600 dark:text-rose-400">allow</span>{" "}
             <span className="text-[#737373">{"{"}</span>
@@ -430,30 +430,30 @@ export default function DocsPage() {
       </h2>
       <p className="text-[15px] text-[#737373] leading-relaxed mb-6">
         Lelu runs as a sidecar or standalone service. Your agents make a single{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           POST /v1/agent/authorize
         </code>{" "}
         call before every tool invocation. The engine evaluates your Rego policies — sub-50ms — and
         returns{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           allow
         </code>
         ,{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           deny
         </code>
         , or{" "}
-        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+        <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           require_approval
         </code>
         .
       </p>
 
-      <div className="rounded-lg border border-[#E7E5E4] dark:border-[#27272A] overflow-hidden mb-14">
+      <div className="rounded-lg border border-[#E7E5E4] dark:border-[#20222B] overflow-hidden mb-14">
         <div className="bg-[#F5F5F4] dark:bg-[#0D0E13] p-5 space-y-2 text-[13px] font-mono text-[#0A0A0A] dark:text-[#E4E4E7]">
           <div className="flex items-center gap-2">
             <span className="text-[#737373]">AI Agent</span>
-            <span className="flex-1 border-t border-dashed border-[#E7E5E4] dark:border-[#27272A]" />
+            <span className="flex-1 border-t border-dashed border-[#E7E5E4] dark:border-[#20222B]" />
             <span className="text-[#737373]">→</span>
             <span>POST /v1/agent/authorize</span>
             <span className="text-[#737373]">→</span>
@@ -500,7 +500,7 @@ export default function DocsPage() {
         >
           fastmcp
         </a>
-        . The official MCP package is <code className="font-mono text-[12px] bg-[#F5F5F4] dark:bg-[#1A1A1C] px-1.5 py-0.5 rounded">lelu-mcp</code> on npm.
+        . The official MCP package is <code className="font-mono text-[12px] bg-[#F5F5F4] dark:bg-[#12141A] px-1.5 py-0.5 rounded">lelu-mcp</code> on npm.
       </Callout>
 
       <h3
@@ -565,7 +565,7 @@ export default function DocsPage() {
       </ul>
 
       {/* ── Prev / Next navigation ── */}
-      <div className="flex justify-end items-center pt-8 border-t border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex justify-end items-center pt-8 border-t border-[#E7E5E4] dark:border-[#20222B]">
         <a
           href="/docs/installation"
           className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"

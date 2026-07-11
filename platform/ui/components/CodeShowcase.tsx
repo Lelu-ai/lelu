@@ -24,7 +24,7 @@ const CodeShowcase = () => {
   };
 
   return (
-    <section className="w-full py-24 md:py-32 border-t border-[#E7E5E4] dark:border-[#222224]">
+    <section className="w-full py-24 md:py-32 border-t border-[#E7E5E4] dark:border-[#20222B]">
       <div className="max-w-6xl mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Left — marketing copy */}
@@ -69,10 +69,10 @@ const CodeShowcase = () => {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="rounded-xl border border-[#E7E5E4] dark:border-[#222224] overflow-hidden"
+            className="rounded-xl border border-[#E7E5E4] dark:border-[#20222B] overflow-hidden"
           >
             {/* Window chrome */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-[#1A1A1C] border-b border-[#E7E5E4] dark:border-[#222224]">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-[#12141A] border-b border-[#E7E5E4] dark:border-[#20222B]">
               <div className="flex items-center gap-1.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#E7E5E4] dark:bg-[#333335]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[#E7E5E4] dark:bg-[#333335]" />
@@ -93,7 +93,7 @@ const CodeShowcase = () => {
             </div>
 
             {/* Language tabs */}
-            <div className="flex border-b border-[#E7E5E4] dark:border-[#222224] overflow-x-auto scrollbar-hide bg-[#F5F5F4] dark:bg-[#0D0E13]">
+            <div className="flex border-b border-[#E7E5E4] dark:border-[#20222B] overflow-x-auto scrollbar-hide bg-[#F5F5F4] dark:bg-[#0D0E13]">
               {langs.map((l) => (
                 <button
                   key={l.id}

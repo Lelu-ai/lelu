@@ -22,7 +22,7 @@ const LeluHero = () => {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#0D0E13] px-4 py-1.5 text-[13px] text-zinc-600 dark:text-zinc-400 mb-10"
+          className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0D0E13] px-4 py-1.5 text-[13px] text-zinc-600 dark:text-zinc-400 mb-10"
         >
           <span className="h-1.5 w-1.5 rounded-full bg-lelu-amber animate-pulse" />
           Lelu Engine v1.0 is live
@@ -83,7 +83,7 @@ const LeluHero = () => {
           </Link>
           <Link
             href="/api-key"
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E7E5E4] dark:border-[#222224] bg-transparent text-[#0A0A0A] dark:text-white px-6 py-2.5 text-sm font-medium hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] bg-transparent text-[#0A0A0A] dark:text-white px-6 py-2.5 text-sm font-medium hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
           >
             Get API Key
           </Link>
@@ -101,7 +101,7 @@ const LeluHero = () => {
               <span className="font-semibold text-[#0A0A0A] dark:text-white">{s.value}</span>
               <span>{s.label}</span>
               {i < heroStats.length - 1 && (
-                <span className="ml-8 text-[#E7E5E4] dark:text-[#222224] select-none">·</span>
+                <span className="ml-8 text-[#E7E5E4] dark:text-[#20222B] select-none">·</span>
               )}
             </div>
           ))}

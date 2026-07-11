@@ -75,7 +75,7 @@ export function UserMenu() {
         className="flex items-center gap-2 group"
         aria-label="User menu"
       >
-        <div className="w-8 h-8 rounded-full bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[12px] font-bold flex items-center justify-center ring-2 ring-[#E7E5E4] dark:ring-[#27272A] group-hover:ring-[#0A0A0A] dark:group-hover:ring-white transition-all">
+        <div className="w-8 h-8 rounded-full bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[12px] font-bold flex items-center justify-center ring-2 ring-[#E7E5E4] dark:ring-[#20222B] group-hover:ring-[#0A0A0A] dark:group-hover:ring-white transition-all">
           {initials}
         </div>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-[#737373] transition-transform ${open ? "rotate-180" : ""}`}>
@@ -84,8 +84,8 @@ export function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#27272A] rounded-lg shadow-lg overflow-hidden z-50">
-          <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#27272A]">
+        <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-lg shadow-lg overflow-hidden z-50">
+          <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#20222B]">
             <p className="text-[13px] font-semibold text-[#0A0A0A] dark:text-white truncate">{user.name}</p>
             <p className="text-[12px] text-[#737373] truncate">{user.email}</p>
           </div>
@@ -99,16 +99,16 @@ export function UserMenu() {
                 key={item.href}
                 href={item.href}
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+                className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
               >
                 {item.label}
               </Link>
             ))}
           </div>
-          <div className="border-t border-[#E7E5E4] dark:border-[#27272A] py-1">
+          <div className="border-t border-[#E7E5E4] dark:border-[#20222B] py-1">
             <button
               onClick={logout}
-              className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+              className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
             >
               Sign out
             </button>

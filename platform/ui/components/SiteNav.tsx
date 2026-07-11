@@ -73,7 +73,7 @@ export function SiteNav() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/80 dark:bg-[#0A0B10]/90 backdrop-blur-md">
+      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#20222B] bg-white/80 dark:bg-[#0A0B10]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-4">
 
           {/* Logo */}
@@ -161,8 +161,8 @@ export function SiteNav() {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#27272A] rounded-lg shadow-lg overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#27272A]">
+                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-lg shadow-lg overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#20222B]">
                       <p className="text-[13px] font-semibold text-[#0A0A0A] dark:text-white truncate">{user.name}</p>
                       <p className="text-[12px] text-[#737373] truncate">{user.email}</p>
                     </div>
@@ -179,16 +179,16 @@ export function SiteNav() {
                           key={item.href}
                           href={item.href}
                           onClick={() => setDropdownOpen(false)}
-                          className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+                          className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
                         >
                           {item.label}
                         </Link>
                       ))}
                     </div>
-                    <div className="border-t border-[#E7E5E4] dark:border-[#27272A] py-1">
+                    <div className="border-t border-[#E7E5E4] dark:border-[#20222B] py-1">
                       <button
                         onClick={logout}
-                        className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+                        className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
                       >
                         Sign out
                       </button>
@@ -220,7 +220,7 @@ export function SiteNav() {
 
       {/* Mobile dropdown menu */}
       {mobileOpen && (
-        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#27272A] shadow-md md:hidden">
+        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#20222B] shadow-md md:hidden">
           <nav className="flex flex-col px-4 py-3 gap-0.5">
             {NAV_LINKS.map((item) => (
               <Link
@@ -231,7 +231,7 @@ export function SiteNav() {
                 {item.name}
               </Link>
             ))}
-            <div className="h-px bg-[#E7E5E4] dark:bg-[#27272A] my-2" />
+            <div className="h-px bg-[#E7E5E4] dark:bg-[#20222B] my-2" />
             <a
               href="https://github.com/lelu-ai/lelu"
               target="_blank"

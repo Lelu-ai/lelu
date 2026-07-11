@@ -14,10 +14,10 @@ export function DocsNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-[4999] h-14 bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#27272A]">
+    <header className="sticky top-0 z-[4999] h-14 bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#20222B]">
       <div className="h-full flex items-stretch max-w-[1400px] mx-auto">
         {/* Left — sidebar zone; root layout's fixed logo appears here */}
-        <div className="w-[240px] shrink-0 flex items-center px-6 border-r border-[#E7E5E4] dark:border-[#27272A]">
+        <div className="w-[240px] shrink-0 flex items-center px-6 border-r border-[#E7E5E4] dark:border-[#20222B]">
           <span className="text-[13px] font-bold tracking-[0.12em] text-[#0A0A0A] dark:text-white select-none">
             LELU.
           </span>

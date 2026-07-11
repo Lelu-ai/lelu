@@ -30,7 +30,7 @@ const LeluFeatures = () => {
           </h2>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-[#E7E5E4] dark:bg-[#222224] rounded-xl overflow-hidden border border-[#E7E5E4] dark:border-[#222224]">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-[#E7E5E4] dark:bg-[#20222B] rounded-xl overflow-hidden border border-[#E7E5E4] dark:border-[#20222B]">
           {numberedFeatures.map((feat, i) => (
             <motion.div
               key={feat.num}

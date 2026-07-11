@@ -8,7 +8,7 @@ const steps = [
 ];
 
 const QuickstartStrip = () => (
-  <section className="w-full py-20 border-t border-[#E7E5E4] dark:border-[#222224]">
+  <section className="w-full py-20 border-t border-[#E7E5E4] dark:border-[#20222B]">
     <div className="max-w-6xl mx-auto px-4">
       <motion.p
         initial={{ opacity: 0, y: 12 }}
@@ -27,7 +27,7 @@ const QuickstartStrip = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: i * 0.1 }}
-            className="rounded-lg border border-[#E7E5E4] dark:border-[#222224] bg-[#F5F5F4] dark:bg-[#0D0E13] p-4"
+            className="rounded-lg border border-[#E7E5E4] dark:border-[#20222B] bg-[#F5F5F4] dark:bg-[#0D0E13] p-4"
           >
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-[10px] font-mono text-zinc-300 dark:text-zinc-600">

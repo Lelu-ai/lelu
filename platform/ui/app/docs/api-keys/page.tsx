@@ -27,7 +27,7 @@ export default function ApiKeysPage() {
         </div>
       </div>
 
-      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+      <hr className="border-[#E7E5E4] dark:border-[#20222B] mb-10" />
 
       <div className="space-y-14">
         {/* Key types */}
@@ -41,7 +41,7 @@ export default function ApiKeysPage() {
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
             Lelu has three kinds of keys. Only one of them requires an account — testing never does.
           </p>
-          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm overflow-x-auto">
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
                 <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] text-left">
@@ -51,7 +51,7 @@ export default function ApiKeysPage() {
                 </tr>
               </thead>
               <tbody className="text-[#737373]">
-                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                <tr className="border-t border-[#E7E5E4] dark:border-[#20222B]">
                   <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_local_…</td>
                   <td className="px-4 py-3">No</td>
                   <td className="px-4 py-3">
@@ -59,12 +59,12 @@ export default function ApiKeysPage() {
                     the local engine on your machine. Stored in <code className="font-mono text-[13px]">~/.lelu/engine.key</code>; you never handle it.
                   </td>
                 </tr>
-                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                <tr className="border-t border-[#E7E5E4] dark:border-[#20222B]">
                   <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_sandbox_…</td>
                   <td className="px-4 py-3">No</td>
                   <td className="px-4 py-3">Hosted API in demo mode — try decisions without signing up.</td>
                 </tr>
-                <tr className="border-t border-[#E7E5E4] dark:border-[#27272A]">
+                <tr className="border-t border-[#E7E5E4] dark:border-[#20222B]">
                   <td className="px-4 py-3 font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7]">lelu_sk_…</td>
                   <td className="px-4 py-3">Yes</td>
                   <td className="px-4 py-3">Hosted API with your own policies, revocation, expiry, and audit history.</td>
@@ -106,11 +106,11 @@ export default function ApiKeysPage() {
           </div>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
-            Copy the key and add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file:
+            Copy the key and add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file:
           </p>
 
-          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
-            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm">
+            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
               <span className="text-[12px] text-[#737373] font-mono">.env</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
@@ -129,11 +129,11 @@ export default function ApiKeysPage() {
           </h2>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
-            The key authenticates requests to the hosted API. With the SDK, point <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">baseUrl</code> at your engine (self-hosted binary, Docker, or the one lelu-mcp runs for you):
+            The key authenticates requests to the hosted API. With the SDK, point <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">baseUrl</code> at your engine (self-hosted binary, Docker, or the one lelu-mcp runs for you):
           </p>
 
-          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
-            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-6">
+            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
               <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
@@ -147,11 +147,11 @@ const lelu = createClient({
           </div>
 
           <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-            Or call the hosted API directly using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">Authorization: Bearer</code>:
+            Or call the hosted API directly using <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">Authorization: Bearer</code>:
           </p>
 
-          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
-            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm">
+            <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
               <span className="text-[12px] text-[#737373] font-mono">bash</span>
             </div>
             <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
@@ -172,15 +172,15 @@ const lelu = createClient({
             Key properties
           </h2>
 
-          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-[13px]">
+          <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-[13px]">
             <table className="w-full">
               <thead>
-                <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#27272A]">
+                <tr className="bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                   <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Property</th>
                   <th className="text-left px-4 py-2.5 text-[#0A0A0A] dark:text-white font-semibold">Value</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#27272A]">
+              <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#20222B]">
                 {[
                   { prop: "Format", val: "lelu_sk_<prefix>_<secret> — shown once, hash-stored" },
                   { prop: "Free tier limit", val: "Fair-use while in beta" },
@@ -214,7 +214,7 @@ const lelu = createClient({
               { term: "Monitor via audit trail", desc: "Every authorization call is logged. Use lelu.listAuditEvents() to detect unexpected usage." },
             ].map((r) => (
               <div key={r.term} className="flex gap-3">
-                <code className="font-mono text-[12px] px-2 py-1 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded shrink-0 h-fit whitespace-nowrap">
+                <code className="font-mono text-[12px] px-2 py-1 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded shrink-0 h-fit whitespace-nowrap">
                   {r.term}
                 </code>
                 <span className="text-[#737373] leading-relaxed">{r.desc}</span>
@@ -237,7 +237,7 @@ const lelu = createClient({
                 401 unauthorized: invalid or missing API key
               </p>
               <p className="text-[14px] text-[#737373] leading-relaxed">
-                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu_sk_</code> and is shown only once at creation — make sure you copied it in full.
+                Check that <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code> is set in your environment and that your <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file is loaded (e.g. via <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">dotenv</code> or Next.js automatic loading). The key starts with <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu_sk_</code> and is shown only once at creation — make sure you copied it in full.
               </p>
             </div>
             <div>
@@ -257,7 +257,7 @@ const lelu = createClient({
       </div>
 
       {/* Prev / Next */}
-      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#20222B]">
         <a
           href="/docs/installation"
           className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"

@@ -5,7 +5,7 @@ import { marqueeRow1, marqueeRow2 } from "@/data";
 const Pill = ({ label, "aria-hidden": ariaHidden }: { label: string; "aria-hidden"?: boolean }) => (
   <span
     aria-hidden={ariaHidden}
-    className="inline-flex shrink-0 items-center px-3.5 py-1.5 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#0D0E13] text-[13px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap select-none mx-1.5"
+    className="inline-flex shrink-0 items-center px-3.5 py-1.5 rounded-full border border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0D0E13] text-[13px] text-zinc-600 dark:text-zinc-400 whitespace-nowrap select-none mx-1.5"
   >
     {label}
   </span>
@@ -36,7 +36,7 @@ const MarqueeRow = ({
 };
 
 const IntegrationMarquee = () => (
-  <section className="w-full py-20 border-t border-[#E7E5E4] dark:border-[#222224] overflow-hidden">
+  <section className="w-full py-20 border-t border-[#E7E5E4] dark:border-[#20222B] overflow-hidden">
     <div className="max-w-6xl mx-auto px-4 mb-8">
       <motion.p
         initial={{ opacity: 0, y: 12 }}

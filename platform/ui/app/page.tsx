@@ -329,11 +329,20 @@ export default function HomePage() {
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/lelu-flow.svg"
+              src="/lelu-flow-light.svg"
               alt="Agents built with LangChain, CrewAI, Claude Code (MCP), or plain REST call Lelu and receive allow, deny, human_review, or compute decisions — every decision written to the audit log"
               width={760}
               height={330}
-              className="w-full h-auto rounded-2xl shadow-[0_0_80px_rgba(59,130,246,0.08)]"
+              className="w-full h-auto rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.06)] dark:hidden"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/lelu-flow.svg"
+              alt=""
+              aria-hidden="true"
+              width={760}
+              height={330}
+              className="w-full h-auto rounded-2xl shadow-[0_0_80px_rgba(59,130,246,0.08)] hidden dark:block"
             />
           </motion.div>
         </div>
@@ -443,11 +452,20 @@ export default function HomePage() {
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/lelu-terminal.svg"
+                src="/lelu-terminal-light.svg"
                 alt="Terminal demo: npx -y lelu-mcp start launches the zero-config local engine, then a curl to /v1/agent/authorize asking to delete_all_records is denied by policy"
                 width={760}
                 height={272}
-                className="w-full h-auto rounded-2xl"
+                className="w-full h-auto rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.06)] dark:hidden"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/lelu-terminal.svg"
+                alt=""
+                aria-hidden="true"
+                width={760}
+                height={272}
+                className="w-full h-auto rounded-2xl hidden dark:block"
               />
             </motion.div>
 

@@ -65,10 +65,10 @@ export function DocsNav() {
         {/* Right — CTA */}
         <div className="flex items-center px-6">
           <a
-            href="/login"
+            href="/docs/quickstart"
             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-[0.05em] bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded border border-[#0A0A0A] dark:border-white hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors whitespace-nowrap"
           >
-            SIGN IN
+            GET STARTED
             <svg
               width="10"
               height="10"

@@ -603,7 +603,7 @@ function SandboxContent() {
             <p className="text-[13px] text-[#737373]">Get a real API key and configure custom policies for your stack.</p>
           </div>
           <Link
-            href="/register"
+            href="/docs/quickstart"
             className="shrink-0 px-6 py-3 bg-white text-[#0A0A0A] rounded-xl font-bold text-[14px] hover:bg-zinc-100 transition-colors whitespace-nowrap"
           >
             Get started free

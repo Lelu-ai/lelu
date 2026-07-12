@@ -288,30 +288,32 @@ func normalizeHomoglyphs(s string) string {
 	return b.String()
 }
 
-// fuzzyMatch checks each 3–5 word window against canonical patterns using Levenshtein.
+// fuzzyMatch slides a word window sized to each canonical pattern across the
+// input and flags near-misses using Levenshtein distance. Sizing the window per
+// pattern — rather than pre-generating only bigrams and trigrams — lets patterns
+// of any length be matched fuzzily, including those with ≥4 words such as
+// "the following is a test"; previously those could only match via the exact
+// layer and a single typo evaded them entirely.
 func fuzzyMatch(lower, source string) Result {
 	words := strings.Fields(lower)
 	if len(words) < 2 {
 		return Result{}
 	}
 
-	// Generate bigrams and trigrams from the input.
-	ngrams := make([]string, 0, len(words)*2)
-	for i := 0; i < len(words)-1; i++ {
-		ngrams = append(ngrams, words[i]+" "+words[i+1])
-	}
-	for i := 0; i < len(words)-2; i++ {
-		ngrams = append(ngrams, words[i]+" "+words[i+1]+" "+words[i+2])
-	}
-
 	for _, pattern := range exactPatterns {
 		patWords := strings.Fields(pattern)
-		if len(patWords) < 2 {
+		n := len(patWords)
+		// Only fuzzy-check multi-word patterns; single tokens are handled by the
+		// exact layer. Skip patterns longer than the input — no window can fit.
+		if n < 2 || len(words) < n {
 			continue
 		}
-		// Only fuzzy-check patterns with ≥2 words against same-length ngrams.
 		target := strings.Join(patWords, " ")
-		for _, ng := range ngrams {
+
+		// Compare each n-word window of the input (same length as the pattern)
+		// against the pattern.
+		for i := 0; i+n <= len(words); i++ {
+			ng := strings.Join(words[i:i+n], " ")
 			if len(ng) < 4 {
 				continue
 			}
@@ -320,7 +322,7 @@ func fuzzyMatch(lower, source string) Result {
 			if maxLen < len(ng) {
 				maxLen = len(ng)
 			}
-			// Allow up to 15% edit distance.
+			// Allow up to 15% edit distance (and at most 3 edits).
 			if float64(dist)/float64(maxLen) <= 0.15 && dist <= 3 {
 				return Result{
 					Detected: true,

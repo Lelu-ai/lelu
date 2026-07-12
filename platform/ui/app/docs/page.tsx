@@ -284,11 +284,12 @@ export default function DocsPage() {
         <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
           npx -y lelu-mcp start
         </code>{" "}
-        to get a policy-gated engine on your machine in one command.{" "}
-        <a href="/register" className="underline hover:text-[#3B82F6] transition-colors">
-          Create an account
+        to get a policy-gated engine on your machine in one command — no account, no
+        signup, everything free while Lelu is in beta.{" "}
+        <a href="/pricing" className="underline hover:text-[#3B82F6] transition-colors">
+          Hosted cloud
         </a>{" "}
-        when you want cloud-managed policies, audit history, and a hosted API key (free tier).
+        is available as early access.
       </Callout>
 
       {/* ── Features ── */}

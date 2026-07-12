@@ -77,15 +77,17 @@ export default function DocsQuickStart() {
           </div>
           <div className="pl-13 ml-13">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
-              Visit{" "}
+              No account needed — Lelu is free while in beta. The local engine accepts{" "}
+              <strong className="text-[#0A0A0A] dark:text-white font-semibold">any API key you choose</strong>{" "}
+              (whatever <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">API_KEY</code> you
+              start it with). Want the hosted engine instead? Ask for{" "}
               <a
-                href="/api-key"
+                href="/pricing"
                 className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
-                lelu-ai.com/api-key
-              </a>{" "}
-              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier has fair-use limits
-              while Lelu is in beta.
+                early access
+              </a>
+              .
             </p>
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
               Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}

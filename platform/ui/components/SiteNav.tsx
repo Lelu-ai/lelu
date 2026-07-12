@@ -15,6 +15,7 @@ interface User {
 
 const NAV_LINKS = [
   { name: "Docs", href: "/docs" },
+  { name: "Pricing", href: "/pricing" },
   { name: "Sandbox", href: "/sandbox" },
   { name: "About", href: "/about" },
   { name: "Agents", href: "/agents" },
@@ -122,17 +123,11 @@ export function SiteNav() {
               <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#0D0E13] animate-pulse" />
             )}
 
-            {/* Auth: logged out */}
+            {/* No accounts during beta — everything is free */}
             {user === null && (
               <div className="hidden sm:flex items-center gap-2">
                 <Link
-                  href="/login"
-                  className="px-3 py-1.5 text-[13px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
+                  href="/docs/quickstart"
                   className="px-3 py-1.5 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
                 >
                   Get started
@@ -242,10 +237,7 @@ export function SiteNav() {
             </a>
             {user === null && (
               <>
-                <Link href="/login" className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors">
-                  Sign in
-                </Link>
-                <Link href="/register" className="mx-3 mt-1 py-2.5 text-[14px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md text-center hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
+                <Link href="/docs/quickstart" className="mx-3 mt-1 py-2.5 text-[14px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md text-center hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
                   Get started
                 </Link>
               </>

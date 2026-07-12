@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { LeluMark } from "@/components/ui/LeluMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import IntegrationMarquee from "@/components/IntegrationMarquee";
 import WorkflowDiagram from "@/components/WorkflowDiagram";
-
-interface User { name: string; email: string; }
 
 /* ── Design tokens (alterauth-style dark) ──────────────────────────────
    base    #0A0B10   surface #0D0E13   elevated rgba(255,255,255,0.04)
@@ -125,37 +122,6 @@ export default function HomePage() {
   const [codeTab, setCodeTab] = useState<keyof typeof CODE>("CLI");
   const [copied, setCopied] = useState(false);
   const [npxCopied, setNpxCopied] = useState(false);
-  const [user, setUser] = useState<User | null | "loading">("loading");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setUser(d?.user ?? null))
-      .catch(() => setUser(null));
-  }, []);
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
-        setDropdownOpen(false);
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
-    setDropdownOpen(false);
-    router.refresh();
-  }
-
-  const initials = typeof user === "object" && user
-    ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
-    : "";
 
   function copy() {
     navigator.clipboard.writeText(CODE[codeTab]).then(() => {
@@ -183,58 +149,13 @@ export default function HomePage() {
           </Link>
           <div className="hidden sm:flex items-center gap-6 text-[13px] text-[#737373] dark:text-[#8B8D98]">
             <Link href="/docs" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Docs</Link>
+            <Link href="/pricing" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Pricing</Link>
             <Link href="/sandbox" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Sandbox</Link>
             <Link href="/about" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">About</Link>
             <a href="https://github.com/lelu-ai/lelu" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">GitHub</a>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {user === null && (
-              <Link
-                href="/login"
-                className="text-[13px] text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
-              >
-                Sign in
-              </Link>
-            )}
-            {typeof user === "object" && user !== null && (
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setDropdownOpen((v) => !v)}
-                  className="w-8 h-8 rounded-full bg-[#0A0A0A] text-white dark:bg-white dark:text-[#0A0B10] text-[11px] font-bold flex items-center justify-center"
-                  aria-label="User menu"
-                >
-                  {initials}
-                </button>
-                {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-white/[0.08] rounded-lg shadow-xl overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-white/[0.06]">
-                      <p className="text-[13px] font-semibold text-[#0A0A0A] dark:text-white truncate">{user.name}</p>
-                      <p className="text-[12px] text-[#737373] dark:text-[#8B8D98] truncate">{user.email}</p>
-                    </div>
-                    <div className="py-1">
-                      {[
-                        { label: "Dashboard", href: "/dashboard" },
-                        { label: "API Keys", href: "/api-key" },
-                        { label: "Policies", href: "/policies" },
-                        { label: "Audit Log", href: "/audit" },
-                      ].map((item) => (
-                        <Link key={item.href} href={item.href} onClick={() => setDropdownOpen(false)}
-                          className="block px-4 py-2 text-[13px] text-[#3F3F46] dark:text-[#C9C9D2] hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                    <div className="border-t border-[#E7E5E4] dark:border-white/[0.06] py-1">
-                      <button onClick={logout}
-                        className="w-full text-left px-4 py-2 text-[13px] text-red-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
-                        Sign out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
             <Link
               href="/docs/quickstart"
               className="rounded-md bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 transition-opacity"
@@ -595,6 +516,7 @@ export default function HomePage() {
                 <p className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[#8E8E93] dark:text-[#5A5C66]">Product</p>
                 <ul className="space-y-2 text-[#737373] dark:text-[#8B8D98]">
                   <li><Link href="/docs" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Docs</Link></li>
+                  <li><Link href="/pricing" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Pricing</Link></li>
                   <li><Link href="/sandbox" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Sandbox</Link></li>
                   <li><Link href="/policies" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Policies</Link></li>
                   <li><Link href="/audit" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Audit Log</Link></li>

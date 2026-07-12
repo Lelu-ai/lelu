@@ -53,6 +53,10 @@ class AuthorizeRequest(BaseModel):
         description="Structured agent context (confidence, acting_for, scope)",
     )
     args: dict[str, Any] | None = Field(default=None, description="Optional tool arguments")
+    resource: dict[str, str] | None = Field(
+        default=None, description="Target resource attributes forwarded to the policy"
+    )
+    tenant_id: str | None = Field(default=None, description="Tenant identifier for multi-tenant engines")
 
 
 class AuthRequest(BaseModel):
@@ -113,6 +117,17 @@ class AuthDecision(BaseModel):
     input_hash: str | None = Field(default=None, description="SHA-256 of the request payload — tamper-proof record of what was asked")
     output_hash: str | None = Field(default=None, description="SHA-256 of the decision response — tamper-proof record of what was decided")
     policy_digest: str | None = Field(default=None, description="SHA-256 of the policy bytes active at evaluation time")
+    confidence_used: float = Field(default=0.0, description="Confidence value the engine evaluated with")
+    effective_scope: str | None = Field(default=None, description="Scope the engine actually granted")
+    downgraded_scope: str | None = Field(default=None, description="Set when the requested scope was downgraded")
+    risk_score: float | None = Field(default=None, description="Composite risk score, when risk evaluation ran")
+    risk_criticality: float | None = Field(default=None)
+    risk_reliability: float | None = Field(default=None)
+    risk_anomaly_factor: float | None = Field(default=None)
+    shadow_mode: bool = Field(default=False, description="True when the engine evaluated in shadow mode")
+    would_have_allowed: bool | None = Field(default=None, description="Shadow mode: the decision that would have applied")
+    would_have_reason: str | None = Field(default=None)
+    would_have_requires_human_review: bool | None = Field(default=None)
 
     @property
     def allowed(self) -> bool:
@@ -165,6 +180,82 @@ class RevokeTokenResult(BaseModel):
     """Token revocation result."""
 
     success: bool
+
+
+# ─── Human review queue (engine /v1/queue) ────────────────────────────────────
+
+
+class ReviewItem(BaseModel):
+    """A human-review queue item, as returned by the engine."""
+
+    id: str
+    tenant_id: str | None = None
+    actor: str = ""
+    action: str = ""
+    resource: dict[str, str] | None = None
+    confidence_score: float = 0.0
+    reason: str = ""
+    acting_for: str | None = None
+    enqueued_at: datetime | None = None
+    status: str = "pending"
+    resolved_at: datetime | None = None
+    resolved_by: str | None = None
+    resolution_note: str | None = None
+
+    @property
+    def pending(self) -> bool:
+        return self.status == "pending"
+
+    @property
+    def approved(self) -> bool:
+        return self.status == "approved"
+
+
+class ListReviewsResult(BaseModel):
+    """Pending review items."""
+
+    items: list[ReviewItem]
+    count: int = 0
+
+
+# ─── Output scanning (engine /v1/scan/output) ─────────────────────────────────
+
+
+class ScanOutputResult(BaseModel):
+    """Indirect prompt-injection scan verdict for a tool output."""
+
+    safe: bool
+    detected: bool
+    pattern: str | None = None
+    source: str | None = None
+    method: str | None = None
+    score: float = 0.0
+
+
+# ─── Engine policy (engine /v1/policy) ────────────────────────────────────────
+
+
+class EnginePolicyInfo(BaseModel):
+    """Metadata about the policy currently loaded in the engine."""
+
+    digest: str
+    policy_path: str | None = None
+    source: str = "engine"
+
+
+class PolicyValidationResult(BaseModel):
+    """Result of validating policy bytes against a throwaway evaluator."""
+
+    valid: bool
+    digest: str | None = None
+
+
+class PolicyUpdateResult(BaseModel):
+    """Result of replacing the engine's active policy."""
+
+    digest: str
+    previous_digest: str | None = None
+    loaded_at: str | None = None
 
 
 # ─── Audit ────────────────────────────────────────────────────────────────────

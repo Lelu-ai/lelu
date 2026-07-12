@@ -59,6 +59,15 @@ from .models import (
     VaultStoreResult,
     VaultTokenResult,
     VaultCredentialSummary,
+    # Human review queue
+    ReviewItem,
+    ListReviewsResult,
+    # Output scanning
+    ScanOutputResult,
+    # Engine policy
+    EnginePolicyInfo,
+    PolicyValidationResult,
+    PolicyUpdateResult,
 )
 
 # Enhanced Observability
@@ -118,6 +127,15 @@ __all__ = [
     "ListAuditEventsResult",
     # Error
     "AuthEngineError",
+    # Human review queue
+    "ReviewItem",
+    "ListReviewsResult",
+    # Output scanning
+    "ScanOutputResult",
+    # Engine policy
+    "EnginePolicyInfo",
+    "PolicyValidationResult",
+    "PolicyUpdateResult",
     # Vault
     "VaultStoreRequest",
     "VaultStoreResult",
@@ -137,4 +155,4 @@ __all__ = [
     "CrewAIPermissionDeniedError",
 ]
 
-__version__ = "0.3.67"
+__version__ = "0.4.0"

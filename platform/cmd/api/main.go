@@ -1,14 +1,15 @@
 // Lelu Platform — Cloud Control Plane entrypoint.
 //
 // Environment variables:
-//   LISTEN_ADDR        HTTP listen address (default: :9090)
-//   DATABASE_URL       Postgres DSN (required)
-//   PLATFORM_API_KEY   API key for engine → platform authentication
-//   OIDC_ISSUER_URL    OIDC issuer URL for enterprise SSO (optional)
-//   OIDC_AUDIENCE      OIDC audience/client ID (optional)
-//   SSO_TRUSTED_HEADER Trusted upstream identity header (optional)
-//   SSO_TRUSTED_EMAIL_DOMAIN Optional email-domain restriction for trusted header mode
-//   EVIDENCE_SIGNING_KEY Optional HMAC key used to sign compliance export evidence payloads
+//
+//	LISTEN_ADDR        HTTP listen address (default: :9090)
+//	DATABASE_URL       Postgres DSN (required)
+//	PLATFORM_API_KEY   API key for engine → platform authentication
+//	OIDC_ISSUER_URL    OIDC issuer URL for enterprise SSO (optional)
+//	OIDC_AUDIENCE      OIDC audience/client ID (optional)
+//	SSO_TRUSTED_HEADER Trusted upstream identity header (optional)
+//	SSO_TRUSTED_EMAIL_DOMAIN Optional email-domain restriction for trusted header mode
+//	EVIDENCE_SIGNING_KEY Optional HMAC key used to sign compliance export evidence payloads
 package main
 
 import (

@@ -38,12 +38,12 @@ func TestGenerateKey(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name      string
-		tenantID  string
-		env       string
-		keyName   string
-		wantErr   bool
-		wantEnv   string
+		name     string
+		tenantID string
+		env      string
+		keyName  string
+		wantErr  bool
+		wantEnv  string
 	}{
 		{
 			name:     "generate test key",
@@ -153,10 +153,10 @@ func TestValidateKey(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		apiKey    string
+		name       string
+		apiKey     string
 		wantTenant string
-		wantErr   error
+		wantErr    error
 	}{
 		{
 			name:       "valid key",
@@ -505,7 +505,7 @@ func TestIsValidKeyFormat(t *testing.T) {
 		{"lelu_invalid_abc", false},
 		{"", false},
 		{"lelu_test_", false},
-		{"lelu_test_short", false}, // Too short
+		{"lelu_test_short", false},        // Too short
 		{"lelu_anon_short_random", false}, // Wrong format for anon key (parts too short)
 	}
 

@@ -21,12 +21,12 @@ import (
 
 // Handler holds all control-plane HTTP handlers.
 type Handler struct {
-	policies *policy.Store
-	audit    *auditstore.Store
-	apiKey   string // SHA-256 of the real key stored in memory
-	oidcAuth *OIDCAuth
-	trustedHeader string
-	trustedDomain string
+	policies           *policy.Store
+	audit              *auditstore.Store
+	apiKey             string // SHA-256 of the real key stored in memory
+	oidcAuth           *OIDCAuth
+	trustedHeader      string
+	trustedDomain      string
 	evidenceSigningKey string
 }
 
@@ -34,12 +34,12 @@ type Handler struct {
 func New(policies *policy.Store, audit *auditstore.Store, apiKey string, oidcAuth *OIDCAuth, trustedHeader, trustedDomain, evidenceSigningKey string) *Handler {
 	hash := sha256.Sum256([]byte(apiKey))
 	return &Handler{
-		policies: policies,
-		audit:    audit,
-		apiKey:   hex.EncodeToString(hash[:]),
-		oidcAuth: oidcAuth,
-		trustedHeader: trustedHeader,
-		trustedDomain: strings.ToLower(strings.TrimSpace(trustedDomain)),
+		policies:           policies,
+		audit:              audit,
+		apiKey:             hex.EncodeToString(hash[:]),
+		oidcAuth:           oidcAuth,
+		trustedHeader:      trustedHeader,
+		trustedDomain:      strings.ToLower(strings.TrimSpace(trustedDomain)),
 		evidenceSigningKey: evidenceSigningKey,
 	}
 }
@@ -440,9 +440,9 @@ func parseComplianceFramework(value string) complianceFramework {
 
 func summarizeControls(framework complianceFramework, events []auditstore.Event) []complianceControlSummary {
 	type bucket struct {
-		title   string
-		count   int
-		traces  []string
+		title    string
+		count    int
+		traces   []string
 		traceSet map[string]struct{}
 	}
 

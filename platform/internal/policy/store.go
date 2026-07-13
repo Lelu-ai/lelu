@@ -15,14 +15,14 @@ import (
 
 // Policy is a stored YAML policy document.
 type Policy struct {
-	ID        string    `json:"id"`
-	TenantID  string    `json:"tenant_id"`
-	Name      string    `json:"name"`
-	Content   string    `json:"content"`
-	Version   string    `json:"version"`
-	HMACSha256 string   `json:"hmac_sha256"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	TenantID   string    `json:"tenant_id"`
+	Name       string    `json:"name"`
+	Content    string    `json:"content"`
+	Version    string    `json:"version"`
+	HMACSha256 string    `json:"hmac_sha256"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // Store manages policy CRUD in Postgres.

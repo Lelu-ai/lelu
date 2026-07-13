@@ -36,42 +36,42 @@ type NHIStatus string
 
 const (
 	NHIStatusActive    NHIStatus = "active"
-	NHIStatusShadow    NHIStatus = "shadow"    // unregistered, runtime-detected
+	NHIStatusShadow    NHIStatus = "shadow" // unregistered, runtime-detected
 	NHIStatusSuspended NHIStatus = "suspended"
 	NHIStatusRevoked   NHIStatus = "revoked"
-	NHIStatusStale     NHIStatus = "stale"     // no activity in > 30 days
+	NHIStatusStale     NHIStatus = "stale" // no activity in > 30 days
 )
 
 // NHIEntry is a normalized non-human identity record with risk posture.
 type NHIEntry struct {
-	ID           string       `json:"id"`
-	TenantID     string       `json:"tenant_id"`
-	Type         NHIType      `json:"type"`
-	Name         string       `json:"name"`
-	Status       NHIStatus    `json:"status"`
-	Scopes       []string     `json:"scopes"`
-	RiskScore    float64      `json:"risk_score"`    // 0.0–1.0
-	RiskLevel    string       `json:"risk_level"`    // "critical" | "high" | "medium" | "low" | "none"
-	Findings     []OWASPFinding `json:"findings"`
-	LastSeen     time.Time    `json:"last_seen"`
-	CreatedAt    time.Time    `json:"created_at"`
+	ID        string         `json:"id"`
+	TenantID  string         `json:"tenant_id"`
+	Type      NHIType        `json:"type"`
+	Name      string         `json:"name"`
+	Status    NHIStatus      `json:"status"`
+	Scopes    []string       `json:"scopes"`
+	RiskScore float64        `json:"risk_score"` // 0.0–1.0
+	RiskLevel string         `json:"risk_level"` // "critical" | "high" | "medium" | "low" | "none"
+	Findings  []OWASPFinding `json:"findings"`
+	LastSeen  time.Time      `json:"last_seen"`
+	CreatedAt time.Time      `json:"created_at"`
 	// Type-specific fields
-	AgentType    string       `json:"agent_type,omitempty"`    // registered_agent
-	OwnerEmail   string       `json:"owner_email,omitempty"`   // registered_agent
-	Provider     string       `json:"provider,omitempty"`      // credential
-	RequestCount int          `json:"request_count,omitempty"` // shadow_agent
-	ExpiresAt    *time.Time   `json:"expires_at,omitempty"`    // credential
+	AgentType    string     `json:"agent_type,omitempty"`    // registered_agent
+	OwnerEmail   string     `json:"owner_email,omitempty"`   // registered_agent
+	Provider     string     `json:"provider,omitempty"`      // credential
+	RequestCount int        `json:"request_count,omitempty"` // shadow_agent
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`    // credential
 }
 
 // ScanResult summarises a full NHI scan across the org.
 type ScanResult struct {
-	TenantID      string    `json:"tenant_id"`
-	ScannedAt     time.Time `json:"scanned_at"`
-	TotalNHIs     int       `json:"total_nhis"`
+	TenantID      string         `json:"tenant_id"`
+	ScannedAt     time.Time      `json:"scanned_at"`
+	TotalNHIs     int            `json:"total_nhis"`
 	ByType        map[string]int `json:"by_type"`
 	ByStatus      map[string]int `json:"by_status"`
 	ByRiskLevel   map[string]int `json:"by_risk_level"`
-	TopRisks      []*NHIEntry   `json:"top_risks"`
+	TopRisks      []*NHIEntry    `json:"top_risks"`
 	FindingCounts map[string]int `json:"finding_counts"` // by OWASP check ID
 }
 
@@ -411,10 +411,10 @@ func scanRegisteredAgent(s scanner) (*NHIEntry, error) {
 
 func scanShadowAgent(s scanner) (*NHIEntry, error) {
 	var (
-		e           NHIEntry
-		fpHash      string
-		userAgent   string
-		statusStr   string
+		e            NHIEntry
+		fpHash       string
+		userAgent    string
+		statusStr    string
 		firstSeenRaw string
 		lastSeenRaw  string
 	)
@@ -449,12 +449,12 @@ func scanShadowAgent(s scanner) (*NHIEntry, error) {
 
 func scanCredential(s scanner) (*NHIEntry, error) {
 	var (
-		e          NHIEntry
-		agentID    string
-		scopesStr  string
-		expiresAt  sql.NullInt64
-		createdAt  int64
-		updatedAt  int64
+		e         NHIEntry
+		agentID   string
+		scopesStr string
+		expiresAt sql.NullInt64
+		createdAt int64
+		updatedAt int64
 	)
 	if err := s.Scan(
 		&e.ID, &e.TenantID, &agentID, &e.Provider,

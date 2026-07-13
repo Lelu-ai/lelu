@@ -121,9 +121,9 @@ func TestEscalatorCreateReviewTask(t *testing.T) {
 		Reason:        "significant drift",
 	}
 	auditReq := &AuditRequest{
-		Prompt:    "approve payment",
-		Action:    "approve",
-		TenantID:  "tenant_456",
+		Prompt:   "approve payment",
+		Action:   "approve",
+		TenantID: "tenant_456",
 	}
 
 	task := escalator.CreateReviewTask(result, SeverityMedium, auditReq)

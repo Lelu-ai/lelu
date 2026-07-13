@@ -5,15 +5,17 @@
 //   - Client Credentials — for M2M / service-to-service access
 //
 // Endpoints:
-//   POST /oauth/clients          — RFC 7591 dynamic client registration
-//   GET  /oauth/authorize        — authorization code initiation
-//   POST /oauth/token            — token exchange (code, client_credentials, refresh_token)
+//
+//	POST /oauth/clients          — RFC 7591 dynamic client registration
+//	GET  /oauth/authorize        — authorization code initiation
+//	POST /oauth/token            — token exchange (code, client_credentials, refresh_token)
 //
 // Metadata (public, no auth):
-//   GET /.well-known/oauth-authorization-server   — RFC 8414
-//   GET /.well-known/oauth-protected-resource     — RFC 9728
-//   GET /.well-known/openid-configuration         — OIDC discovery
-//   GET /.well-known/jwks.json                    — public key set
+//
+//	GET /.well-known/oauth-authorization-server   — RFC 8414
+//	GET /.well-known/oauth-protected-resource     — RFC 9728
+//	GET /.well-known/openid-configuration         — OIDC discovery
+//	GET /.well-known/jwks.json                    — public key set
 package mcpauth
 
 import (
@@ -63,7 +65,7 @@ type Server struct {
 // Config for Server.
 type Config struct {
 	DB         *sql.DB
-	SigningKey  *rsa.PrivateKey // same key as identity.Registry for unified JWKS
+	SigningKey *rsa.PrivateKey // same key as identity.Registry for unified JWKS
 	Issuer     string
 	KeyID      string
 	AccessTTL  time.Duration // default 1h
@@ -162,13 +164,13 @@ func (s *Server) handleRegisterClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{
-		"client_id":                 clientID,
-		"client_name":               req.ClientName,
-		"redirect_uris":             req.RedirectURIs,
-		"grant_types":               req.GrantTypes,
-		"scope":                     req.Scope,
+		"client_id":                  clientID,
+		"client_name":                req.ClientName,
+		"redirect_uris":              req.RedirectURIs,
+		"grant_types":                req.GrantTypes,
+		"scope":                      req.Scope,
 		"token_endpoint_auth_method": req.TokenEndpointAuthMethod,
-		"client_id_issued_at":       time.Now().UTC().Unix(),
+		"client_id_issued_at":        time.Now().UTC().Unix(),
 	}
 	if clientSecret != "" {
 		resp["client_secret"] = clientSecret
@@ -350,7 +352,7 @@ func (s *Server) handleAuthCodeExchange(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.issueTokenResponse(w, r.Context(), clientID, storedScope)
+	s.issueTokenResponse(r.Context(), w, clientID, storedScope)
 }
 
 // handleClientCredentials issues an access token for M2M / service-to-service.
@@ -386,7 +388,7 @@ func (s *Server) handleClientCredentials(w http.ResponseWriter, r *http.Request)
 		scope = client.Scopes
 	}
 
-	s.issueTokenResponse(w, r.Context(), clientID, scope)
+	s.issueTokenResponse(r.Context(), w, clientID, scope)
 }
 
 // handleRefreshToken exchanges a refresh token for a new access token.
@@ -430,11 +432,11 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	// Revoke old token record, issue fresh pair.
 	s.db.ExecContext(r.Context(), `DELETE FROM oauth_tokens WHERE token_id = ?`, tokenID)
-	s.issueTokenResponse(w, r.Context(), storedClientID, storedScope)
+	s.issueTokenResponse(r.Context(), w, storedClientID, storedScope)
 }
 
 // issueTokenResponse mints access + refresh tokens and writes the token response.
-func (s *Server) issueTokenResponse(w http.ResponseWriter, ctx context.Context, clientID, scope string) {
+func (s *Server) issueTokenResponse(ctx context.Context, w http.ResponseWriter, clientID, scope string) {
 	now := time.Now().UTC()
 	exp := now.Add(s.accessTTL)
 

@@ -317,17 +317,17 @@ func IsValidKeyFormat(key string) bool {
 	hasValidPrefix := strings.HasPrefix(key, PrefixLive) ||
 		strings.HasPrefix(key, PrefixTest) ||
 		strings.HasPrefix(key, PrefixAnon)
-	
+
 	if !hasValidPrefix {
 		return false
 	}
-	
+
 	// Check minimum length (prefix + at least some random data)
 	minLength := len(PrefixTest) + 8 // Shortest prefix + minimum random part
 	if len(key) < minLength {
 		return false
 	}
-	
+
 	// For anonymous keys, check format: lelu_anon_shortid_random
 	if strings.HasPrefix(key, PrefixAnon) {
 		parts := strings.Split(key, "_")
@@ -344,7 +344,7 @@ func IsValidKeyFormat(key string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 

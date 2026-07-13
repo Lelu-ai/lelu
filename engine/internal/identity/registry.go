@@ -89,13 +89,13 @@ type Registry struct {
 
 // Config for Registry.
 type Config struct {
-	DB        *sql.DB
+	DB *sql.DB
 	// SigningKey is used for RS256 token issuance. Generated (2048-bit) if nil.
 	SigningKey *rsa.PrivateKey
 	// Issuer is the OIDC issuer URL (e.g. "https://lelu-ai.com").
-	Issuer    string
+	Issuer string
 	// TokenTTL is the lifetime of issued workload tokens. Default 1 hour.
-	TokenTTL  time.Duration
+	TokenTTL time.Duration
 }
 
 // New creates a Registry. A fresh RSA-2048 key is generated if cfg.SigningKey
@@ -359,10 +359,10 @@ func (r *Registry) MCPAuthServerMetadata() map[string]any {
 // Expose at /.well-known/oauth-protected-resource.
 func (r *Registry) MCPProtectedResourceMetadata() map[string]any {
 	return map[string]any{
-		"resource":                r.issuer,
-		"authorization_servers":   []string{r.issuer},
-		"jwks_uri":                r.issuer + "/.well-known/jwks.json",
-		"scopes_supported":        []string{"openid", "profile", "agent:read", "agent:write", "tools:call"},
+		"resource":                 r.issuer,
+		"authorization_servers":    []string{r.issuer},
+		"jwks_uri":                 r.issuer + "/.well-known/jwks.json",
+		"scopes_supported":         []string{"openid", "profile", "agent:read", "agent:write", "tools:call"},
 		"bearer_methods_supported": []string{"header"},
 	}
 }
@@ -387,13 +387,13 @@ type scanner interface {
 
 func scanAgent(s scanner) (*RegisteredAgent, error) {
 	var (
-		a          RegisteredAgent
-		scopesRaw  string
-		metaRaw    string
-		createdAt  int64
-		updatedAt  int64
-		agentType  string
-		status     string
+		a         RegisteredAgent
+		scopesRaw string
+		metaRaw   string
+		createdAt int64
+		updatedAt int64
+		agentType string
+		status    string
 	)
 	if err := s.Scan(
 		&a.ID, &a.TenantID, &a.Name, &a.Description,

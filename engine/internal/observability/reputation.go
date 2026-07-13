@@ -25,7 +25,7 @@ type ReputationManager struct {
 	accuracyGauge    prometheus.GaugeVec
 	calibrationGauge prometheus.GaugeVec
 	decisionCounter  prometheus.CounterVec
-	
+
 	// Shutdown handling
 	shutdown chan struct{}
 	done     chan struct{}
@@ -401,18 +401,18 @@ func (rm *ReputationManager) startReputationUpdater() {
 			rm.mutex.RLock()
 			dbClosed := rm.db == nil
 			rm.mutex.RUnlock()
-			
+
 			if dbClosed {
 				// Database closed, stop updating
 				return
 			}
-			
+
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			err := rm.UpdateAllReputations(ctx)
 			if err != nil {
 				// Check if error is due to closed database
-				if strings.Contains(err.Error(), "database is closed") || 
-				   strings.Contains(err.Error(), "sql: database is closed") {
+				if strings.Contains(err.Error(), "database is closed") ||
+					strings.Contains(err.Error(), "sql: database is closed") {
 					cancel()
 					return
 				}

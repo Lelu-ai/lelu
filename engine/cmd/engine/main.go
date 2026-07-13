@@ -59,8 +59,8 @@ func main() {
 	otelSampleRate := parseFloatOr(envOr("OTEL_SAMPLE_RATE", "1.0"), 1.0)
 
 	// Feature 2: Durable Agent Identity + MCP OAuth 2.1
-	leluIssuer    := envOr("LELU_ISSUER", "https://lelu-ai.com")
-	rsaKeyPath    := envOr("LELU_RSA_KEY_PATH", "/var/lib/lelu/signing.key.pem")
+	leluIssuer := envOr("LELU_ISSUER", "https://lelu-ai.com")
+	rsaKeyPath := envOr("LELU_RSA_KEY_PATH", "/var/lib/lelu/signing.key.pem")
 
 	// Phase 2: Behavioral Analytics Database
 	dbPath := envOr("DATABASE_PATH", "/var/lib/lelu/lelu.db")
@@ -224,17 +224,17 @@ func main() {
 		identityReg, iErr = identity.New(identity.Config{
 			DB:         db,
 			Issuer:     leluIssuer,
-			SigningKey:  rsaKey,
+			SigningKey: rsaKey,
 		})
 		if iErr != nil {
 			log.Printf("warning: agent identity registry init failed: %v", iErr)
 		} else {
 			log.Printf("agent identity registry ready (issuer: %s)", leluIssuer)
 			mcpAuthSvc, iErr = mcpauth.New(mcpauth.Config{
-				DB:        db,
+				DB:         db,
 				SigningKey: identityReg.SigningKey(),
-				Issuer:    leluIssuer,
-				KeyID:     identityReg.KeyID(),
+				Issuer:     leluIssuer,
+				KeyID:      identityReg.KeyID(),
 			})
 			if iErr != nil {
 				log.Printf("warning: MCP OAuth 2.1 server init failed: %v", iErr)

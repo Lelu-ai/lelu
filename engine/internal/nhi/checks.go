@@ -28,7 +28,7 @@ const (
 
 // OWASPFinding is a single OWASP NHI top-10 risk detection result.
 type OWASPFinding struct {
-	CheckID     string `json:"check_id"`    // e.g. "NHI-05"
+	CheckID     string `json:"check_id"` // e.g. "NHI-05"
 	Title       string `json:"title"`
 	Severity    string `json:"severity"`    // "critical" | "high" | "medium" | "low"
 	Description string `json:"description"` // what was detected

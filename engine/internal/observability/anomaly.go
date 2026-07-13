@@ -417,9 +417,9 @@ type iTree struct {
 
 // isolationForest holds a trained ensemble of isolation trees.
 type isolationForest struct {
-	trees      []*iTree
-	numTrees   int
-	sampleSize int
+	trees       []*iTree
+	numTrees    int
+	sampleSize  int
 	heightLimit int
 }
 
@@ -654,7 +654,7 @@ func (r *lcgRand) perm(n int) []int {
 // forestState guards the shared isolation forest with a read-write mutex so
 // concurrent DetectAnomaly calls and periodic rebuildForest calls are safe.
 var (
-	forestMu    sync.RWMutex
+	forestMu     sync.RWMutex
 	globalForest *isolationForest
 )
 

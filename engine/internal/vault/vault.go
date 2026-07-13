@@ -37,7 +37,7 @@ type CredentialEntry struct {
 	UserID       string
 	Provider     string
 	AccessToken  string
-	RefreshToken string    // empty when not available
+	RefreshToken string // empty when not available
 	Scopes       []string
 	ExpiresAt    time.Time // zero = non-expiring
 	CreatedAt    time.Time
@@ -206,10 +206,10 @@ func (s *Service) Get(ctx context.Context, agentID, userID, provider string) (*C
 	`, agentID, userID, provider)
 
 	var (
-		id, accessEnc string
-		refreshEnc    sql.NullString
-		scopesStr     string
-		expiresAtUnix sql.NullInt64
+		id, accessEnc                string
+		refreshEnc                   sql.NullString
+		scopesStr                    string
+		expiresAtUnix                sql.NullInt64
 		createdAtUnix, updatedAtUnix int64
 	)
 	if err := row.Scan(&id, &accessEnc, &refreshEnc, &scopesStr, &expiresAtUnix, &createdAtUnix, &updatedAtUnix); err != nil {

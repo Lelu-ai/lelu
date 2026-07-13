@@ -23,9 +23,9 @@ type Calibrator struct {
 	yBreaks []float64
 
 	// Feedback buffer: (rawScore, wasThreeat) pairs from human review outcomes.
-	buffer   []calibrationPoint
-	maxBuf   int
-	fitted   bool
+	buffer []calibrationPoint
+	maxBuf int
+	fitted bool
 
 	// Dynamic decision threshold — updated via feedback loop.
 	// Initialized to 0.5, converges to optimal TPR/FPR operating point.

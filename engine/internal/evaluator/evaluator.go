@@ -26,25 +26,25 @@ type AuthRequest struct {
 
 // AgentAuthRequest represents an agent authorization check.
 type AgentAuthRequest struct {
-	TenantID   string                 `json:"tenant_id"`
-	Actor      string                 `json:"actor"`
-	Action     string                 `json:"action"`
-	Resource   map[string]string      `json:"resource"`
-	Confidence float64                `json:"confidence"`
-	ActingFor  string                 `json:"acting_for"`
-	Scope      string                 `json:"scope"`
+	TenantID   string            `json:"tenant_id"`
+	Actor      string            `json:"actor"`
+	Action     string            `json:"action"`
+	Resource   map[string]string `json:"resource"`
+	Confidence float64           `json:"confidence"`
+	ActingFor  string            `json:"acting_for"`
+	Scope      string            `json:"scope"`
 	// Args are structured call arguments forwarded verbatim to Rego as input.args,
 	// enabling policies like: deny { input.args.amount > 10000 }.
-	Args       map[string]interface{} `json:"args,omitempty"`
+	Args map[string]interface{} `json:"args,omitempty"`
 }
 
 // Decision is the output of the policy evaluation.
 type Decision struct {
-	Allowed             bool                   `json:"allowed"`
-	Reason              string                 `json:"reason"`
-	DowngradedScope     string                 `json:"downgraded_scope,omitempty"`
-	RequiresHumanReview bool                   `json:"requires_human_review"`
-	ConfidenceUsed      float64                `json:"confidence_used,omitempty"`
+	Allowed             bool    `json:"allowed"`
+	Reason              string  `json:"reason"`
+	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
+	RequiresHumanReview bool    `json:"requires_human_review"`
+	ConfidenceUsed      float64 `json:"confidence_used,omitempty"`
 	// Compute fields — set when a compute rule matches instead of allow/deny.
 	Compute  bool                   `json:"compute,omitempty"`
 	SafeTool string                 `json:"safe_tool,omitempty"`
@@ -68,9 +68,9 @@ type Decision struct {
 //	    reason: "All payment actions require approval"
 type PatternRule struct {
 	ID       string                 `yaml:"id"`
-	Match    string                 `yaml:"match"`              // glob on action
-	Actor    string                 `yaml:"actor,omitempty"`    // optional glob on actor
-	Decision string                 `yaml:"decision"`           // allow | deny | human_review | compute
+	Match    string                 `yaml:"match"`           // glob on action
+	Actor    string                 `yaml:"actor,omitempty"` // optional glob on actor
+	Decision string                 `yaml:"decision"`        // allow | deny | human_review | compute
 	Reason   string                 `yaml:"reason,omitempty"`
 	SafeTool string                 `yaml:"safe_tool,omitempty"`
 	SafeArgs map[string]interface{} `yaml:"safe_args,omitempty"`
@@ -102,7 +102,7 @@ type AgentScope struct {
 	Inherits    string           `yaml:"inherits"`
 	Constraints []Constraint     `yaml:"constraints"`
 	Deny        []string         `yaml:"deny"`
-	Compute     []ComputeRule    `yaml:"compute"`     // safe-redirect rules
+	Compute     []ComputeRule    `yaml:"compute"`      // safe-redirect rules
 	CanDelegate []DelegationRule `yaml:"can_delegate"` // agent-to-agent delegation rules
 }
 

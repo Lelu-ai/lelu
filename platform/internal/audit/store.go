@@ -32,15 +32,15 @@ type Event struct {
 
 // QueryFilter filters the audit log query.
 type QueryFilter struct {
-	TenantID  string
-	Actor     string
-	Action    string
-	Decision  string
-	TraceID   string
-	From      *time.Time
-	To        *time.Time
-	Limit     int64
-	Offset    int64
+	TenantID string
+	Actor    string
+	Action   string
+	Decision string
+	TraceID  string
+	From     *time.Time
+	To       *time.Time
+	Limit    int64
+	Offset   int64
 }
 
 // Store persists audit events to Postgres.

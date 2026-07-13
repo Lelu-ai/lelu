@@ -286,10 +286,27 @@ export async function startLocalEngine(): Promise<LocalEngine> {
   child.stdout?.on("data", forward);
   child.stderr?.on("data", forward);
 
+  // Advertise the running engine so other local tools (the lelu-agent-auth
+  // SDK) can discover its URL — the port is random per start. Removed on stop;
+  // readers must also check the pid is still alive to survive hard crashes.
+  const runtimePath = path.join(home, "engine.json");
+  const writeRuntimeFile = async () => {
+    const info = { url, pid: child.pid, startedAt: new Date().toISOString() };
+    await fsp.writeFile(runtimePath, `${JSON.stringify(info)}\n`, { mode: 0o600 });
+  };
+  const removeRuntimeFile = () => {
+    try {
+      const current = JSON.parse(fs.readFileSync(runtimePath, "utf8")) as { pid?: number };
+      // Only remove our own record — a newer lelu-mcp may have replaced it.
+      if (current.pid === child.pid) fs.unlinkSync(runtimePath);
+    } catch { /* already gone or unreadable */ }
+  };
+
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    removeRuntimeFile();
     try { child.kill("SIGTERM"); } catch { /* already gone */ }
   };
   process.on("exit", stop);
@@ -298,6 +315,7 @@ export async function startLocalEngine(): Promise<LocalEngine> {
 
   try {
     await waitHealthy(url, child);
+    await writeRuntimeFile();
   } catch (err) {
     stop();
     throw err;

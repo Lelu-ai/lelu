@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -744,4 +746,34 @@ agent_scopes:
 	assert.False(t, body["allowed"].(bool))
 	assert.True(t, body["requires_human_review"].(bool))
 	assert.NotEmpty(t, body["risk_score"])
+}
+
+// ── Request body size limit (DoS guard) ─────────────────────────────────────────
+
+// TestRequestBodySizeLimit verifies that the shared bodyLimit middleware caps
+// request bodies: a payload under the limit is processed normally, while an
+// oversized payload is rejected before the handler (and the O(n·m) injection
+// scanner) ever runs on it. See issue #12 (E1).
+func TestRequestBodySizeLimit(t *testing.T) {
+	t.Setenv("LELU_MAX_BODY_BYTES", "1024")
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", nil)
+	defer srv.Close()
+
+	// Under the limit: handled normally.
+	resp := postJSON(t, srv, "/v1/authorize", map[string]any{
+		"user_id": "user_123",
+		"action":  "approve_refunds",
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	resp.Body.Close()
+
+	// Over the limit: rejected before the handler processes the payload.
+	resp2 := postJSON(t, srv, "/v1/authorize", map[string]any{
+		"user_id": strings.Repeat("A", 4096),
+		"action":  "approve_refunds",
+	})
+	defer resp2.Body.Close()
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp2.StatusCode)
+	respBody, _ := io.ReadAll(resp2.Body)
+	assert.Contains(t, string(respBody), "too large")
 }

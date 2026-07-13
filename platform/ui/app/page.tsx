@@ -15,22 +15,24 @@ import WorkflowDiagram from "@/components/WorkflowDiagram";
 
 const CODE: Record<string, string> = {
   CLI: `npx -y lelu-mcp start
-# → local engine ready on http://localhost:8082`,
-  TypeScript: `import { createClient } from "lelu-agent-auth";
+# → local engine ready — policy, key, and audit
+#   trail live in ~/.lelu. No account needed.`,
+  TypeScript: `// npm install lelu-agent-auth
+import { lelu } from "lelu-agent-auth";
 
-const lelu = createClient({
-  apiKey: process.env.LELU_API_KEY,
-});
+// Zero-config: finds the engine that
+// \`npx lelu-mcp start\` is already running.
+const auth = lelu();
 
-const decision = await lelu.agentAuthorize({
+const decision = await auth.authorize({
+  tool: "refund:process",
   actor: "billing-agent",
-  action: "refund:process",
   context: { confidence: 0.85 },
 });
 
 if (decision.allowed) {
   // proceed
-} else if (decision.requiresHumanReview) {
+} else if (decision.decision === "human_review") {
   // queued for human approval
 }`,
   curl: `curl -X POST localhost:8082/v1/agent/authorize \\
@@ -122,6 +124,7 @@ export default function HomePage() {
   const [codeTab, setCodeTab] = useState<keyof typeof CODE>("CLI");
   const [copied, setCopied] = useState(false);
   const [npxCopied, setNpxCopied] = useState(false);
+  const [npmCopied, setNpmCopied] = useState(false);
 
   function copy() {
     navigator.clipboard.writeText(CODE[codeTab]).then(() => {
@@ -134,6 +137,13 @@ export default function HomePage() {
     navigator.clipboard.writeText("npx -y lelu-mcp start").then(() => {
       setNpxCopied(true);
       setTimeout(() => setNpxCopied(false), 1500);
+    });
+  }
+
+  function copyNpm() {
+    navigator.clipboard.writeText("npm install lelu-agent-auth").then(() => {
+      setNpmCopied(true);
+      setTimeout(() => setNpmCopied(false), 1500);
     });
   }
 
@@ -221,12 +231,12 @@ export default function HomePage() {
             </Link>
           </motion.div>
 
-          {/* npx one-liner */}
+          {/* install one-liners: MCP + SDK */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-6 flex justify-center"
+            className="mt-6 flex flex-wrap items-center justify-center gap-3"
           >
             <button
               onClick={copyNpx}
@@ -234,6 +244,17 @@ export default function HomePage() {
             >
               <span className="text-[#30A46C]">$</span> npx -y lelu-mcp start
               {npxCopied ? (
+                <span className="text-[11px] text-emerald-400">copied</span>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8E8E93] dark:text-[#5A5C66] group-hover:text-[#0A0A0A] dark:hover:text-white transition-colors"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+              )}
+            </button>
+            <button
+              onClick={copyNpm}
+              className="group inline-flex items-center gap-3 rounded-lg border border-[#E7E5E4] dark:border-white/[0.08] bg-white dark:bg-[#0D0E13] px-4 py-2.5 font-mono text-[13px] text-[#3F3F46] dark:text-[#C9C9D2] hover:border-[#A8A29E] dark:hover:border-white/[0.16] transition-colors"
+            >
+              <span className="text-[#30A46C]">$</span> npm install lelu-agent-auth
+              {npmCopied ? (
                 <span className="text-[11px] text-emerald-400">copied</span>
               ) : (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8E8E93] dark:text-[#5A5C66] group-hover:text-[#0A0A0A] dark:hover:text-white transition-colors"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>

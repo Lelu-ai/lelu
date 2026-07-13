@@ -92,20 +92,7 @@ export default function DocsQuickStart() {
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
               Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}
               <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx -y lelu-mcp start</code>{" "}
-              runs the engine on your machine, and a self-hosted engine accepts any key you set at startup. See the{" "}
-              <a href="/docs/integrations/mcp" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
-                MCP guide
-              </a>{" "}
-              or{" "}
-              <a href="/docs/installation" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
-                self-hosting
-              </a>
-              .
-            </p>
-            <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
-              Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}
-              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">npx -y lelu-mcp start</code>{" "}
-              runs the engine on your machine, and a self-hosted engine accepts any key you set at startup. See the{" "}
+              runs the engine on your machine with a self-generated key, and the TypeScript SDK discovers that engine automatically. A self-hosted engine accepts any key you set at startup. See the{" "}
               <a href="/docs/integrations/mcp" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
                 MCP guide
               </a>{" "}
@@ -187,21 +174,25 @@ export default function DocsQuickStart() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              The SDK talks to a Lelu engine — the one <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-mcp</code> started for you, a Docker container, or a binary install:
+              The SDK talks to a Lelu engine. If <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx lelu-mcp start</code> is
+              running on your machine, <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu()</code> finds
+              it automatically — its address and key live in{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu</code>, so
+              there is nothing to configure:
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`import { createClient } from "lelu-agent-auth";
+{`import { lelu } from "lelu-agent-auth";
 
-const lelu = createClient({
-  baseUrl: process.env.LELU_ENGINE_URL ?? "http://localhost:8080",
-  apiKey: process.env.LELU_API_KEY,
-});
+// Zero-config: discovers the engine \`npx lelu-mcp start\` is running.
+// Point it elsewhere with lelu({ baseUrl, apiKey }) — e.g. a Docker
+// or self-hosted engine — or via LELU_BASE_URL / LELU_API_KEY.
+const auth = lelu();
 
-const result = await lelu.authorize({
+const result = await auth.authorize({
   tool: "refund_payment",
   context: { confidence: 0.85 },
 });
@@ -215,6 +206,14 @@ if (result.decision === "allow") {
 }`}
               </pre>
             </div>
+            <p className="text-[14px] text-[#737373] leading-[1.65] mb-5">
+              The instance also exposes the full engine API under{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">auth.api</code>{" "}
+              (tokens, review queue, audit, policies) and a mountable{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">auth.handler</code>{" "}
+              for Next.js / Express routes. <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">createClient()</code>{" "}
+              from earlier versions keeps working unchanged.
+            </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
               Or try the hosted API directly with your key:

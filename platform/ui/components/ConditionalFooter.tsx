@@ -2,7 +2,7 @@
 import { usePathname } from "next/navigation";
 import LeluFooter from "./LeluFooter";
 
-const HIDE_ON = ["/", "/login", "/register"];
+const HIDE_ON = ["/", "/demo", "/login", "/register"];
 
 export function ConditionalFooter() {
   const pathname = usePathname();

@@ -204,7 +204,7 @@ export default function PoliciesPage() {
     setRules(rules.filter(r => r.id !== id));
   }
 
-  const inputCls = "w-full h-9 px-3 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all";
+  const inputCls = "w-full h-9 px-3 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[#0A0A0A] dark:text-white text-[13px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/10 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/20 transition-all";
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -234,7 +234,7 @@ export default function PoliciesPage() {
       {error && <p className="text-sm text-red-500 mb-6">{error}</p>}
 
       {/* How it works banner */}
-      <div className="mb-6 bg-[#F4F4F5] dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl px-4 py-3 flex items-start gap-3">
+      <div className="mb-6 bg-[#F4F4F5] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-xl px-4 py-3 flex items-start gap-3">
         <Shield className="w-4 h-4 text-[#737373] shrink-0 mt-0.5" />
         <p className="text-[12px] text-[#737373] leading-relaxed">
           Active policies are applied to your real API key requests at <code className="font-mono bg-[#E7E5E4] dark:bg-[#1C1C1E] px-1 py-0.5 rounded">POST /api/v1/authorize</code>.
@@ -245,8 +245,8 @@ export default function PoliciesPage() {
 
       {/* Empty state */}
       {policies.length === 0 && (
-        <div className="text-center py-16 bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl">
-          <div className="w-12 h-12 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] flex items-center justify-center mx-auto mb-4">
+        <div className="text-center py-16 bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl">
+          <div className="w-12 h-12 rounded-full bg-[#F4F4F5] dark:bg-[#20222B] flex items-center justify-center mx-auto mb-4">
             <Shield className="w-5 h-5 text-[#A3A3A3]" />
           </div>
           <p className="text-[14px] font-medium text-[#0A0A0A] dark:text-white mb-1">No policies yet</p>
@@ -269,7 +269,7 @@ export default function PoliciesPage() {
           const result = testResult[policy.id];
 
           return (
-            <div key={policy.id} className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl overflow-hidden">
+            <div key={policy.id} className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl overflow-hidden">
               {/* Policy header */}
               <div className="flex items-center gap-3 px-5 py-4">
                 <button
@@ -324,7 +324,7 @@ export default function PoliciesPage() {
 
               {/* Expanded body */}
               {isExpanded && (
-                <div className="border-t border-[#E7E5E4] dark:border-[#222224] px-5 py-4 space-y-4">
+                <div className="border-t border-[#E7E5E4] dark:border-[#20222B] px-5 py-4 space-y-4">
                   {/* Description edit */}
                   {isEditing && (
                     <div className="space-y-1">
@@ -369,12 +369,12 @@ export default function PoliciesPage() {
                                     value={rule.pattern}
                                     onChange={e => updateRule(draft.rules, rules => setEditDraft(d => d ? { ...d, rules } : d), rule.id, "pattern", e.target.value)}
                                     placeholder="Pattern (e.g. delete|drop)"
-                                    className="flex-1 h-8 px-2.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white font-mono text-[12px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#0A0A0A]/10"
+                                    className="flex-1 h-8 px-2.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[#0A0A0A] dark:text-white font-mono text-[12px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#0A0A0A]/10"
                                   />
                                   <select
                                     value={rule.decision}
                                     onChange={e => updateRule(draft.rules, rules => setEditDraft(d => d ? { ...d, rules } : d), rule.id, "decision", e.target.value)}
-                                    className="h-8 px-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[12px] text-[#0A0A0A] dark:text-white focus:outline-none"
+                                    className="h-8 px-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[12px] text-[#0A0A0A] dark:text-white focus:outline-none"
                                   >
                                     <option value="allow">Allow</option>
                                     <option value="deny">Deny</option>
@@ -387,7 +387,7 @@ export default function PoliciesPage() {
                                   value={rule.reason}
                                   onChange={e => updateRule(draft.rules, rules => setEditDraft(d => d ? { ...d, rules } : d), rule.id, "reason", e.target.value)}
                                   placeholder="Reason shown in the API response"
-                                  className="w-full h-8 px-2.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white text-[12px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#0A0A0A]/10"
+                                  className="w-full h-8 px-2.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[#0A0A0A] dark:text-white text-[12px] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#0A0A0A]/10"
                                 />
                               </div>
                             ) : (
@@ -453,8 +453,8 @@ export default function PoliciesPage() {
       {showCreate && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-[100]">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreate(false)} />
-          <div className="relative bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E4] dark:border-[#222224]">
+          <div className="relative bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E5E4] dark:border-[#20222B]">
               <h2 className="text-[16px] font-bold text-[#0A0A0A] dark:text-white">New Policy</h2>
               <button onClick={() => setShowCreate(false)} className="text-[#A3A3A3] hover:text-[#0A0A0A] dark:hover:text-white"><X className="w-4 h-4" /></button>
             </div>
@@ -484,7 +484,7 @@ export default function PoliciesPage() {
 
                 <div className="space-y-2">
                   {newRules.map((rule, idx) => (
-                    <div key={rule.id} className="bg-[#F9F9F9] dark:bg-[#18181B] rounded-xl p-3 space-y-2">
+                    <div key={rule.id} className="bg-[#F9F9F9] dark:bg-[#13151C] rounded-xl p-3 space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold text-[#A3A3A3] w-5 shrink-0">{idx + 1}</span>
                         <input
@@ -516,7 +516,7 @@ export default function PoliciesPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-[#E7E5E4] dark:border-[#222224] flex gap-3 justify-end">
+            <div className="px-6 py-4 border-t border-[#E7E5E4] dark:border-[#20222B] flex gap-3 justify-end">
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-[13px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Cancel</button>
               <button
                 onClick={handleCreate}
@@ -534,11 +534,11 @@ export default function PoliciesPage() {
       {deleteId && (
         <div className="fixed inset-0 flex items-center justify-center p-4 z-[100]">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteId(null)} />
-          <div className="relative bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className="relative bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <h3 className="text-[16px] font-bold text-[#0A0A0A] dark:text-white mb-2">Delete Policy?</h3>
             <p className="text-[13px] text-[#737373] mb-6">This cannot be undone. The policy will stop affecting authorization immediately.</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] rounded-xl text-[13px] font-medium hover:bg-[#F4F4F5] dark:hover:bg-[#1C1C1E] transition-colors">Cancel</button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#20222B] rounded-xl text-[13px] font-medium hover:bg-[#F4F4F5] dark:hover:bg-[#1C1C1E] transition-colors">Cancel</button>
               <button onClick={() => handleDelete(deleteId)} disabled={deleting} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl text-[13px] font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors">
                 {deleting ? "Deleting…" : "Delete"}
               </button>

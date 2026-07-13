@@ -27,8 +27,8 @@ const config = {
       colors: {
         black: {
           DEFAULT: "#000",
-          100: "#0B0B0C",
-          200: "#141416",
+          100: "#0A0B10",
+          200: "#0D0E13",
           300: "#222224",
         },
         white: {
@@ -38,7 +38,7 @@ const config = {
         },
         surface: {
           light: "#F5F5F4",
-          dark: "#141416",
+          dark: "#0D0E13",
         },
         lelu: {
           amber: "#E8B339",

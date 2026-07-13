@@ -213,7 +213,7 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="p-6 sm:p-8 rounded-[2rem] bg-[#0A0A0A] dark:bg-[#141416] shadow-xl overflow-hidden relative">
+          <div className="p-6 sm:p-8 rounded-[2rem] bg-[#0A0A0A] dark:bg-[#0D0E13] shadow-xl overflow-hidden relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl -translate-y-12 translate-x-12" />
             <div className="relative z-10 flex flex-col h-full gap-4">
               <Shield className="w-9 h-9 text-white/40" />

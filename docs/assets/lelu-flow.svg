@@ -1,0 +1,213 @@
+<svg width="760" height="330" viewBox="0 0 760 330" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="lf-title lf-desc">
+  <title id="lf-title">How Lelu works</title>
+  <desc id="lf-desc">Agents built with LangChain, CrewAI, Claude Code (MCP), or plain REST call the Lelu authorization engine and receive one of four decisions — allow, deny, human_review, or compute — and every decision is written to the audit log.</desc>
+
+  <defs>
+    <linearGradient id="lf-lg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8B5CF6"/>
+      <stop offset="0.5" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+
+  <style>
+    .t-name { font: 600 12.5px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: #D4D4D8; }
+    .t-lelu { font: 700 15px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: #FAFAFA; }
+    .t-sub  { font: 400 9.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #77777f; }
+    .t-esub { font: 400 10px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #8B8D98; }
+    .t-req  { font: 500 12px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #C9C9D2; }
+    .t-chip { font: 500 12.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #9A9AA3; }
+    .t-log  { font: 400 11.5px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; fill: #A1A1AA; }
+    .t-audit{ font: 600 9px system-ui, -apple-system, 'Segoe UI', sans-serif; fill: #6B6B76; letter-spacing: 1.5px; }
+    .icon   { stroke: #8B8D98; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+    .ping { transform-box: fill-box; transform-origin: center; animation: lf-ping 1.8s ease-out infinite; }
+    .adot { animation: lf-adot 1.2s ease-in-out infinite; }
+
+    .g1 { animation: lf-g1 16s linear infinite; }
+    .g2 { animation: lf-g2 16s linear infinite; }
+    .g3 { animation: lf-g3 16s linear infinite; }
+    .g4 { animation: lf-g4 16s linear infinite; }
+    .s1 { animation: lf-g1 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .s2 { animation: lf-g2 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .s3 { animation: lf-g3 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .s4 { animation: lf-g4 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .c1 { animation: lf-c1 16s linear infinite; }
+    .c2 { animation: lf-c2 16s linear infinite; }
+    .c3 { animation: lf-c3 16s linear infinite; }
+    .c4 { animation: lf-c4 16s linear infinite; }
+    .k1 { animation: lf-c1 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .k2 { animation: lf-c2 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .k3 { animation: lf-c3 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .k4 { animation: lf-c4 16s linear infinite, lf-dash 0.7s linear infinite; }
+    .a1 { animation: lf-a1 16s linear infinite; }
+    .a2 { animation: lf-a2 16s linear infinite; }
+    .a3 { animation: lf-a3 16s linear infinite; }
+    .a4 { animation: lf-a4 16s linear infinite; }
+
+    @keyframes lf-dash { to { stroke-dashoffset: -12; } }
+    @keyframes lf-ping { 0% { transform: scale(1); opacity: 0.45; } 70% { opacity: 0; } 100% { transform: scale(1.07); opacity: 0; } }
+    @keyframes lf-adot { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+    @keyframes lf-g1 { 0% { opacity: 0; } 1.5% { opacity: 1; } 23% { opacity: 1; } 25%, 100% { opacity: 0; } }
+    @keyframes lf-g2 { 0%, 25% { opacity: 0; } 26.5% { opacity: 1; } 48% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    @keyframes lf-g3 { 0%, 50% { opacity: 0; } 51.5% { opacity: 1; } 73% { opacity: 1; } 75%, 100% { opacity: 0; } }
+    @keyframes lf-g4 { 0%, 75% { opacity: 0; } 76.5% { opacity: 1; } 98% { opacity: 1; } 100% { opacity: 0; } }
+
+    @keyframes lf-c1 { 0%, 5% { opacity: 0; } 7% { opacity: 1; } 23% { opacity: 1; } 25%, 100% { opacity: 0; } }
+    @keyframes lf-c2 { 0%, 30% { opacity: 0; } 32% { opacity: 1; } 34% { opacity: 0.25; } 36% { opacity: 1; } 38% { opacity: 0.25; } 40% { opacity: 1; } 48% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    @keyframes lf-c3 { 0%, 55% { opacity: 0; } 57% { opacity: 1; } 73% { opacity: 1; } 75%, 100% { opacity: 0; } }
+    @keyframes lf-c4 { 0%, 80% { opacity: 0; } 82% { opacity: 1; } 98% { opacity: 1; } 100% { opacity: 0; } }
+
+    @keyframes lf-a1 { 0%, 9% { opacity: 0; } 11% { opacity: 1; } 23.5% { opacity: 1; } 25%, 100% { opacity: 0; } }
+    @keyframes lf-a2 { 0%, 34% { opacity: 0; } 36% { opacity: 1; } 48.5% { opacity: 1; } 50%, 100% { opacity: 0; } }
+    @keyframes lf-a3 { 0%, 59% { opacity: 0; } 61% { opacity: 1; } 73.5% { opacity: 1; } 75%, 100% { opacity: 0; } }
+    @keyframes lf-a4 { 0%, 84% { opacity: 0; } 86% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ping, .adot, .g1, .g2, .g3, .g4, .s1, .s2, .s3, .s4, .c1, .c2, .c3, .c4, .k1, .k2, .k3, .k4, .a1, .a2, .a3, .a4 { animation: none; }
+    }
+  </style>
+
+  <!-- card -->
+  <rect x="0.5" y="0.5" width="759" height="329" rx="14" fill="#0A0A0E" stroke="#26262E"/>
+
+  <!-- source nodes (integrations) -->
+  <rect x="36" y="30" width="132" height="40" rx="9" fill="#131318" stroke="#2A2A33"/>
+  <circle cx="53" cy="50" r="3" fill="#3B82F6" opacity="0.55"/>
+  <text x="65" y="47" class="t-name">LangChain</text>
+  <text x="65" y="61" class="t-sub">support-bot</text>
+
+  <rect x="36" y="78" width="132" height="40" rx="9" fill="#131318" stroke="#2A2A33"/>
+  <circle cx="53" cy="98" r="3" fill="#3B82F6" opacity="0.55"/>
+  <text x="65" y="95" class="t-name">CrewAI</text>
+  <text x="65" y="109" class="t-sub">billing-crew</text>
+
+  <rect x="36" y="126" width="132" height="40" rx="9" fill="#131318" stroke="#2A2A33"/>
+  <circle cx="53" cy="146" r="3" fill="#3B82F6" opacity="0.55"/>
+  <text x="65" y="143" class="t-name">Claude Code</text>
+  <text x="65" y="157" class="t-sub">via MCP</text>
+
+  <rect x="36" y="174" width="132" height="40" rx="9" fill="#131318" stroke="#2A2A33"/>
+  <circle cx="53" cy="194" r="3" fill="#3B82F6" opacity="0.55"/>
+  <text x="65" y="191" class="t-name">REST API</text>
+  <text x="65" y="205" class="t-sub">any language</text>
+
+  <!-- + more integrations hint -->
+  <text x="102" y="228" class="t-sub" text-anchor="middle">+ AutoGen · LangGraph · Mastra</text>
+
+  <!-- source active overlays -->
+  <g class="g1" opacity="0">
+    <rect x="36" y="30" width="132" height="40" rx="9" stroke="#3B82F6" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="36" y="30" width="132" height="40" rx="9" fill="#3B82F6" fill-opacity="0.06" stroke="#3B82F6" stroke-width="1.5"/>
+    <circle cx="53" cy="50" r="3" fill="#3B82F6"/>
+    <text x="65" y="47" class="t-name" fill="#FFFFFF">LangChain</text>
+  </g>
+  <g class="g2" opacity="1">
+    <rect x="36" y="78" width="132" height="40" rx="9" stroke="#3B82F6" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="36" y="78" width="132" height="40" rx="9" fill="#3B82F6" fill-opacity="0.06" stroke="#3B82F6" stroke-width="1.5"/>
+    <circle cx="53" cy="98" r="3" fill="#3B82F6"/>
+    <text x="65" y="95" class="t-name" fill="#FFFFFF">CrewAI</text>
+  </g>
+  <g class="g3" opacity="0">
+    <rect x="36" y="126" width="132" height="40" rx="9" stroke="#3B82F6" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="36" y="126" width="132" height="40" rx="9" fill="#3B82F6" fill-opacity="0.06" stroke="#3B82F6" stroke-width="1.5"/>
+    <circle cx="53" cy="146" r="3" fill="#3B82F6"/>
+    <text x="65" y="143" class="t-name" fill="#FFFFFF">Claude Code</text>
+  </g>
+  <g class="g4" opacity="0">
+    <rect x="36" y="174" width="132" height="40" rx="9" stroke="#3B82F6" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="36" y="174" width="132" height="40" rx="9" fill="#3B82F6" fill-opacity="0.06" stroke="#3B82F6" stroke-width="1.5"/>
+    <circle cx="53" cy="194" r="3" fill="#3B82F6"/>
+    <text x="65" y="191" class="t-name" fill="#FFFFFF">REST API</text>
+  </g>
+
+  <!-- connectors sources → lelu -->
+  <path d="M168 50 C 240 50 254 140 326 140" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M168 98 C 240 98 254 140 326 140" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M168 146 C 240 146 254 140 326 140" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M168 194 C 240 194 254 140 326 140" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M168 50 C 240 50 254 140 326 140"   stroke="#3B82F6" stroke-width="2" stroke-dasharray="6 6" class="s1" opacity="0"/>
+  <path d="M168 98 C 240 98 254 140 326 140"   stroke="#3B82F6" stroke-width="2" stroke-dasharray="6 6" class="s2" opacity="1"/>
+  <path d="M168 146 C 240 146 254 140 326 140" stroke="#3B82F6" stroke-width="2" stroke-dasharray="6 6" class="s3" opacity="0"/>
+  <path d="M168 194 C 240 194 254 140 326 140" stroke="#3B82F6" stroke-width="2" stroke-dasharray="6 6" class="s4" opacity="0"/>
+
+  <!-- request labels (one per segment) -->
+  <text x="401" y="82" class="t-req g1" text-anchor="middle" opacity="0">read_record</text>
+  <text x="401" y="82" class="t-req g2" text-anchor="middle" opacity="1">delete_all_records</text>
+  <text x="401" y="82" class="t-req g3" text-anchor="middle" opacity="0">send_refund $500</text>
+  <text x="401" y="82" class="t-req g4" text-anchor="middle" opacity="0">write prod_db</text>
+
+  <!-- lelu node -->
+  <rect x="326" y="96" width="150" height="88" rx="12" class="ping" stroke="#8B5CF6" stroke-width="2"/>
+  <rect x="326" y="96" width="150" height="88" rx="12" fill="#17171D" stroke="url(#lf-lg)" stroke-width="1.5"/>
+  <g transform="translate(348 111) scale(0.62)" fill="#FAFAFA">
+    <rect x="0" y="0" width="26" height="9" rx="4.5"/>
+    <rect x="3" y="13" width="26" height="9" rx="4.5"/>
+    <rect x="6" y="26" width="26" height="9" rx="4.5"/>
+  </g>
+  <text x="376" y="128" class="t-lelu">Lelu</text>
+  <text x="401" y="166" class="t-esub" text-anchor="middle">authorization engine</text>
+
+  <!-- connectors lelu → decisions -->
+  <path d="M476 140 C 528 140 532 50 584 50" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M476 140 C 528 140 532 98 584 98" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M476 140 C 528 140 532 146 584 146" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M476 140 C 528 140 532 194 584 194" stroke="#26262E" stroke-width="1.25"/>
+  <path d="M476 140 C 528 140 532 50 584 50"   stroke="#10B981" stroke-width="2" stroke-dasharray="6 6" class="k1" opacity="0"/>
+  <path d="M476 140 C 528 140 532 98 584 98"   stroke="#EF4444" stroke-width="2" stroke-dasharray="6 6" class="k2" opacity="1"/>
+  <path d="M476 140 C 528 140 532 146 584 146" stroke="#F59E0B" stroke-width="2" stroke-dasharray="6 6" class="k3" opacity="0"/>
+  <path d="M476 140 C 528 140 532 194 584 194" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="6 6" class="k4" opacity="0"/>
+
+  <!-- decision chips (base) -->
+  <rect x="584" y="30" width="152" height="40" rx="9" fill="#121217" stroke="#26262E"/>
+  <path d="M600 50l4 4 8-8" class="icon"/>
+  <text x="622" y="54" class="t-chip">allow</text>
+
+  <rect x="584" y="78" width="152" height="40" rx="9" fill="#121217" stroke="#26262E"/>
+  <g class="icon"><circle cx="606" cy="98" r="7"/><line x1="601.2" y1="102.8" x2="610.8" y2="93.2"/></g>
+  <text x="622" y="102" class="t-chip">deny</text>
+
+  <rect x="584" y="126" width="152" height="40" rx="9" fill="#121217" stroke="#26262E"/>
+  <g class="icon"><circle cx="606" cy="142.5" r="3"/><path d="M599.5 152.5a6.5 5.5 0 0 1 13 0"/></g>
+  <text x="622" y="150" class="t-chip">human_review</text>
+
+  <rect x="584" y="174" width="152" height="40" rx="9" fill="#121217" stroke="#26262E"/>
+  <g class="icon"><path d="M603.5 188v4l-4.6 8a1.7 1.7 0 0 0 1.5 2.5h11.2a1.7 1.7 0 0 0 1.5-2.5l-4.6-8v-4"/><line x1="601.5" y1="188" x2="610.5" y2="188"/></g>
+  <text x="622" y="198" class="t-chip">compute</text>
+
+  <!-- decision chips (active overlays) -->
+  <g class="c1" opacity="0">
+    <rect x="584" y="30" width="152" height="40" rx="9" stroke="#10B981" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="584" y="30" width="152" height="40" rx="9" fill="#10B981" fill-opacity="0.07" stroke="#10B981" stroke-width="1.5"/>
+    <path d="M600 50l4 4 8-8" class="icon" style="stroke:#10B981"/>
+    <text x="622" y="54" class="t-chip" fill="#10B981">allow</text>
+  </g>
+  <g class="c2" opacity="1">
+    <rect x="584" y="78" width="152" height="40" rx="9" stroke="#EF4444" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="584" y="78" width="152" height="40" rx="9" fill="#EF4444" fill-opacity="0.07" stroke="#EF4444" stroke-width="1.5"/>
+    <g class="icon" style="stroke:#EF4444"><circle cx="606" cy="98" r="7"/><line x1="601.2" y1="102.8" x2="610.8" y2="93.2"/></g>
+    <text x="622" y="102" class="t-chip" fill="#EF4444">deny</text>
+  </g>
+  <g class="c3" opacity="0">
+    <rect x="584" y="126" width="152" height="40" rx="9" stroke="#F59E0B" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="584" y="126" width="152" height="40" rx="9" fill="#F59E0B" fill-opacity="0.07" stroke="#F59E0B" stroke-width="1.5"/>
+    <g class="icon" style="stroke:#F59E0B"><circle cx="606" cy="142.5" r="3"/><path d="M599.5 152.5a6.5 5.5 0 0 1 13 0"/></g>
+    <text x="622" y="150" class="t-chip" fill="#F59E0B">human_review</text>
+  </g>
+  <g class="c4" opacity="0">
+    <rect x="584" y="174" width="152" height="40" rx="9" stroke="#8B5CF6" stroke-opacity="0.18" stroke-width="6"/>
+    <rect x="584" y="174" width="152" height="40" rx="9" fill="#8B5CF6" fill-opacity="0.07" stroke="#8B5CF6" stroke-width="1.5"/>
+    <g class="icon" style="stroke:#8B5CF6"><path d="M603.5 188v4l-4.6 8a1.7 1.7 0 0 0 1.5 2.5h11.2a1.7 1.7 0 0 0 1.5-2.5l-4.6-8v-4"/><line x1="601.5" y1="188" x2="610.5" y2="188"/></g>
+    <text x="622" y="198" class="t-chip" fill="#8B5CF6">compute</text>
+  </g>
+
+  <!-- audit log -->
+  <rect x="36" y="258" width="700" height="52" rx="10" fill="#0F0F14" stroke="#232329"/>
+  <circle cx="52" cy="275" r="3" fill="#10B981" class="adot"/>
+  <text x="62" y="279" class="t-audit">AUDIT LOG</text>
+  <text x="52" y="298" class="t-log a1" opacity="0"><tspan fill="#10B981">ALLOW</tspan> read_record · langchain support-bot · policy crud-read</text>
+  <text x="52" y="298" class="t-log a2" opacity="1"><tspan fill="#EF4444">DENY</tspan> delete_all_records · crewai billing-crew · destructive action blocked</text>
+  <text x="52" y="298" class="t-log a3" opacity="0"><tspan fill="#F59E0B">PAUSE</tspan> send_refund $500 · claude-code · awaiting human approval (Slack)</text>
+  <text x="52" y="298" class="t-log a4" opacity="0"><tspan fill="#8B5CF6">REDIR</tspan> write prod_db · rest client · rerouted to sandbox_db (compute)</text>
+</svg>

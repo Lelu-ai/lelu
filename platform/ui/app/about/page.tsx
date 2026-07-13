@@ -18,7 +18,7 @@ const TEAM = [
       { label: "GitHub", href: "https://github.com/Abenezer0923", icon: <FaGithub /> },
       { label: "Contact", href: "mailto:abenezerg@lelu-ai.com", icon: <FiMail /> },
     ],
-    avatarBg: "bg-[#0A0A0A] dark:bg-[#222224]",
+    avatarBg: "bg-[#0A0A0A] dark:bg-[#20222B]",
     badge: "bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A]",
   },
   {
@@ -73,7 +73,7 @@ const WHAT_WE_BUILT = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C]">
+    <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10]">
       <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-16">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
@@ -93,8 +93,8 @@ export default function AboutPage() {
           <h2 className="text-[18px] font-bold tracking-[-0.01em] text-[#0A0A0A] dark:text-white mb-5">
             Company Overview
           </h2>
-          <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl overflow-hidden">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-[#E7E5E4] dark:divide-[#222224]">
+          <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y divide-[#E7E5E4] dark:divide-[#20222B]">
               {OVERVIEW.map((item) => (
                 <div key={item.label} className="p-4">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-[#A3A3A3] mb-1.5">{item.label}</p>
@@ -102,7 +102,7 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
-            <div className="border-t border-[#E7E5E4] dark:border-[#222224] p-5">
+            <div className="border-t border-[#E7E5E4] dark:border-[#20222B] p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-[#A3A3A3] mb-4">Links</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {LINKS.map((l) => (
@@ -111,7 +111,7 @@ export default function AboutPage() {
                     href={l.href}
                     target={l.href.startsWith("http") ? "_blank" : undefined}
                     rel="noopener noreferrer"
-                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#F4F4F5] dark:bg-[#1A1A1C] border border-[#E7E5E4] dark:border-[#27272A] hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#F4F4F5] dark:bg-[#12141A] border border-[#E7E5E4] dark:border-[#20222B] hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
                   >
                     <div className="flex items-center gap-2 text-[13px] font-medium text-[#0A0A0A] dark:text-white">
                       <span className="text-base">{l.icon}</span>
@@ -130,7 +130,7 @@ export default function AboutPage() {
           <h2 className="text-[18px] font-bold tracking-[-0.01em] text-[#0A0A0A] dark:text-white mb-5">
             Mission
           </h2>
-          <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-6 space-y-4 text-[15px] text-[#737373] leading-relaxed">
+          <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-6 space-y-4 text-[15px] text-[#737373] leading-relaxed">
             <p>
               AI agents are powerful enough to take real actions — processing refunds, modifying
               databases, sending emails, making business decisions. But traditional authorization
@@ -157,7 +157,7 @@ export default function AboutPage() {
             {WHAT_WE_BUILT.map((item) => (
               <div
                 key={item.title}
-                className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-5"
+                className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-5"
               >
                 <p className="text-[13px] font-bold text-[#0A0A0A] dark:text-white mb-2">{item.title}</p>
                 <p className="text-[13px] text-[#737373] leading-relaxed">{item.desc}</p>
@@ -175,7 +175,7 @@ export default function AboutPage() {
             {TEAM.map((person) => (
               <div
                 key={person.name}
-                className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5"
+                className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5"
               >
                 <div className={`w-14 h-14 rounded-xl ${person.avatarBg} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
                   {person.initials}
@@ -201,7 +201,7 @@ export default function AboutPage() {
                           href={l.href}
                           target={l.href.startsWith("http") ? "_blank" : undefined}
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#1A1A1C] border border-[#E7E5E4] dark:border-[#27272A] text-[12px] font-medium text-[#0A0A0A] dark:text-white hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F4F4F5] dark:bg-[#12141A] border border-[#E7E5E4] dark:border-[#20222B] text-[12px] font-medium text-[#0A0A0A] dark:text-white hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors"
                         >
                           <span className="text-sm">{l.icon}</span>
                           {l.label}
@@ -217,7 +217,7 @@ export default function AboutPage() {
           {/* Advisor */}
           <div className="mt-4">
             <p className="text-[11px] font-bold uppercase tracking-widest text-[#A3A3A3] mb-3 px-1">Advisor</p>
-            <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5">
+            <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5">
               <div className={`w-14 h-14 rounded-xl ${ADVISOR.avatarBg} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
                 {ADVISOR.initials}
               </div>
@@ -243,9 +243,9 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <a
               href="mailto:abenezerg@lelu-ai.com"
-              className="flex items-center gap-4 p-5 bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
+              className="flex items-center gap-4 p-5 bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] dark:bg-[#1A1A1C] flex items-center justify-center shrink-0 group-hover:bg-[#0A0A0A] dark:group-hover:bg-white transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] dark:bg-[#12141A] flex items-center justify-center shrink-0 group-hover:bg-[#0A0A0A] dark:group-hover:bg-white transition-colors">
                 <FiMail className="text-[#737373] group-hover:text-white dark:group-hover:text-[#0A0A0A] transition-colors" size={16} />
               </div>
               <div>
@@ -255,9 +255,9 @@ export default function AboutPage() {
             </a>
             <a
               href="mailto:security@lelu-ai.com"
-              className="flex items-center gap-4 p-5 bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
+              className="flex items-center gap-4 p-5 bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl hover:border-[#0A0A0A] dark:hover:border-white/30 transition-colors group"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] dark:bg-[#1A1A1C] flex items-center justify-center shrink-0 group-hover:bg-[#0A0A0A] dark:group-hover:bg-white transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] dark:bg-[#12141A] flex items-center justify-center shrink-0 group-hover:bg-[#0A0A0A] dark:group-hover:bg-white transition-colors">
                 <FiShield className="text-[#737373] group-hover:text-white dark:group-hover:text-[#0A0A0A] transition-colors" size={16} />
               </div>
               <div>
@@ -270,7 +270,7 @@ export default function AboutPage() {
 
         {/* ── Open Source ────────────────────────────────────────────── */}
         <section className="pb-4">
-          <div className="bg-[#0A0A0A] dark:bg-[#111113] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-[#0A0A0A] dark:bg-[#0D0E13] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="text-[13px] font-bold text-white mb-1">Open Source — MIT License</p>
               <p className="text-[13px] text-white/50 leading-relaxed max-w-md">

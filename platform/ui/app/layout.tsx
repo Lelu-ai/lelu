@@ -29,11 +29,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
-      <body className="bg-[#FAFAFA] dark:bg-[#0B0B0C] text-[#0A0A0A] dark:text-zinc-100 font-sans min-h-screen selection:bg-black/10 dark:selection:bg-white/20 flex flex-col transition-colors duration-300">
+      <body className="bg-[#FAFAFA] dark:bg-[#0A0B10] text-[#0A0A0A] dark:text-zinc-100 font-sans min-h-screen selection:bg-black/10 dark:selection:bg-white/20 flex flex-col transition-colors duration-300">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <SiteNav />

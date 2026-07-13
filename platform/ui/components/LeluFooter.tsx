@@ -11,7 +11,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
   const showCTA = manualShowCTA ?? false;
 
   return (
-    <footer className="w-full border-t border-[#E7E5E4] dark:border-[#222224]" id="contact">
+    <footer className="w-full border-t border-[#E7E5E4] dark:border-[#20222B]" id="contact">
       {/* Final CTA */}
       {showCTA && (
         <motion.div
@@ -38,7 +38,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
               href="https://github.com/lelu-ai/lelu"
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E7E5E4] dark:border-[#222224] bg-transparent text-[#0A0A0A] dark:text-white px-6 py-2.5 text-sm font-medium hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] bg-transparent text-[#0A0A0A] dark:text-white px-6 py-2.5 text-sm font-medium hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
             >
               <FaGithub className="w-4 h-4" />
               View on GitHub

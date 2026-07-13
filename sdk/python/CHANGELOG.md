@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0] (2026-07-13)
+
+### Features — full alignment with the current engine API
+
+* **Human-review queue client** — the engine's HITL endpoints are now first-class: `list_pending_reviews()`, `get_review(id)`, `wait_review(id, timeout_ms)` (long-poll until a human approves/denies; engine caps each wait at 60s), `approve_review(id, resolved_by, note)` and `deny_review(...)`. New `ReviewItem` / `ListReviewsResult` models mirror the engine's queue item exactly (`confidence_score`, `acting_for`, `enqueued_at`, `status`, `resolved_by`, `resolution_note`, …).
+* **Output scanning** — `scan_output(output, actor?, action?, resource?)` calls `POST /v1/scan/output` (indirect prompt-injection defense) and returns `ScanOutputResult` (`safe`, `detected`, `pattern`, `source`, `method`, `score`).
+* **Engine policy management** — `get_engine_policy()` (`GET /v1/policy`), `validate_policy(bytes)` (`POST /v1/policy/validate`), and `put_engine_policy(bytes, if_match=digest)` (`PUT /v1/policy`, admin key + optimistic concurrency via `If-Match`). These target the engine's live policy — distinct from the platform policy CRUD, which is unchanged.
+* **Engine status** — `fallback_status()` (`GET /v1/fallback/status`) and `shadow_summary()` (`GET /v1/shadow/summary`).
+
+### Improvements
+
+* **`AuthDecision` now parses the engine's complete response** — added `confidence_used`, `effective_scope`, `downgraded_scope`, `risk_score`, `risk_criticality`, `risk_reliability`, `risk_anomaly_factor`, `shadow_mode`, and the shadow-mode `would_have_allowed` / `would_have_reason` / `would_have_requires_human_review` fields. Previously these were silently dropped.
+* **`AuthorizeRequest` gains `resource` and `tenant_id`** — both are accepted by `POST /v1/agent/authorize` and forwarded when set (previously there was no way to send a target resource through the primary API).
+
+
 ## [0.3.67] (2026-06-16)
 
 ### Bug Fixes

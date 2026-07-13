@@ -203,14 +203,14 @@ export function DocsSidebar() {
   const isDark = resolvedTheme === "dark";
 
   return (
-    <aside className="hidden md:flex flex-col w-[240px] shrink-0 sticky top-14 h-[calc(100vh-56px)] border-r border-[#E7E5E4] dark:border-[#27272A] bg-white dark:bg-[#0B0B0C]">
+    <aside className="hidden md:flex flex-col w-[240px] shrink-0 sticky top-14 h-[calc(100vh-56px)] border-r border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0A0B10]">
       {/* Scrollable nav area */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto overscroll-contain no-scrollbar py-5 px-3"
       >
         {/* Version selector */}
-        <button className="w-full mb-3 flex items-center gap-2 px-3 py-2 text-xs border border-[#E7E5E4] dark:border-[#27272A] rounded-md bg-white dark:bg-[#0B0B0C] hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors text-left">
+        <button className="w-full mb-3 flex items-center gap-2 px-3 py-2 text-xs border border-[#E7E5E4] dark:border-[#20222B] rounded-md bg-white dark:bg-[#0A0B10] hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors text-left">
           <svg
             width="12"
             height="12"
@@ -228,7 +228,7 @@ export function DocsSidebar() {
             <path d="M18 9a9 9 0 0 1-9 9" />
           </svg>
           <span className="flex-1 font-medium text-[#0A0A0A] dark:text-white">v1.0</span>
-          <span className="text-[10px] text-[#737373] border border-[#E7E5E4] dark:border-[#27272A] px-1.5 py-0.5 rounded">
+          <span className="text-[10px] text-[#737373] border border-[#E7E5E4] dark:border-[#20222B] px-1.5 py-0.5 rounded">
             Latest
           </span>
           <svg
@@ -245,7 +245,7 @@ export function DocsSidebar() {
         </button>
 
         {/* Search */}
-        <button className="w-full mb-5 flex items-center gap-2 px-3 py-2 text-xs text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded-md transition-colors">
+        <button className="w-full mb-5 flex items-center gap-2 px-3 py-2 text-xs text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-md transition-colors">
           <svg
             width="13"
             height="13"
@@ -260,7 +260,7 @@ export function DocsSidebar() {
             <path d="m21 21-4.35-4.35" />
           </svg>
           <span className="flex-1 text-left">Search...</span>
-          <kbd className="flex items-center px-1.5 py-0.5 text-[10px] font-medium text-[#737373] bg-white dark:bg-[#0B0B0C] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+          <kbd className="flex items-center px-1.5 py-0.5 text-[10px] font-medium text-[#737373] bg-white dark:bg-[#0A0B10] border border-[#E7E5E4] dark:border-[#20222B] rounded">
             ⌘K
           </kbd>
         </button>
@@ -319,8 +319,8 @@ export function DocsSidebar() {
                               className={[
                                 "flex items-center py-1.5 pl-8 pr-3 -mx-3 text-[13px] transition-colors",
                                 active
-                                  ? "is-active bg-[#F5F5F4] dark:bg-[#141416] text-[#0A0A0A] dark:text-white font-medium"
-                                  : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416]",
+                                  ? "is-active bg-[#F5F5F4] dark:bg-[#0D0E13] text-[#0A0A0A] dark:text-white font-medium"
+                                  : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13]",
                               ].join(" ")}
                             >
                               {item.label}
@@ -343,7 +343,7 @@ export function DocsSidebar() {
           href="https://github.com/lelu-ai/lelu"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#27272A] text-[12px] font-semibold text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] transition-colors"
+          className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] text-[12px] font-semibold text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -356,7 +356,7 @@ export function DocsSidebar() {
       </div>
 
       {/* Bottom bar: GitHub + theme toggle */}
-      <div className="px-4 py-3 border-t border-[#E7E5E4] dark:border-[#27272A] flex items-center gap-3">
+      <div className="px-4 py-3 border-t border-[#E7E5E4] dark:border-[#20222B] flex items-center gap-3">
         <a
           href="https://github.com/lelu-ai/lelu"
           target="_blank"

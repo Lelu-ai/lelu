@@ -15,6 +15,7 @@ interface User {
 
 const NAV_LINKS = [
   { name: "Docs", href: "/docs" },
+  { name: "Pricing", href: "/pricing" },
   { name: "Sandbox", href: "/sandbox" },
   { name: "About", href: "/about" },
   { name: "Agents", href: "/agents" },
@@ -65,7 +66,7 @@ export function SiteNav() {
   }
 
   // Home and auth pages manage their own nav/logo
-  if (pathname === "/" || AUTH_ROUTES.includes(pathname)) return null;
+  if (pathname === "/" || pathname === "/demo" || AUTH_ROUTES.includes(pathname)) return null;
 
   const initials = typeof user === "object" && user
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
@@ -73,7 +74,7 @@ export function SiteNav() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#27272A] bg-white/80 dark:bg-[#0B0B0C]/90 backdrop-blur-md">
+      <header className="fixed top-0 left-0 right-0 z-[5000] h-14 border-b border-[#E7E5E4] dark:border-[#20222B] bg-white/80 dark:bg-[#0A0B10]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between gap-4">
 
           {/* Logo */}
@@ -119,20 +120,14 @@ export function SiteNav() {
 
             {/* Auth: loading skeleton */}
             {user === "loading" && (
-              <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#141416] animate-pulse" />
+              <div className="w-8 h-8 rounded-full bg-[#F5F5F4] dark:bg-[#0D0E13] animate-pulse" />
             )}
 
-            {/* Auth: logged out */}
+            {/* No accounts during beta — everything is free */}
             {user === null && (
               <div className="hidden sm:flex items-center gap-2">
                 <Link
-                  href="/login"
-                  className="px-3 py-1.5 text-[13px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
+                  href="/docs/quickstart"
                   className="px-3 py-1.5 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
                 >
                   Get started
@@ -161,8 +156,8 @@ export function SiteNav() {
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#27272A] rounded-lg shadow-lg overflow-hidden z-50">
-                    <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#27272A]">
+                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-lg shadow-lg overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#20222B]">
                       <p className="text-[13px] font-semibold text-[#0A0A0A] dark:text-white truncate">{user.name}</p>
                       <p className="text-[12px] text-[#737373] truncate">{user.email}</p>
                     </div>
@@ -179,16 +174,16 @@ export function SiteNav() {
                           key={item.href}
                           href={item.href}
                           onClick={() => setDropdownOpen(false)}
-                          className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+                          className="block px-4 py-2 text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
                         >
                           {item.label}
                         </Link>
                       ))}
                     </div>
-                    <div className="border-t border-[#E7E5E4] dark:border-[#27272A] py-1">
+                    <div className="border-t border-[#E7E5E4] dark:border-[#20222B] py-1">
                       <button
                         onClick={logout}
-                        className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#1A1A1C] transition-colors"
+                        className="w-full text-left px-4 py-2 text-[13px] text-red-600 dark:text-red-400 hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
                       >
                         Sign out
                       </button>
@@ -220,32 +215,29 @@ export function SiteNav() {
 
       {/* Mobile dropdown menu */}
       {mobileOpen && (
-        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0B0B0C] border-b border-[#E7E5E4] dark:border-[#27272A] shadow-md md:hidden">
+        <div className="fixed top-14 left-0 right-0 z-[4999] bg-white dark:bg-[#0A0B10] border-b border-[#E7E5E4] dark:border-[#20222B] shadow-md md:hidden">
           <nav className="flex flex-col px-4 py-3 gap-0.5">
             {NAV_LINKS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors"
+                className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors"
               >
                 {item.name}
               </Link>
             ))}
-            <div className="h-px bg-[#E7E5E4] dark:bg-[#27272A] my-2" />
+            <div className="h-px bg-[#E7E5E4] dark:bg-[#20222B] my-2" />
             <a
               href="https://github.com/lelu-ai/lelu"
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors flex items-center gap-2"
+              className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] rounded-md transition-colors flex items-center gap-2"
             >
               <FaGithub className="h-4 w-4" /> GitHub
             </a>
             {user === null && (
               <>
-                <Link href="/login" className="px-3 py-2.5 text-[14px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#141416] rounded-md transition-colors">
-                  Sign in
-                </Link>
-                <Link href="/register" className="mx-3 mt-1 py-2.5 text-[14px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md text-center hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
+                <Link href="/docs/quickstart" className="mx-3 mt-1 py-2.5 text-[14px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md text-center hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors">
                   Get started
                 </Link>
               </>

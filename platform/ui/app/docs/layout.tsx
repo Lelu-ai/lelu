@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0B0B0C]">
+    <div className="min-h-screen bg-white dark:bg-[#0A0B10]">
       <div className="docs-page flex max-w-[1400px] mx-auto w-full">
         <DocsSidebar />
 

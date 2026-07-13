@@ -16,7 +16,7 @@ export default function DocsQuickStart() {
         </p>
       </div>
 
-      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+      <hr className="border-[#E7E5E4] dark:border-[#20222B] mb-10" />
 
       {/* Zero-setup path */}
       <section className="mb-14">
@@ -30,11 +30,11 @@ export default function DocsQuickStart() {
           One command downloads the Lelu engine, starts it on your machine with a starter
           policy, and serves it over MCP. Everything runs locally — nothing is sent to our cloud.
         </p>
-        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4">
-          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-4">
+          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
             <span className="text-[12px] text-[#737373] font-mono">terminal</span>
           </div>
-          <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+          <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`npx -y lelu-mcp start`}
           </pre>
         </div>
@@ -42,30 +42,30 @@ export default function DocsQuickStart() {
           Or wire it straight into your agent host — Claude Code, Claude Desktop, or Cursor —
           so every tool call is policy-gated:
         </p>
-        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-4">
-          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+        <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-4">
+          <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
             <span className="text-[12px] text-[#737373] font-mono">Claude Code</span>
           </div>
-          <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+          <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio`}
           </pre>
         </div>
         <p className="text-[14px] text-[#737373] leading-[1.65]">
           The starter policy lands in{" "}
-          <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">~/.lelu/policy.yaml</code>
+          <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu/policy.yaml</code>
           {" "}— it denies destructive actions, routes payments to human review, allows reads,
           and default-denies the rest. Edit it and restart to change the rules. When you want
           cloud-managed policies and audit history, continue below.
         </p>
       </section>
 
-      <hr className="border-[#E7E5E4] dark:border-[#27272A] mb-10" />
+      <hr className="border-[#E7E5E4] dark:border-[#20222B] mb-10" />
 
       <div className="space-y-14">
         {/* Step 1 — API key */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               1
             </div>
             <h2
@@ -77,15 +77,30 @@ export default function DocsQuickStart() {
           </div>
           <div className="pl-13 ml-13">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
-              Visit{" "}
+              No account needed — Lelu is free while in beta. The local engine accepts{" "}
+              <strong className="text-[#0A0A0A] dark:text-white font-semibold">any API key you choose</strong>{" "}
+              (whatever <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">API_KEY</code> you
+              start it with). Want the hosted engine instead? Ask for{" "}
               <a
-                href="/api-key"
+                href="/pricing"
                 className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
-                lelu-ai.com/api-key
+                early access
+              </a>
+              .
+            </p>
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
+              Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx -y lelu-mcp start</code>{" "}
+              runs the engine on your machine, and a self-hosted engine accepts any key you set at startup. See the{" "}
+              <a href="/docs/integrations/mcp" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
+                MCP guide
               </a>{" "}
-              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier has fair-use limits
-              while Lelu is in beta.
+              or{" "}
+              <a href="/docs/installation" className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity">
+                self-hosting
+              </a>
+              .
             </p>
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5 ml-[52px]">
               Prefer to run everything locally? <strong className="text-[#0A0A0A] dark:text-white font-semibold">No account or key needed</strong> —{" "}
@@ -118,10 +133,10 @@ export default function DocsQuickStart() {
                 </svg>
                 <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
                   Copy the key and store it as{" "}
-                  <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">
+                  <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">
                     LELU_API_KEY
                   </code>{" "}
-                  in your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">.env</code> file. Never commit it to version control.
+                  in your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file. Never commit it to version control.
                 </p>
               </div>
             </div>
@@ -131,7 +146,7 @@ export default function DocsQuickStart() {
         {/* Step 2 — Install */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               2
             </div>
             <h2
@@ -143,13 +158,13 @@ export default function DocsQuickStart() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-agent-auth</code> to your project:
+              Add <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-agent-auth</code> to your project:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">terminal</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
 {`npm install lelu-agent-auth
 # or: pnpm add lelu-agent-auth  |  yarn add lelu-agent-auth`}
               </pre>
@@ -160,7 +175,7 @@ export default function DocsQuickStart() {
         {/* Step 3 — Connect */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               3
             </div>
             <h2
@@ -172,13 +187,13 @@ export default function DocsQuickStart() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              The SDK talks to a Lelu engine — the one <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded">lelu-mcp</code> started for you, a Docker container, or a binary install:
+              The SDK talks to a Lelu engine — the one <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-mcp</code> started for you, a Docker container, or a binary install:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`import { createClient } from "lelu-agent-auth";
 
 const lelu = createClient({
@@ -204,11 +219,11 @@ if (result.decision === "allow") {
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
               Or try the hosted API directly with your key:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">bash</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`curl -X POST ${CLOUD_URL}/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
@@ -221,7 +236,7 @@ if (result.decision === "allow") {
         {/* Step 4 — Response */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               4
             </div>
             <h2
@@ -235,11 +250,11 @@ if (result.decision === "allow") {
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               The hosted API evaluates the request against your policies and returns one of four decisions:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-6">
-              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-6">
+              <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">json</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`{
   "requestId": "req_7f30c2a4e1b8",
   "tool":      "refund_payment",
@@ -268,7 +283,7 @@ if (result.decision === "allow") {
                 },
               ].map((r) => (
                 <div key={r.field} className="flex gap-3">
-                  <code className="font-mono text-[12px] px-2 py-1 bg-[#F5F5F4] dark:bg-[#141416] border border-[#E7E5E4] dark:border-[#27272A] rounded shrink-0 h-fit">
+                  <code className="font-mono text-[12px] px-2 py-1 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded shrink-0 h-fit">
                     {r.field}
                   </code>
                   <span className="text-[#737373] leading-relaxed">{r.desc}</span>
@@ -281,7 +296,7 @@ if (result.decision === "allow") {
         {/* Step 5 — Framework integrations */}
         <section>
           <div className="flex gap-5 mb-5">
-            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#27272A] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
+            <div className="flex-none w-8 h-8 rounded-full border border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-center text-[13px] font-semibold text-[#0A0A0A] dark:text-white shrink-0 mt-0.5">
               5
             </div>
             <h2
@@ -295,11 +310,11 @@ if (result.decision === "allow") {
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
               Lelu ships framework wrappers so you can gate tool calls with one line:
             </p>
-            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#27272A] text-sm mb-5">
-              <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#141416] border-b border-[#E7E5E4] dark:border-[#27272A]">
+            <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5">
+              <div className="flex items-center gap-1 px-3 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373]">Vercel AI SDK</span>
               </div>
-              <pre className="p-4 bg-white dark:bg-[#0B0B0C] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
+              <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
 {`import { secureTool } from "lelu-agent-auth/vercel";
 import { tool } from "ai";
 import { z } from "zod";
@@ -336,7 +351,7 @@ const processRefund = secureTool(lelu, "billing-agent", {
       </div>
 
       {/* Prev / Next */}
-      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#27272A]">
+      <div className="flex justify-between items-center pt-10 mt-14 border-t border-[#E7E5E4] dark:border-[#20222B]">
         <a
           href="/docs"
           className="flex items-center gap-2 text-[14px] font-medium text-[#0A0A0A] dark:text-white hover:opacity-70 transition-opacity"

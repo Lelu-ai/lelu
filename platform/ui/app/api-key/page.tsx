@@ -32,7 +32,7 @@ function KeyRow({
   onRevoke: (id: string, name: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-4 py-4 border-b border-[#E7E5E4] dark:border-[#222224] last:border-0">
+    <div className="flex items-center gap-4 py-4 border-b border-[#E7E5E4] dark:border-[#20222B] last:border-0">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-[14px] font-medium text-[#0A0A0A] dark:text-white truncate">
@@ -110,7 +110,7 @@ function CreateModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-[420px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+      <div className="relative w-full max-w-[420px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-7 shadow-xl">
         <h2 className="text-[18px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-1">
           Create API key
         </h2>
@@ -141,7 +141,7 @@ function CreateModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Production, Local dev, CI"
-              className="w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#18181B] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all"
+              className="w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all"
             />
           </div>
 
@@ -149,7 +149,7 @@ function CreateModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+              className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-[#13151C] transition-colors"
             >
               Cancel
             </button>
@@ -189,7 +189,7 @@ function RevealModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-[480px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+      <div className="relative w-full max-w-[480px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-7 shadow-xl">
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
@@ -248,7 +248,7 @@ function RevealModal({
           </button>
           <button
             onClick={onClose}
-            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#13151C] transition-colors"
           >
             Done
           </button>
@@ -277,7 +277,7 @@ function RevokeModal({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-[400px] bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-2xl p-7 shadow-xl">
+      <div className="relative w-full max-w-[400px] bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-7 shadow-xl">
         <h2 className="text-[17px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white mb-2">
           Revoke key?
         </h2>
@@ -289,7 +289,7 @@ function RevokeModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#18181B] transition-colors"
+            className="flex-1 h-11 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] text-[14px] font-medium text-[#737373] hover:bg-zinc-50 dark:hover:bg-[#13151C] transition-colors"
           >
             Cancel
           </button>
@@ -383,13 +383,13 @@ export default function ApiKeyPage() {
         />
       )}
 
-      <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0B0B0C] pt-24 md:pt-32 pb-20 px-4">
+      <main className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10] pt-24 md:pt-32 pb-20 px-4">
         <div className="max-w-2xl mx-auto">
 
           {/* Header */}
           <div className="flex items-start justify-between mb-10 gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#222224] bg-white dark:bg-[#141416] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-5">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0D0E13] px-4 py-1.5 text-[13px] text-zinc-500 dark:text-zinc-400 mb-5">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#0A0A0A] dark:bg-white" />
                 API Keys
               </div>
@@ -412,8 +412,8 @@ export default function ApiKeyPage() {
           </div>
 
           {/* Active Keys */}
-          <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl overflow-hidden mb-4">
-            <div className="px-6 py-4 border-b border-[#E7E5E4] dark:border-[#222224] flex items-center justify-between">
+          <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-xl overflow-hidden mb-4">
+            <div className="px-6 py-4 border-b border-[#E7E5E4] dark:border-[#20222B] flex items-center justify-between">
               <h2 className="text-[14px] font-semibold text-[#0A0A0A] dark:text-white">
                 Active keys
               </h2>
@@ -429,7 +429,7 @@ export default function ApiKeyPage() {
                 </div>
               ) : activeKeys.length === 0 ? (
                 <div className="py-12 text-center">
-                  <div className="w-10 h-10 rounded-full bg-[#F4F4F5] dark:bg-[#27272A] flex items-center justify-center mx-auto mb-3">
+                  <div className="w-10 h-10 rounded-full bg-[#F4F4F5] dark:bg-[#20222B] flex items-center justify-center mx-auto mb-3">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A3A3A3" strokeWidth="1.5">
                       <path d="m21 2-1 1M3.5 20.5l1-1M9 3.5l.7.7M14.3 20.3l.7.7M3.5 3.5l1 1M20.3 20.3l.7-.7M20.5 9h-1M4.5 15H3M17 7l-10 10M9 7l8 8" />
                       <circle cx="17" cy="7" r="3" />
@@ -454,7 +454,7 @@ export default function ApiKeyPage() {
 
           {/* Quick Start (visible only when there are active keys) */}
           {activeKeys.length > 0 && (
-            <div className="bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl p-6 mb-4">
+            <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-xl p-6 mb-4">
               <h3 className="text-[14px] font-semibold text-[#0A0A0A] dark:text-white mb-4">
                 Quick start
               </h3>
@@ -496,7 +496,7 @@ if (!decision.allowed) throw new Error(decision.reason);`}</pre>
                 </Link>
                 <Link
                   href="/docs"
-                  className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#222224] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-[13px] font-medium hover:bg-zinc-50 dark:hover:bg-[#141416] transition-colors"
+                  className="flex-1 py-2.5 border border-[#E7E5E4] dark:border-[#20222B] text-zinc-700 dark:text-zinc-300 rounded-lg text-center text-[13px] font-medium hover:bg-zinc-50 dark:hover:bg-[#0D0E13] transition-colors"
                 >
                   View examples
                 </Link>
@@ -506,7 +506,7 @@ if (!decision.allowed) throw new Error(decision.reason);`}</pre>
 
           {/* Revoked Keys (collapsed section) */}
           {revokedKeys.length > 0 && (
-            <details className="group bg-white dark:bg-[#111113] border border-[#E7E5E4] dark:border-[#222224] rounded-xl overflow-hidden">
+            <details className="group bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-xl overflow-hidden">
               <summary className="px-6 py-4 cursor-pointer list-none flex items-center justify-between select-none">
                 <span className="text-[14px] font-semibold text-[#737373]">
                   Revoked keys ({revokedKeys.length})
@@ -523,7 +523,7 @@ if (!decision.allowed) throw new Error(decision.reason);`}</pre>
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </summary>
-              <div className="px-6 border-t border-[#E7E5E4] dark:border-[#222224]">
+              <div className="px-6 border-t border-[#E7E5E4] dark:border-[#20222B]">
                 {revokedKeys.map((k) => (
                   <KeyRow
                     key={k.id}

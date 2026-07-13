@@ -29,6 +29,20 @@
 
 ---
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lelu-flow.svg">
+    <img src="docs/assets/lelu-flow-light.svg" alt="Animated diagram: agents built with LangChain, CrewAI, Claude Code (MCP), or plain REST call the Lelu authorization engine and receive allow, deny, human_review, or compute decisions — every decision written to the audit log" width="760" />
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/lelu-terminal.svg">
+    <img src="docs/assets/lelu-terminal-light.svg" alt="Terminal demo: npx -y lelu-mcp start launches the zero-config local engine, then a curl to /v1/agent/authorize asking to delete_all_records returns allowed: false — blocked by policy" width="760" />
+  </picture>
+</p>
+
 ## What is Lelu?
 
 **Lelu is an open-source authorization engine that sits between your AI agent and the real world.** Before the agent takes any action — issuing a refund, sending an email, deleting a record — it asks Lelu first, and Lelu returns one of four decisions:

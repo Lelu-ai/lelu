@@ -93,6 +93,7 @@ type Handler struct {
 	audit     *audit.Writer
 	queue     *queue.Queue
 	apiKey    string
+	keyVerify *keyVerifier // account-bound lelu_sk_ keys; nil unless PLATFORM_URL is set
 	confCfg   ConfidenceConfig
 	mode      EnforcementMode
 	shadow    *shadowStats
@@ -308,6 +309,13 @@ func New(
 		log.Printf("Phase 2 behavioral analytics disabled (no database)")
 	}
 
+	// Account-bound API key verification (optional — only active when
+	// PLATFORM_URL is configured)
+	keyVerify := newKeyVerifierFromEnv()
+	if keyVerify != nil {
+		log.Printf("platform key verification enabled (lelu_sk_ keys accepted)")
+	}
+
 	// External confidence auditor (optional — only active when API key configured)
 	extAuditor := confidence.NewExternalAuditorFromEnv()
 	var confScorer *confidence.Scorer
@@ -328,6 +336,7 @@ func New(
 		audit:          auditWriter,
 		queue:          q,
 		apiKey:         apiKey,
+		keyVerify:      keyVerify,
 		confCfg:        confCfg.withDefaults(),
 		mode:           mode,
 		shadow:         newShadowStats(),
@@ -2243,10 +2252,11 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Fail closed when no API key is configured. The unauthenticated path is
-		// only allowed when the operator explicitly opts in via LELU_DEV_INSECURE,
-		// so a missing/misspelled ENV can never silently leave the engine open.
-		if h.apiKey == "" {
+		// Fail closed when no authentication is configured. The unauthenticated
+		// path is only allowed when the operator explicitly opts in via
+		// LELU_DEV_INSECURE, so a missing/misspelled ENV can never silently
+		// leave the engine open.
+		if h.apiKey == "" && h.keyVerify == nil {
 			if strings.EqualFold(strings.TrimSpace(os.Getenv("LELU_DEV_INSECURE")), "true") {
 				next.ServeHTTP(w, r)
 				return
@@ -2257,14 +2267,28 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		}
 
 		authHeader := r.Header.Get("Authorization")
-		expected := "Bearer " + h.apiKey
-		// Constant-time comparison to avoid leaking the key via response timing.
-		if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expected)) != 1 {
-			writeError(w, http.StatusUnauthorized, "unauthorized: invalid or missing API key")
-			return
+
+		// Operator-configured static key (self-hosted deployments).
+		if h.apiKey != "" {
+			expected := "Bearer " + h.apiKey
+			// Constant-time comparison to avoid leaking the key via response timing.
+			if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expected)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
 		}
 
-		next.ServeHTTP(w, r)
+		// Account-bound keys (lelu_sk_…) resolved against the platform key store.
+		if h.keyVerify != nil {
+			if token, ok := strings.CutPrefix(authHeader, "Bearer "); ok && strings.HasPrefix(token, "lelu_sk_") {
+				if _, valid := h.keyVerify.verify(r.Context(), token); valid {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+		}
+
+		writeError(w, http.StatusUnauthorized, "unauthorized: invalid or missing API key")
 	})
 }
 

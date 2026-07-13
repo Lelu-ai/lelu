@@ -70,8 +70,14 @@ func main() {
 		if signingKey == "" || signingKey == "change-me-in-production" {
 			log.Fatal("JWT_SIGNING_KEY must be explicitly set to a strong secret in production")
 		}
-		if apiKey == "" || apiKey == "change-me-in-production" {
+		if apiKey == "change-me-in-production" {
 			log.Fatal("API_KEY must be explicitly set in production")
+		}
+		// Either a static API_KEY or platform key verification (PLATFORM_URL,
+		// which lets the engine accept account-bound lelu_sk_ keys) must be
+		// configured — otherwise no caller could ever authenticate.
+		if apiKey == "" && envOr("PLATFORM_URL", "") == "" {
+			log.Fatal("API_KEY or PLATFORM_URL must be explicitly set in production")
 		}
 	}
 

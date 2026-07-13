@@ -13,57 +13,54 @@ pip install lelu-agent-auth-sdk
 
 ## Quick start
 
-### Option 1: Use Hosted Engine (Recommended)
+### Option 1: Zero-config local (recommended)
 
-Connect to the hosted Lelu engine for instant setup:
-
-```python
-import asyncio
-from lelu import LeluClient, AgentAuthRequest, AgentContext
-
-async def main():
-    async with LeluClient(base_url="https://lelu-ai.com") as client:
-        result = await client.agent_authorize(AgentAuthRequest(
-            actor="invoice_bot",
-            action="invoice:create",
-            context=AgentContext(
-                confidence=0.92,
-                acting_for="user_123",
-            ),
-        ))
-        print(result.allowed, result.reason)
-
-asyncio.run(main())
-```
-
-### Option 2: Run Locally
-
-For development, you can run the engine locally:
-
-```python
-import asyncio
-from lelu import LeluClient, AgentAuthRequest, AgentContext
-
-async def main():
-    async with LeluClient(base_url="http://localhost:8082") as client:
-        result = await client.agent_authorize(AgentAuthRequest(
-            actor="invoice_bot",
-            action="invoice:create",
-            context=AgentContext(
-                confidence=0.92,
-                acting_for="user_123",
-            ),
-        ))
-        print(result.allowed, result.reason)
-
-asyncio.run(main())
-```
-
-Start the local engine with Docker:
+Run the local engine once — it self-generates its key and policy in `~/.lelu`,
+no account needed:
 
 ```bash
-docker compose up -d
+npx -y lelu-mcp start
 ```
+
+Then create one shared instance and import it everywhere. With no arguments,
+`lelu()` discovers that engine automatically:
+
+```python
+import asyncio
+from lelu import lelu
+
+auth = lelu(actor="invoice_bot")   # zero-config: finds the local engine
+
+async def main():
+    result = await auth.authorize(tool="invoice:create")
+    if result.decision == "allow":
+        ...  # proceed
+    elif result.decision == "human_review":
+        ...  # queued — agent pauses, awaiting approval
+    else:
+        raise PermissionError(result.reason)
+
+asyncio.run(main())
+```
+
+The instance exposes the full client as `auth.api` (tokens, review queue,
+audit, policies): `await auth.api.mint_token(...)`.
+
+### Option 2: Self-hosted or cloud engine
+
+Point the same factory at any engine with explicit config — or set
+`LELU_BASE_URL` / `LELU_API_KEY` and keep calling `lelu()` with no arguments:
+
+```python
+auth = lelu(
+    base_url="https://your-engine.example.com",
+    api_key=os.environ["LELU_API_KEY"],
+    actor="invoice_bot",
+)
+```
+
+`LeluClient(...)` from earlier versions keeps working unchanged — `auth.api`
+is that same client.
 
 ## API
 

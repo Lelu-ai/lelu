@@ -218,13 +218,13 @@ async def test_revoke_token(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     assert result.success is True
 
 
-# ─── GET /api/config-check ────────────────────────────────────────────────────
+# ─── GET /healthz ─────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_is_healthy_true(client: LeluClient, httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8080/api/config-check",
+        url="http://localhost:8080/healthz",
         json={"status": "ok"},
     )
     assert await client.is_healthy() is True
@@ -242,10 +242,12 @@ async def test_is_healthy_false_on_error(client: LeluClient, httpx_mock: HTTPXMo
 @pytest.mark.asyncio
 async def test_context_manager(httpx_mock: HTTPXMock) -> None:
     httpx_mock.add_response(
-        url="http://localhost:8080/api/config-check",
+        url="http://localhost:8080/healthz",
         json={"status": "ok"},
     )
-    async with LeluClient() as lelu:
+    # Explicit base_url so zero-config discovery of a real local engine
+    # can never redirect this test away from the mock.
+    async with LeluClient(base_url="http://localhost:8080") as lelu:
         assert await lelu.is_healthy() is True
 
 

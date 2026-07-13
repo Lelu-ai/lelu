@@ -57,6 +57,7 @@ from .models import (
     PolicyValidationResult,
     PolicyUpdateResult,
 )
+from .local import discover_local_engine
 from .observability import (
     agent_tracer,
     DecisionMetrics,
@@ -92,10 +93,22 @@ class LeluClient:
         api_key: str | None = None,
     ) -> None:
         resolved_key = api_key or os.environ.get("LELU_API_KEY")
+        resolved_url = base_url or os.environ.get("LELU_BASE_URL")
 
-        # Default to cloud when any lelu_sk_* key is provided
-        default_url = LELU_CLOUD_URL if resolved_key else "http://localhost:8080"
-        resolved_url = (base_url or os.environ.get("LELU_BASE_URL") or default_url).rstrip("/")
+        if resolved_url is None:
+            if resolved_key:
+                # Default to cloud when any lelu_sk_* key is provided
+                resolved_url = LELU_CLOUD_URL
+            else:
+                # Zero-config: with no explicit target, connect to the engine
+                # `lelu-mcp` is already running here (recorded in ~/.lelu).
+                local = discover_local_engine()
+                if local.base_url:
+                    resolved_url = local.base_url
+                    resolved_key = local.api_key
+                else:
+                    resolved_url = "http://localhost:8080"
+        resolved_url = resolved_url.rstrip("/")
 
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if resolved_key:
@@ -414,9 +427,9 @@ class LeluClient:
     # ── Health check ──────────────────────────────────────────────────────────
 
     async def is_healthy(self) -> bool:
-        """Return True if the platform is reachable."""
+        """Return True if the engine is reachable."""
         try:
-            resp = await self._client.get("/api/config-check")
+            resp = await self._client.get("/healthz")
             return resp.is_success
         except httpx.HTTPError:
             return False

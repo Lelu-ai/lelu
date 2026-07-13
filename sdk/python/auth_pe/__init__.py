@@ -16,6 +16,8 @@ Quick start::
 """
 
 from .client import LeluClient, LELU_CLOUD_URL
+from .instance import LeluInstance, lelu
+from .local import LocalEngineInfo, discover_local_engine
 from .langchain import (
     SecuredTool,
     LangChainPermissionDeniedError,
@@ -91,6 +93,11 @@ except ImportError:
 __all__ = [
     "LeluClient",
     "LELU_CLOUD_URL",
+    # Shared-instance factory + zero-config local discovery
+    "lelu",
+    "LeluInstance",
+    "LocalEngineInfo",
+    "discover_local_engine",
     "LeluAutoGPTPlugin",
     "AgentMiddleware",
     "LocalStorage",
@@ -155,4 +162,4 @@ __all__ = [
     "CrewAIPermissionDeniedError",
 ]
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"

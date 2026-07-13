@@ -50,6 +50,12 @@ from .models import (
     NHIStats,
     RegisterOAuthClientRequest,
     OAuthClient,
+    ReviewItem,
+    ListReviewsResult,
+    ScanOutputResult,
+    EnginePolicyInfo,
+    PolicyValidationResult,
+    PolicyUpdateResult,
 )
 from .observability import (
     agent_tracer,
@@ -146,6 +152,10 @@ class LeluClient:
                 body["scope"] = ctx.scope
         if req.args is not None:
             body["args"] = req.args
+        if req.resource:
+            body["resource"] = req.resource
+        if req.tenant_id:
+            body["tenant_id"] = req.tenant_id
 
         data = await self._post("/v1/agent/authorize", body)
 
@@ -175,6 +185,17 @@ class LeluClient:
             input_hash=data.get("input_hash"),
             output_hash=data.get("output_hash"),
             policy_digest=data.get("policy_digest"),
+            confidence_used=data.get("confidence_used", 0.0),
+            effective_scope=data.get("effective_scope"),
+            downgraded_scope=data.get("downgraded_scope"),
+            risk_score=data.get("risk_score"),
+            risk_criticality=data.get("risk_criticality"),
+            risk_reliability=data.get("risk_reliability"),
+            risk_anomaly_factor=data.get("risk_anomaly_factor"),
+            shadow_mode=data.get("shadow_mode", False),
+            would_have_allowed=data.get("would_have_allowed"),
+            would_have_reason=data.get("would_have_reason"),
+            would_have_requires_human_review=data.get("would_have_requires_human_review"),
         )
 
     async def authorize_tool(self, req: AuthorizeRequest) -> AuthDecision:
@@ -218,6 +239,119 @@ class LeluClient:
                 trace_id=decision.request_id,
                 downgraded_scope=None,
             )
+
+    # ── Human review queue (engine /v1/queue) ─────────────────────────────────
+
+    async def list_pending_reviews(self) -> ListReviewsResult:
+        """List actions currently paused for human review."""
+        resp = await self._client.get("/v1/queue/pending")
+        await self._raise_for_status(resp)
+        data = resp.json()
+        items = [ReviewItem(**i) for i in (data.get("items") or [])]
+        return ListReviewsResult(items=items, count=data.get("count", len(items)))
+
+    async def get_review(self, review_id: str) -> ReviewItem:
+        """Fetch one review item by ID."""
+        resp = await self._client.get(f"/v1/queue/{review_id}")
+        await self._raise_for_status(resp)
+        return ReviewItem(**resp.json())
+
+    async def wait_review(self, review_id: str, timeout_ms: int = 30_000) -> ReviewItem:
+        """
+        Long-poll until the review is resolved or `timeout_ms` elapses
+        (engine caps the wait at 60s per call). Returns the item either way —
+        check `.pending` to see whether it resolved.
+        """
+        resp = await self._client.get(
+            f"/v1/queue/{review_id}/wait",
+            params={"timeout_ms": str(timeout_ms)},
+            timeout=(timeout_ms / 1000) + 10,
+        )
+        if resp.status_code not in (200, 408):
+            await self._raise_for_status(resp)
+        return ReviewItem(**resp.json())
+
+    async def approve_review(self, review_id: str, resolved_by: str = "", note: str = "") -> bool:
+        """Approve a paused action; the waiting agent resumes."""
+        data = await self._post(
+            f"/v1/queue/{review_id}/approve", {"resolved_by": resolved_by, "note": note}
+        )
+        return bool(data.get("success"))
+
+    async def deny_review(self, review_id: str, resolved_by: str = "", note: str = "") -> bool:
+        """Deny a paused action; the waiting agent receives the denial."""
+        data = await self._post(
+            f"/v1/queue/{review_id}/deny", {"resolved_by": resolved_by, "note": note}
+        )
+        return bool(data.get("success"))
+
+    # ── Output scanning (indirect injection defense) ──────────────────────────
+
+    async def scan_output(
+        self,
+        output: str,
+        actor: str | None = None,
+        action: str | None = None,
+        resource: dict[str, str] | None = None,
+    ) -> ScanOutputResult:
+        """Scan a tool output for injected instructions before the agent reads it."""
+        body: dict[str, Any] = {"output": output}
+        if actor:
+            body["actor"] = actor
+        if action:
+            body["action"] = action
+        if resource:
+            body["resource"] = resource
+        data = await self._post("/v1/scan/output", body)
+        return ScanOutputResult(**data)
+
+    # ── Engine policy (engine /v1/policy) ─────────────────────────────────────
+
+    async def get_engine_policy(self) -> EnginePolicyInfo:
+        """Digest and source of the policy currently loaded in the engine."""
+        resp = await self._client.get("/v1/policy")
+        await self._raise_for_status(resp)
+        return EnginePolicyInfo(**resp.json())
+
+    async def validate_policy(self, policy: str | bytes) -> PolicyValidationResult:
+        """Validate policy bytes without touching the live policy."""
+        content = policy.encode() if isinstance(policy, str) else policy
+        resp = await self._client.post(
+            "/v1/policy/validate", content=content,
+            headers={"Content-Type": "application/x-yaml"},
+        )
+        await self._raise_for_status(resp)
+        return PolicyValidationResult(**resp.json())
+
+    async def put_engine_policy(
+        self, policy: str | bytes, if_match: str | None = None
+    ) -> PolicyUpdateResult:
+        """
+        Replace the engine's active policy (requires the admin API key).
+        Pass `if_match` (the digest from get_engine_policy) for optimistic
+        concurrency — the engine rejects the write if the policy changed.
+        """
+        content = policy.encode() if isinstance(policy, str) else policy
+        headers = {"Content-Type": "application/x-yaml"}
+        if if_match:
+            headers["If-Match"] = if_match
+        resp = await self._client.put("/v1/policy", content=content, headers=headers)
+        await self._raise_for_status(resp)
+        return PolicyUpdateResult(**resp.json())
+
+    # ── Engine status ──────────────────────────────────────────────────────────
+
+    async def fallback_status(self) -> dict[str, Any]:
+        """Status of the engine's fallback layer (returns the raw engine payload)."""
+        resp = await self._client.get("/v1/fallback/status")
+        await self._raise_for_status(resp)
+        return resp.json()  # type: ignore[no-any-return]
+
+    async def shadow_summary(self) -> dict[str, Any]:
+        """Shadow-mode evaluation summary (returns the raw engine payload)."""
+        resp = await self._client.get("/v1/shadow/summary")
+        await self._raise_for_status(resp)
+        return resp.json()  # type: ignore[no-any-return]
 
     # ── JIT token minting ─────────────────────────────────────────────────────
 

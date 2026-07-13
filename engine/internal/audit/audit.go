@@ -26,7 +26,7 @@ type Event struct {
 	Action          string            `json:"action"`
 	Resource        map[string]string `json:"resource,omitempty"`
 	ConfidenceScore float64           `json:"confidence_score,omitempty"`
-	Decision        string            `json:"decision"` // "allowed" | "denied" | "human_review" | "compute"
+	Decision        string            `json:"decision"` // "allowed" | "denied" | "human_review" | "compute" | "shadow_detected"
 	Reason          string            `json:"reason,omitempty"`
 	DowngradedScope string            `json:"downgraded_scope,omitempty"`
 	LatencyMS       float64           `json:"latency_ms"`

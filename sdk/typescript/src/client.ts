@@ -54,6 +54,7 @@ import {
   type ConfidenceSignal,
 } from "./types.js";
 import { agentTracer } from "./observability/tracer.js";
+import { discoverLocalEngine } from "./local.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
 
@@ -239,9 +240,22 @@ export class LeluClient {
     // to point anywhere other than a local engine.
     const defaultUrl = "http://localhost:8080";
 
-    this.baseUrl = (cfg.baseUrl ?? envBaseUrl ?? defaultUrl).replace(/\/$/, "");
+    let baseUrl = cfg.baseUrl ?? envBaseUrl;
+    let apiKey = cfg.apiKey;
+
+    // Zero-config: with no explicit target, connect to the engine that
+    // `lelu-mcp` is already running on this machine (recorded in ~/.lelu).
+    if (baseUrl === undefined) {
+      const local = discoverLocalEngine();
+      if (local.baseUrl) {
+        baseUrl = local.baseUrl;
+        apiKey = apiKey ?? local.apiKey;
+      }
+    }
+
+    this.baseUrl = (baseUrl ?? defaultUrl).replace(/\/$/, "");
     this.timeoutMs = cfg.timeoutMs ?? 5_000;
-    this.apiKey = cfg.apiKey;
+    this.apiKey = apiKey;
   }
 
   // ── Authorization ──────────────────────────────────────────────────────────

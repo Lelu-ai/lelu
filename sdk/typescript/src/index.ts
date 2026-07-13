@@ -13,6 +13,14 @@ export { LeluClient } from "./client.js";
 export const LELU_CLOUD_URL = "https://lelu-ai.com";
 export { LocalStorage } from "./storage.js";
 
+// ─── Shared-instance factory ──────────────────────────────────────────────────
+export { lelu } from "./lelu.js";
+export type { LeluOptions, LeluInstance } from "./lelu.js";
+
+// ─── Zero-config local engine discovery ───────────────────────────────────────
+export { discoverLocalEngine } from "./local.js";
+export type { LocalEngineInfo } from "./local.js";
+
 export type {
   AuthorizeRequest,
   AuthRequest,

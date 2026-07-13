@@ -12,27 +12,44 @@ npm install lelu-agent-auth
 
 ## Get an API key
 
-Visit **[lelu-ai.com/api-key](https://lelu-ai.com/api-key)** — no signup, no email, instant anonymous key with 500 requests/day free.
+Sign in at **[lelu-ai.com](https://lelu-ai.com)** and create a key at **[/api-key](https://lelu-ai.com/api-key)**. Keys belong to your account (`lelu_sk_…`), are shown once at creation, and can be revoked anytime.
+
+You can also mint keys programmatically — authenticate with your session or an existing key:
+
+```bash
+curl -X POST https://lelu-ai.com/api/v1/keys \
+  -H "Authorization: Bearer $LELU_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "ci-agent", "expiresInDays": 90}'
+```
 
 ## Quick start
 
+Create one shared instance and import it everywhere:
+
 ```ts
-import { createClient } from "lelu-agent-auth";
+// lib/lelu.ts
+import { lelu } from "lelu-agent-auth";
 
-const lelu = createClient({
+export const auth = lelu({
   apiKey: process.env.LELU_API_KEY,   // key from lelu-ai.com/api-key
+  actor: "billing-agent",             // optional default actor
 });
+```
 
-const decision = await lelu.agentAuthorize({
-  actor: "billing-agent",
-  action: "refund:process",
-  resource: { orderId: "ord_123" },
+```ts
+// anywhere on the server
+import { auth } from "./lib/lelu";
+
+const decision = await auth.authorize({
+  tool: "refund:process",
+  args: { orderId: "ord_123" },
   context: { confidence: 0.85 },
 });
 
 if (decision.allowed) {
   // proceed
-} else if (decision.requiresHumanReview) {
+} else if (decision.decision === "human_review") {
   // agent pauses — action queued for human approval
 } else {
   // blocked by policy
@@ -40,30 +57,68 @@ if (decision.allowed) {
 }
 ```
 
-That's it. No Docker. No local server. The SDK routes to the Lelu cloud engine automatically when an API key is provided.
+That's it. No Docker. No local server.
+
+The instance gives you three things:
+
+- **`auth.authorize(...)`** — authorize a tool call, with the default `actor` filled in.
+- **`auth.api.*`** — the full engine API (`mintToken`, `listQueue`, `listAuditEvents`, policies, vault, …).
+- **`auth.handler`** — a fetch-style `Request → Response` handler you can mount as an API route (see below).
+
+> `createClient(...)` from earlier versions still works and returns the same client as `auth.api` — no breaking changes.
+
+## Mount the handler (optional)
+
+`auth.handler` exposes authorize / review-queue / health endpoints from **your** server, so browser code (like an approval UI) never sees the engine URL or your API key.
+
+```ts
+// app/api/lelu/[...all]/route.ts (Next.js App Router)
+import { auth } from "@/lib/lelu";
+
+export const GET = auth.handler;
+export const POST = auth.handler;
+```
+
+```ts
+// Express
+import { toNodeHandler } from "lelu-agent-auth/express";
+import { auth } from "./lib/lelu";
+
+app.all("/api/lelu/*", toNodeHandler(auth));
+```
+
+Routes served under `basePath` (default `/api/lelu`, configurable via `lelu({ basePath })`):
+
+| Route | Purpose |
+|---|---|
+| `POST /authorize` | Authorize a tool call |
+| `GET /queue` | List pending human-review items |
+| `POST /queue/:id/approve` | Approve a queued action |
+| `POST /queue/:id/deny` | Deny a queued action |
+| `GET /ok` | Engine health check |
 
 ## How URL resolution works
 
 | Situation | Engine used |
 |---|---|
-| `apiKey` provided, no `baseUrl` | Lelu cloud (`https://lelu-ai.com`) |
+| `baseUrl` passed to `lelu()` / `createClient` | That URL |
 | `LELU_BASE_URL` env var set | That URL |
-| `baseUrl` passed to `createClient` | That URL |
-| No `apiKey`, no env var, no `baseUrl` | `http://localhost:8080` (self-hosted dev) |
+| Nothing configured, `npx lelu-mcp start` is running | Its local engine — discovered via `~/.lelu/engine.json`, authenticated with `~/.lelu/engine.key` automatically |
+| Nothing configured, no local engine | `http://localhost:8080` (self-hosted dev) |
+
+The third row is the zero-config path: run `npx -y lelu-mcp start` once and every `lelu()` / `createClient()` call on the machine finds that engine on its own — same policy file, same audit trail, no account and no keys to manage.
 
 ## Framework integrations
 
 ### Vercel AI SDK
 
 ```ts
-import { createClient } from "lelu-agent-auth";
 import { secureTool } from "lelu-agent-auth/vercel";
 import { tool } from "ai";
 import { z } from "zod";
+import { auth } from "./lib/lelu";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
-
-const processRefund = secureTool(lelu, "billing-agent", {
+const processRefund = secureTool(auth.api, "billing-agent", {
   tool: tool({
     description: "Process a customer refund",
     parameters: z.object({ orderId: z.string(), amount: z.number() }),
@@ -80,14 +135,12 @@ const processRefund = secureTool(lelu, "billing-agent", {
 ### Express middleware
 
 ```ts
-import { createClient } from "lelu-agent-auth";
 import { authorize } from "lelu-agent-auth/express";
-
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+import { auth } from "./lib/lelu";
 
 app.post(
   "/api/refund",
-  authorize(lelu, { action: "refund:process", confidence: 0.9 }),
+  authorize("refund:process", { client: auth, confidence: 0.9 }),
   (req, res) => res.json({ ok: true }),
 );
 ```
@@ -95,12 +148,10 @@ app.post(
 ### LangChain
 
 ```ts
-import { createClient } from "lelu-agent-auth";
 import { secureTool } from "lelu-agent-auth/langchain";
+import { auth } from "./lib/lelu";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
-
-const safeTool = secureTool(lelu, "research-agent", myLangChainTool, {
+const safeTool = secureTool(auth.api, "research-agent", myLangChainTool, {
   action: "web:search",
   confidence: 0.8,
 });
@@ -108,29 +159,36 @@ const safeTool = secureTool(lelu, "research-agent", myLangChainTool, {
 
 ## All methods
 
+Everything below lives on `auth.api` (a `LeluClient`):
+
 ```ts
 // Authorization
-lelu.agentAuthorize({ actor, action, resource?, context })
-lelu.authorize({ userId, action, resource? })
+auth.authorize({ tool, actor?, args?, context? })   // instance-level, default actor applied
+auth.api.agentAuthorize({ actor, action, resource?, context })
 
 // Token management (scoped, time-limited JWTs)
-lelu.mintToken({ scope, actingFor?, ttlSeconds? })
-lelu.revokeToken(tokenId)
+auth.api.mintToken({ scope, actingFor?, ttlSeconds? })
+auth.api.revokeToken(tokenId)
 
 // Multi-agent delegation
-lelu.delegateScope({ delegator, delegatee, scopedTo?, ttlSeconds?, confidence? })
+auth.api.delegateScope({ delegator, delegatee, scopedTo?, ttlSeconds?, confidence? })
+
+// Human review queue
+auth.api.listQueue()
+auth.api.approveQueueItem(id, resolvedBy, note?)
+auth.api.denyQueueItem(id, resolvedBy, note?)
 
 // Audit trail
-lelu.listAuditEvents({ actor?, action?, decision?, from?, to?, limit?, cursor? })
+auth.api.listAuditEvents({ actor?, action?, decision?, from?, to?, limit?, cursor? })
 
 // Behavioral analytics
-lelu.getAgentReputation(agentId)
-lelu.getAgentAnomalies(agentId, since?)
-lelu.getAgentBaseline(agentId)
-lelu.getAlerts(agentId?)
+auth.api.getAgentReputation(agentId)
+auth.api.getAgentAnomalies(agentId, since?)
+auth.api.getAgentBaseline(agentId)
+auth.api.getAlerts(agentId?)
 
 // Health
-lelu.isHealthy()  // → boolean
+auth.api.isHealthy()  // → boolean
 ```
 
 ## Environment variables
@@ -145,7 +203,7 @@ lelu.isHealthy()  // → boolean
 If you run your own Lelu engine (Docker / Kubernetes / Cloud Run), pass the URL directly:
 
 ```ts
-const lelu = createClient({
+export const auth = lelu({
   baseUrl: "https://your-engine.example.com",
   apiKey: process.env.LELU_API_KEY,
 });

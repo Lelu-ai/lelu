@@ -634,8 +634,16 @@ func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req a
 
 	if res.IsShadow {
 		shadowAgentsDetectedTotal.Inc()
-		h.audit.LogDecision(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource,
-			true, "shadow agent detected: "+res.Reason, 0, 0)
+		// Monitoring event, not an authorization decision — the policy pipeline
+		// still runs and emits its own decision record for this request.
+		h.audit.Log(audit.Event{
+			TenantID: req.TenantID,
+			Actor:    req.Actor,
+			Action:   req.Action,
+			Resource: req.Resource,
+			Decision: "shadow_detected",
+			Reason:   "shadow agent detected: " + res.Reason,
+		})
 		// Fire incident so operators are notified of the unregistered agent.
 		h.notifyIncident(r.Context(), incident.Event{
 			Type:     "shadow.agent.detected",

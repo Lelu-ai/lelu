@@ -10,30 +10,23 @@ Lelu lets you gate every agent action against a policy, route low-confidence cal
 npm install lelu-agent-auth
 ```
 
-## Get an API key
-
-Sign in at **[lelu-ai.com](https://lelu-ai.com)** and create a key at **[/api-key](https://lelu-ai.com/api-key)**. Keys belong to your account (`lelu_sk_…`), are shown once at creation, and can be revoked anytime.
-
-You can also mint keys programmatically — authenticate with your session or an existing key:
-
-```bash
-curl -X POST https://lelu-ai.com/api/v1/keys \
-  -H "Authorization: Bearer $LELU_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "ci-agent", "expiresInDays": 90}'
-```
-
 ## Quick start
 
-Create one shared instance and import it everywhere:
+No account, no API key, no Docker. Run the local engine once:
+
+```bash
+npx -y lelu-mcp start
+```
+
+Then create one shared instance and import it everywhere — `lelu()` with no
+arguments discovers that engine automatically:
 
 ```ts
 // lib/lelu.ts
 import { lelu } from "lelu-agent-auth";
 
 export const auth = lelu({
-  apiKey: process.env.LELU_API_KEY,   // key from lelu-ai.com/api-key
-  actor: "billing-agent",             // optional default actor
+  actor: "billing-agent",   // optional default actor
 });
 ```
 
@@ -57,8 +50,6 @@ if (decision.allowed) {
 }
 ```
 
-That's it. No Docker. No local server.
-
 The instance gives you three things:
 
 - **`auth.authorize(...)`** — authorize a tool call, with the default `actor` filled in.
@@ -66,6 +57,29 @@ The instance gives you three things:
 - **`auth.handler`** — a fetch-style `Request → Response` handler you can mount as an API route (see below).
 
 > `createClient(...)` from earlier versions still works and returns the same client as `auth.api` — no breaking changes.
+
+## Optional: hosted cloud or a remote self-hosted engine
+
+Skip this if you're running locally — it's only needed to point `lelu()` at
+an engine that *isn't* on your machine.
+
+Sign in at **[lelu-ai.com](https://lelu-ai.com)** and create a key at **[/api-key](https://lelu-ai.com/api-key)**. Keys belong to your account (`lelu_sk_…`), are shown once at creation, and can be revoked anytime.
+
+```ts
+export const auth = lelu({
+  apiKey: process.env.LELU_API_KEY,   // key from lelu-ai.com/api-key
+  actor: "billing-agent",
+});
+```
+
+You can also mint keys programmatically — authenticate with your session or an existing key:
+
+```bash
+curl -X POST https://lelu-ai.com/api/v1/keys \
+  -H "Authorization: Bearer $LELU_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "ci-agent", "expiresInDays": 90}'
+```
 
 ## Mount the handler (optional)
 
@@ -193,10 +207,13 @@ auth.api.isHealthy()  // → boolean
 
 ## Environment variables
 
+Neither is required for local zero-config use — only set these to target a
+remote engine instead of auto-discovering the local one.
+
 | Variable | Description |
 |---|---|
-| `LELU_API_KEY` | Your API key — set this and you're done |
-| `LELU_BASE_URL` | Override the engine URL (e.g. for self-hosted) |
+| `LELU_API_KEY` | API key for a hosted or self-hosted engine that requires one |
+| `LELU_BASE_URL` | Engine URL to use instead of local discovery (e.g. cloud or self-hosted) |
 
 ## Self-hosting
 

@@ -2222,7 +2222,7 @@ func NewHTTPServer(addr string, handler *Handler) *http.Server {
 
 	return &http.Server{
 		Addr:         addr,
-		Handler:      logging(handler.authMiddleware(mux)),
+		Handler:      logging(bodyLimit(maxBodyBytes())(handler.authMiddleware(mux))),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -2240,6 +2240,44 @@ type responseRecorder struct {
 func (rec *responseRecorder) WriteHeader(statusCode int) {
 	rec.statusCode = statusCode
 	rec.ResponseWriter.WriteHeader(statusCode)
+}
+
+// defaultMaxBodyBytes caps the size of request bodies the engine will read.
+// Every JSON handler decodes with json.NewDecoder(r.Body) and the prompt-injection
+// scanner then runs O(n·m) work (Levenshtein over each bi/trigram × ~84 patterns)
+// over the payload, so an unbounded body is a cheap CPU/memory amplification vector
+// that ReadTimeout alone does not cap. 256 KiB is generous for auth requests and
+// policy documents while eliminating the amplification.
+const defaultMaxBodyBytes int64 = 256 << 10 // 256 KiB
+
+// maxBodyBytes returns the request body limit, overridable via LELU_MAX_BODY_BYTES
+// (a positive byte count) for operators whose endpoints legitimately need more.
+func maxBodyBytes() int64 {
+	if v := strings.TrimSpace(os.Getenv("LELU_MAX_BODY_BYTES")); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			return n
+		}
+	}
+	return defaultMaxBodyBytes
+}
+
+// bodyLimit caps request body size to prevent DoS via oversized payloads. Requests
+// that declare an over-limit Content-Length are rejected up front with 413; for
+// chunked or unknown-length bodies, http.MaxBytesReader caps the bytes any handler
+// (and the injection scanner) can read, so the decode fails before large work runs.
+func bodyLimit(limit int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > limit {
+				writeError(w, http.StatusRequestEntityTooLarge, "request body too large")
+				return
+			}
+			if r.Body != nil {
+				r.Body = http.MaxBytesReader(w, r.Body, limit)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {

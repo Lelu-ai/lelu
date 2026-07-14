@@ -1,8 +1,12 @@
-import Database from "better-sqlite3";
 import { homedir } from "os";
 import { join } from "path";
 import { mkdirSync, existsSync } from "fs";
 import type { AuditEvent, Policy, PolicyRule } from "./types.js";
+// `better-sqlite3` is an optional peer dependency (native bindings). Requiring
+// it at module load would break every consumer of the package on plain
+// `import { lelu } from "lelu-agent-auth"` — even ones that never touch
+// LocalStorage — so it's loaded lazily inside the constructor instead.
+import type Database from "better-sqlite3";
 
 // ─── Local Storage with SQLite ────────────────────────────────────────────────
 
@@ -23,8 +27,19 @@ export class LocalStorage {
       dbPath = join(leluDir, "lelu.db");
     }
 
+    let BetterSqlite3: typeof Database;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      BetterSqlite3 = require("better-sqlite3");
+    } catch {
+      throw new Error(
+        "LocalStorage requires the optional 'better-sqlite3' dependency. " +
+          "Install it with: npm install better-sqlite3"
+      );
+    }
+
     this.dbPath = dbPath;
-    this.db = new Database(dbPath);
+    this.db = new BetterSqlite3(dbPath);
     this.initialize();
   }
 

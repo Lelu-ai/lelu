@@ -570,7 +570,7 @@ export default function HomePage() {
               <div>
                 <p className="mb-3 font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-[#8E8E93] dark:text-[#5A5C66]">Social</p>
                 <ul className="space-y-2 text-[#737373] dark:text-[#8B8D98]">
-                  <li><a href="https://x.com/lelu_auth" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">X / Twitter</a></li>
+                  <li><a href="https://x.com/LeluAuth" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">X / Twitter</a></li>
                   <li><a href="https://github.com/lelu-ai/lelu" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">GitHub</a></li>
                 </ul>
               </div>

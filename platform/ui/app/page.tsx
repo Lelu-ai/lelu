@@ -35,6 +35,22 @@ if (decision.allowed) {
 } else if (decision.decision === "human_review") {
   // queued for human approval
 }`,
+  Python: `# pip install lelu-agent-auth-sdk
+from lelu import lelu
+
+# Zero-config: finds the engine that
+# \`npx lelu-mcp start\` is already running.
+auth = lelu(actor="billing-agent")
+
+result = await auth.authorize(
+    tool="refund:process",
+    context={"confidence": 0.85},
+)
+
+if result.decision == "allow":
+    ...  # proceed
+elif result.decision == "human_review":
+    ...  # queued for human approval`,
   curl: `curl -X POST localhost:8082/v1/agent/authorize \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
   -H "Content-Type: application/json" \\

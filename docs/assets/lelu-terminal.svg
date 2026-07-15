@@ -34,7 +34,7 @@
     @keyframes lt-w4 { 0%, 45.6% { transform: scaleX(0); } 54.4%, 100% { transform: scaleX(1); } }
 
     @keyframes lt-m1 { 0%, 2.8% { transform: translateX(0); } 12.8%, 100% { transform: translateX(152px); } }
-    @keyframes lt-m2 { 0%, 28.9% { transform: translateX(0); } 37.8%, 100% { transform: translateX(310px); } }
+    @keyframes lt-m2 { 0%, 28.9% { transform: translateX(0); } 37.8%, 100% { transform: translateX(317px); } }
     @keyframes lt-m3 { 0%, 37.8% { transform: translateX(0); } 45.6%, 100% { transform: translateX(303px); } }
     @keyframes lt-m4 { 0%, 45.6% { transform: translateX(0); } 54.4%, 100% { transform: translateX(541px); } }
 
@@ -58,7 +58,7 @@
 
   <defs>
     <clipPath id="lt-c1"><rect x="38" y="52" width="152" height="19" class="grow1"/></clipPath>
-    <clipPath id="lt-c2"><rect x="38" y="138" width="310" height="19" class="grow2"/></clipPath>
+    <clipPath id="lt-c2"><rect x="38" y="138" width="317" height="19" class="grow2"/></clipPath>
     <clipPath id="lt-c3"><rect x="53" y="160" width="303" height="19" class="grow3"/></clipPath>
     <clipPath id="lt-c4"><rect x="53" y="182" width="541" height="19" class="grow4"/></clipPath>
   </defs>
@@ -79,11 +79,11 @@
 
   <!-- engine output -->
   <text x="24" y="88" class="tm-dim o1" opacity="1"><tspan class="tag">[lelu-mcp]</tspan> First run: downloading Lelu engine…</text>
-  <text x="24" y="110" class="tm-dim o2" opacity="1"><tspan class="tag">[lelu-mcp]</tspan> Local Lelu engine ready on http://localhost:8082 (policy: ~/.lelu/policy.yaml)</text>
+  <text x="24" y="110" class="tm-dim o2" opacity="1"><tspan class="tag">[lelu-mcp]</tspan> Local Lelu engine ready on http://127.0.0.1:53421 (policy: ~/.lelu/policy.yaml)</text>
 
   <!-- curl command -->
   <text x="24" y="152" class="tm o3" opacity="1"><tspan class="p">$</tspan></text>
-  <text x="38" y="152" class="tm" clip-path="url(#lt-c2)">curl -s localhost:8082/v1/agent/authorize \</text>
+  <text x="38" y="152" class="tm" clip-path="url(#lt-c2)">curl -s 127.0.0.1:53421/v1/agent/authorize \</text>
   <g class="cg2" opacity="0"><rect x="39" y="141" width="7" height="14" fill="#D4D4D8" class="cm2"/></g>
   <text x="53" y="174" class="tm" clip-path="url(#lt-c3)">-H "Authorization: Bearer $LELU_API_KEY" \</text>
   <g class="cg3" opacity="0"><rect x="54" y="163" width="7" height="14" fill="#D4D4D8" class="cm3"/></g>

@@ -29,6 +29,14 @@ roles:
       - view_invoices
     deny: []
 
+  # Broad base role for the hosted cloud tier — see cloud_customer below.
+  # Its own deny/compute rules narrow this down; this just supplies the
+  # inherited "allow" half agent_scopes require.
+  cloud_default:
+    allow:
+      - "*"
+    deny: []
+
 # ── Agent scopes (AI agents) ──────────────────────────────────────────────────
 agent_scopes:
 
@@ -104,3 +112,34 @@ agent_scopes:
     deny:
       - approve_refunds
       - delete_invoices
+
+  # ── Hosted cloud tier ──────────────────────────────────────────────────────
+  # All cloud-dashboard customers share this one scope for now — per-tenant
+  # policy customization (via the dashboard's lib/policies.ts + the engine's
+  # internal/sync control-plane worker) isn't wired up yet. Actions here are
+  # arbitrary tool names from customers' own agents, not fixed business
+  # actions, so this uses the same wildcard shapes as the MCP starter policy
+  # rather than the literal action names the demo scopes above use.
+  cloud_customer:
+    inherits: cloud_default
+    constraints:
+      - require_human_approval_if_confidence_below: 0.90
+      - downgrade_to_read_only_if_confidence_below: 0.70
+      - hard_deny_if_confidence_below: 0.50
+    compute:
+      - action: write_*_prod
+        safe_tool: write_file
+        safe_args:
+          path: /tmp/lelu-sandbox/{original}
+          sandboxed: true
+      - action: deploy_*
+        safe_tool: deploy
+        safe_args:
+          environment: staging
+          sandboxed: true
+    deny:
+      - "*delete*"
+      - "*drop*"
+      - "*wipe*"
+      - "*exec*"
+      - "*shell*"

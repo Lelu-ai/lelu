@@ -34,6 +34,12 @@ spec:
               value: "__PLATFORM_URL__"
             - name: LELU_ENGINE_URL
               value: "__ENGINE_URL__"
+            - name: NEXT_PUBLIC_BASE_URL
+              value: "https://lelu-ai.com"
+            # Amazon SES (HTTPS API) — sends auth/reset emails. SES_REGION must
+            # match the region where lelu-ai.com is verified in SES.
+            - name: SES_REGION
+              value: "us-east-1"
             - name: PLATFORM_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -43,6 +49,29 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: lelu-api-key
+                  key: latest
+            # Postgres for accounts / api-keys / policies (lib/db.ts).
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-database-url
+                  key: latest
+            # Session JWT signing (lib/auth.ts).
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-jwt-secret
+                  key: latest
+            # AWS credentials for SES sending (IAM user lelu-ses-sender).
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-aws-access-key-id
+                  key: latest
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-aws-secret-access-key
                   key: latest
           startupProbe:
             httpGet:

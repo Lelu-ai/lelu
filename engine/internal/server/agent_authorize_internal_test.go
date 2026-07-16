@@ -163,3 +163,44 @@ func TestEvaluateAgentDecision_MissingSignalFailsClosed(t *testing.T) {
 	assert.False(t, resp.Allowed)
 	assert.Contains(t, resp.Reason, "no confidence signal")
 }
+
+// ── ConfidenceVerified ────────────────────────────────────────────────────────
+//
+// A caller must be able to tell a real provider signal apart from a
+// self-reported (or absent) confidence number — see resolveConfidence.
+
+func TestEvaluateAgentDecision_ConfidenceVerified_WithSignal(t *testing.T) {
+	h := newDecisionHandler(t, ConfidenceConfig{})
+	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
+		Actor:  "invoice_bot",
+		Action: "approve_refunds",
+		Signal: &confidence.Signal{
+			Provider:      confidence.ProviderOpenAI,
+			TokenLogProbs: []float64{-0.01, -0.02, -0.01},
+		},
+	})
+
+	assert.False(t, handled)
+	assert.True(t, res.resp.ConfidenceVerified, "a real provider signal must be marked verified")
+}
+
+func TestEvaluateAgentDecision_ConfidenceVerified_SelfReportedIsUnverified(t *testing.T) {
+	h := newDecisionHandler(t, ConfidenceConfig{AllowUnverifiedConfidence: true})
+	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
+		Actor: "invoice_bot", Action: "approve_refunds", Confidence: f64(0.95),
+	})
+
+	assert.False(t, handled)
+	assert.False(t, res.resp.ConfidenceVerified, "a self-reported confidence must never be marked verified")
+}
+
+func TestEvaluateAgentDecision_ConfidenceVerified_MissingSignalIsUnverified(t *testing.T) {
+	h := newDecisionHandler(t, ConfidenceConfig{MissingSignalMode: MissingConfidenceReview})
+	_, handled, rec := evaluate(t, h, agentAuthorizeRequest{
+		Actor: "invoice_bot", Action: "approve_refunds",
+	})
+
+	assert.True(t, handled)
+	resp := decodeResp(t, rec)
+	assert.False(t, resp.ConfidenceVerified)
+}

@@ -40,6 +40,14 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
   `;
 
+  // Backfill for databases created before plan/quota tiers existed.
+  await sql`
+    ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free'
+  `;
+  await sql`
+    ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS lelu_email_tokens (
       token      TEXT PRIMARY KEY,

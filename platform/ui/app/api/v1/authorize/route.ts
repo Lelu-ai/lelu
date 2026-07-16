@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomBytes } from "crypto";
 import { validateApiKey } from "@/lib/apikeys";
-import { getActivePoliciesForUser, evaluateWithPolicies } from "@/lib/policies";
+// Dashboard-editable custom policies (lib/policies.ts) aren't bridged to the
+// real engine yet — cloud customers run on the engine's shared default policy
+// for now. Left in place as the natural hook for per-tenant policy sync
+// (engine/internal/sync polls a control-plane URL per tenant) once that's built.
 import { logAuditEvent } from "@/lib/audit";
 import { detectInjection } from "@/lib/injection";
+import { checkQuota } from "@/lib/quota";
+
+// Matches the ui service's actual env vars in docker-compose.production.yml —
+// NOT the same names the (separately, pre-existingly, incorrectly) named
+// ENGINE_URL in api/sandbox/authorize/route.ts uses.
+const ENGINE_URL = (process.env.LELU_ENGINE_URL ?? "http://localhost:8080").replace(/\/$/, "");
+const ENGINE_API_KEY = process.env.LELU_API_KEY;
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -137,7 +147,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { tool, context, args } = (body as Record<string, unknown>) ?? {};
+  const { tool, context, args, confidence } = (body as Record<string, unknown>) ?? {};
 
   if (typeof tool !== "string" || !tool.trim()) {
     return NextResponse.json({ error: "'tool' is required and must be a non-empty string." }, { status: 400 });
@@ -145,42 +155,127 @@ export async function POST(req: NextRequest) {
   if (tool.length > 128) {
     return NextResponse.json({ error: "'tool' must be 128 characters or less." }, { status: 400 });
   }
+  if (confidence !== undefined && (typeof confidence !== "number" || confidence < 0 || confidence > 1)) {
+    return NextResponse.json({ error: "'confidence' must be a number between 0 and 1." }, { status: 400 });
+  }
 
   // --- Evaluate ---
   const start = Date.now();
 
-  // For real API keys, check user's own policies first (first matching rule wins),
-  // then fall back to the built-in rule set.
   let result: { decision: Decision; reason: string; rule: string; safeTool?: string; safeArgs?: Record<string, unknown> };
-  let policyName: string | undefined;
+  let confidenceUsed = 0;
+  let confidenceVerified: boolean | undefined;
+  let riskScore: number | undefined;
+  let quotaInfo: { plan: string; used: number; limit: number } | undefined;
 
-  // Injection check runs FIRST, across every field — a deny here short-circuits
-  // policy and rule evaluation, mirroring the engine's pipeline ordering.
-  const injection = detectInjection({ tool: tool.trim(), context, args });
-  if (injection.detected) {
-    result = {
-      decision: "deny",
-      reason: `prompt injection detected in ${injection.source}: "${injection.pattern}"`,
-      rule: "deny:prompt-injection",
-    };
-  } else if (userId && !isSandbox) {
-    try {
-      const policies = await getActivePoliciesForUser(userId);
-      const policyMatch = evaluateWithPolicies(tool.trim(), policies);
-      if (policyMatch) {
-        result = { decision: policyMatch.decision, reason: policyMatch.reason, rule: policyMatch.rule };
-        policyName = policyMatch.policyName;
-      } else {
-        result = evaluateTool(tool.trim());
-      }
-    } catch {
+  if (isSandbox) {
+    // Sandbox keys never reach the real engine or count against any quota —
+    // same local demo evaluation as always.
+    const injection = detectInjection({ tool: tool.trim(), context, args });
+    if (injection.detected) {
+      result = {
+        decision: "deny",
+        reason: `prompt injection detected in ${injection.source}: "${injection.pattern}"`,
+        rule: "deny:prompt-injection",
+      };
+    } else {
       result = evaluateTool(tool.trim());
     }
+    confidenceUsed =
+      result.decision === "allow" ? 0.95 :
+      result.decision === "compute" ? 0.85 :
+      result.decision === "human_review" ? 0.7 : 0.3;
   } else {
-    result = evaluateTool(tool.trim());
+    // Real cloud API key — check quota, then run the actual engine pipeline.
+    const quota = await checkQuota(userId!);
+    quotaInfo = { plan: quota.plan, used: quota.used, limit: quota.limit };
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: `Monthly quota exceeded (${quota.used}/${quota.limit} on the ${quota.plan} plan). Upgrade for a higher limit.`,
+          plan: quota.plan,
+          used: quota.used,
+          limit: quota.limit,
+        },
+        { status: 429 }
+      );
+    }
+
+    let engineRes: Response;
+    try {
+      engineRes = await fetch(`${ENGINE_URL}/v1/agent/authorize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(ENGINE_API_KEY ? { Authorization: `Bearer ${ENGINE_API_KEY}` } : {}),
+        },
+        // actor is fixed to the shared cloud_customer policy scope (see
+        // config/auth.yaml) — per-tenant custom policy isn't wired up yet.
+        // acting_for + tenant_id carry the real customer identity through for
+        // the engine's own per-tenant audit/rate-limit/reliability tracking.
+        body: JSON.stringify({
+          actor: "cloud_customer",
+          action: tool.trim(),
+          acting_for: userId,
+          tenant_id: userId,
+          // Self-reported only — honored by the engine only when it's
+          // configured with AllowUnverifiedConfidence (dev/demo mode, same as
+          // the MCP zero-config path). Real deployments should eventually
+          // accept a confidence_signal derived from provider logprobs instead.
+          ...(typeof confidence === "number" ? { confidence } : {}),
+          ...(typeof context === "string" && context ? { resource: { context } } : {}),
+          ...(args && typeof args === "object" ? { args } : {}),
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      console.error("[v1/authorize] engine unreachable:", err);
+      return NextResponse.json(
+        { error: "The authorization engine is temporarily unavailable. Please retry." },
+        { status: 503 }
+      );
+    }
+
+    const engineData = (await engineRes.json().catch(() => null)) as {
+      allowed?: boolean;
+      reason?: string;
+      requires_human_review?: boolean;
+      compute?: boolean;
+      safe_tool?: string;
+      safe_args?: Record<string, unknown>;
+      confidence_used?: number;
+      confidence_verified?: boolean;
+      risk_score?: number;
+    } | null;
+
+    if (!engineRes.ok || !engineData) {
+      return NextResponse.json(
+        { error: "The authorization engine returned an unexpected response." },
+        { status: 502 }
+      );
+    }
+
+    const decision: Decision = engineData.compute
+      ? "compute"
+      : engineData.requires_human_review
+      ? "human_review"
+      : engineData.allowed
+      ? "allow"
+      : "deny";
+
+    result = {
+      decision,
+      reason: engineData.reason ?? "",
+      rule: "engine",
+      safeTool: engineData.safe_tool,
+      safeArgs: engineData.safe_args,
+    };
+    confidenceUsed = engineData.confidence_used ?? 0;
+    confidenceVerified = engineData.confidence_verified;
+    riskScore = engineData.risk_score;
   }
 
-  const latencyMs = Date.now() - start + Math.floor(Math.random() * 8 + 2);
+  const latencyMs = Date.now() - start;
   const requestId = `req_${randomBytes(8).toString("hex")}`;
   const mode = isSandbox ? "sandbox" : "live";
   const inputHash = sha256({ tool: tool.trim(), context, args });
@@ -189,11 +284,6 @@ export async function POST(req: NextRequest) {
     result.decision === "allow" ? "allowed" :
     result.decision === "deny" ? "denied" :
     result.decision === "compute" ? "compute" : "human_review";
-
-  const confidence =
-    result.decision === "allow" ? 0.95 :
-    result.decision === "compute" ? 0.85 :
-    result.decision === "human_review" ? 0.7 : 0.3;
 
   const outputHash = sha256({ requestId, decision: decisionMapped, reason: result.reason });
 
@@ -207,8 +297,7 @@ export async function POST(req: NextRequest) {
     decision: decisionMapped,
     reason: result.reason,
     rule: result.rule,
-    policyName,
-    confidence,
+    confidence: confidenceUsed,
     latencyMs,
     mode,
     inputHash,
@@ -223,9 +312,11 @@ export async function POST(req: NextRequest) {
     decision: result.decision,
     reason: result.reason,
     rule: result.rule,
-    ...(policyName ? { policyName } : {}),
     ...(result.safeTool ? { safeTool: result.safeTool } : {}),
     ...(result.safeArgs ? { safeArgs: result.safeArgs } : {}),
+    ...(confidenceVerified !== undefined ? { confidenceVerified } : {}),
+    ...(riskScore !== undefined ? { riskScore } : {}),
+    ...(quotaInfo ? { quota: quotaInfo } : {}),
     latencyMs,
     mode,
     ...(keyId ? { keyId } : {}),

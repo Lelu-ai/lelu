@@ -1,7 +1,8 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 
-const FROM = process.env.SMTP_FROM ?? process.env.SES_FROM ?? "Lelu <noreply@lelu-ai.com>";
+const FROM =
+  process.env.SMTP_FROM ?? process.env.SES_FROM ?? process.env.EMAIL_FROM ?? "Lelu <noreply@lelu-ai.com>";
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://lelu-ai.com";
 
 // Amazon SES over its HTTPS API — works on Vercel/serverless (SMTP ports are

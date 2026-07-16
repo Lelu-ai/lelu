@@ -27,23 +27,19 @@ const TIERS = [
   {
     name: "Cloud",
     price: "$0",
-    period: "during beta",
+    period: "free tier",
     tagline: "Hosted engine and dashboard, run by us.",
     features: [
+      "Free account — 1,000 authorize calls/month",
       "Managed engine — nothing to deploy",
       "Web dashboard & policy editor",
       "Hosted audit history",
       "Slack human-review approvals",
       "Sandbox environment",
-      "Fair-use limits while in beta",
     ],
-    cta: {
-      label: "Get early access",
-      href: "https://github.com/lelu-ai/lelu/discussions",
-      external: true,
-    },
+    cta: { label: "Create free account", href: "/register" },
     highlight: false,
-    badge: "Early access",
+    badge: "Account required",
   },
   {
     name: "Enterprise",
@@ -70,19 +66,19 @@ const TIERS = [
 const FAQ = [
   {
     q: "Is it really free?",
-    a: "Yes. The engine, SDKs, MCP server, and dashboard are MIT-licensed open source — self-host everything with no limits, forever. The hosted cloud is also free while it's in beta.",
+    a: "Yes. The engine, SDKs, MCP server, and dashboard are MIT-licensed open source — self-host everything with no limits, forever. The hosted cloud also has a real free tier: 1,000 authorize calls/month, no credit card required.",
   },
   {
     q: "Do I need an account?",
-    a: "No. There is no signup and no login today. The local engine runs with npx -y lelu-mcp start and accepts any API key you choose at startup.",
+    a: "No, for local/self-hosted — run npx -y lelu-mcp start and accept any API key you choose at startup, nothing to sign up for. Yes, for the hosted cloud dashboard and cloud API keys — create a free account to get started.",
   },
   {
-    q: "What happens when cloud pricing launches?",
-    a: "The open-source tier stays free forever — that's the point of MIT licensing. Cloud beta users will get generous notice and a founding-user discount before anything is billed.",
+    q: "What happens if I go over the free cloud quota?",
+    a: "Requests beyond the free tier's monthly limit are declined with a clear quota error — nothing bills automatically. Upgrade to a paid plan for a much higher quota.",
   },
   {
-    q: "How do I get early access to the cloud version?",
-    a: "Open a thread in GitHub Discussions and tell us about your use case — we onboard new teams every week.",
+    q: "How do I upgrade to a paid cloud plan?",
+    a: "Open a thread in GitHub Discussions and tell us about your use case — we're onboarding paid teams manually while self-serve billing is being built.",
   },
 ];
 
@@ -98,8 +94,8 @@ export default function PricingPage() {
           Free while we build.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-[#737373] dark:text-[#8B8D98]">
-          No accounts, no credit card, no signup. Self-host the full engine forever,
-          or ask for early access to the hosted beta.
+          Self-host the full engine forever — no account, no credit card, no signup.
+          Want the hosted dashboard instead? Create a free cloud account, no card required.
         </p>
       </section>
 

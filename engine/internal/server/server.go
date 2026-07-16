@@ -562,13 +562,19 @@ type agentAuthorizeRequest struct {
 }
 
 type agentAuthorizeResponse struct {
-	Allowed                      bool    `json:"allowed"`
-	Reason                       string  `json:"reason"`
-	TraceID                      string  `json:"trace_id"`
-	DowngradedScope              string  `json:"downgraded_scope,omitempty"`
-	EffectiveScope               string  `json:"effective_scope,omitempty"`
-	RequiresHumanReview          bool    `json:"requires_human_review"`
-	ConfidenceUsed               float64 `json:"confidence_used"`
+	Allowed             bool    `json:"allowed"`
+	Reason              string  `json:"reason"`
+	TraceID             string  `json:"trace_id"`
+	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
+	EffectiveScope      string  `json:"effective_scope,omitempty"`
+	RequiresHumanReview bool    `json:"requires_human_review"`
+	ConfidenceUsed      float64 `json:"confidence_used"`
+	// ConfidenceVerified is true only when ConfidenceUsed came from a verified
+	// provider signal (confidence.ExtractScore); false when it came from the
+	// AllowUnverifiedConfidence self-reported fallback, or when no signal was
+	// available at all. Lets callers tell a real signal apart from a number the
+	// agent claimed about itself.
+	ConfidenceVerified           bool    `json:"confidence_verified"`
 	RiskScore                    float64 `json:"risk_score,omitempty"`
 	RiskCriticality              float64 `json:"risk_criticality,omitempty"`
 	RiskReliability              float64 `json:"risk_reliability,omitempty"`
@@ -637,6 +643,7 @@ func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req a
 			Reason:              "shadow detection check failed — request escalated for safety",
 			TraceID:             traceID,
 			ConfidenceUsed:      0,
+			ConfidenceVerified:  false,
 		})
 		return true
 	}
@@ -806,7 +813,7 @@ type agentDecisionResult struct {
 // stop. When handled=false the result carries the response plus the inputs the
 // async analytics needs.
 func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWriter, r *http.Request, req agentAuthorizeRequest, span trace.Span, start time.Time, inputHash string) (agentDecisionResult, bool) {
-	confidenceScore, missingSignal, err := h.resolveConfidence(req)
+	confidenceScore, missingSignal, confidenceVerified, err := h.resolveConfidence(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
 		return agentDecisionResult{}, true
@@ -1002,6 +1009,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		EffectiveScope:      effectiveScope,
 		RequiresHumanReview: requiresReview,
 		ConfidenceUsed:      confidenceScore,
+		ConfidenceVerified:  confidenceVerified,
 		RiskScore:           riskDec.Score,
 		RiskCriticality:     riskDec.Criticality,
 		RiskReliability:     riskDec.Reliability,
@@ -1020,19 +1028,20 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 
 	// Audit log with full forensic fields.
 	h.audit.Log(audit.Event{
-		TenantID:        req.TenantID,
-		TraceID:         traceID,
-		Actor:           req.Actor,
-		Action:          req.Action,
-		Resource:        req.Resource,
-		ConfidenceScore: confidenceScore,
-		Decision:        decisionStringFull(allowed, requiresReview, isCompute),
-		Reason:          finalReason,
-		DowngradedScope: downgradedScope,
-		LatencyMS:       totalLatency,
-		InputHash:       inputHash,
-		OutputHash:      resp.OutputHash,
-		PolicyDigest:    evalDec.PolicyDigest,
+		TenantID:           req.TenantID,
+		TraceID:            traceID,
+		Actor:              req.Actor,
+		Action:             req.Action,
+		Resource:           req.Resource,
+		ConfidenceScore:    confidenceScore,
+		ConfidenceVerified: confidenceVerified,
+		Decision:           decisionStringFull(allowed, requiresReview, isCompute),
+		Reason:             finalReason,
+		DowngradedScope:    downgradedScope,
+		LatencyMS:          totalLatency,
+		InputHash:          inputHash,
+		OutputHash:         resp.OutputHash,
+		PolicyDigest:       evalDec.PolicyDigest,
 	})
 	h.notifyIncident(r.Context(), incident.Event{
 		Type:                eventTypeFrom(resp.Allowed, resp.RequiresHumanReview),
@@ -1284,15 +1293,19 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) resolveConfidence(req agentAuthorizeRequest) (score float64, missingSignal bool, err error) {
+// resolveConfidence returns the confidence score to use, whether the request
+// has no usable signal at all, and whether the score is a verified provider
+// signal (true) or a self-reported number accepted only because
+// AllowUnverifiedConfidence is set (false).
+func (h *Handler) resolveConfidence(req agentAuthorizeRequest) (score float64, missingSignal bool, verified bool, err error) {
 	if req.Signal != nil {
 		score, err = confidence.ExtractScore(req.Signal)
-		return score, false, err
+		return score, false, true, err
 	}
 	if h.confCfg.AllowUnverifiedConfidence && req.Confidence != nil {
-		return *req.Confidence, false, nil
+		return *req.Confidence, false, false, nil
 	}
-	return 0, true, nil
+	return 0, true, false, nil
 }
 
 func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthorizeRequest, traceID string, start time.Time) agentAuthorizeResponse {
@@ -1329,6 +1342,7 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 		DowngradedScope:     downgradedScope,
 		RequiresHumanReview: requiresReview,
 		ConfidenceUsed:      0,
+		ConfidenceVerified:  false,
 	}
 }
 

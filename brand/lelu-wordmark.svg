@@ -1,0 +1,18 @@
+<svg width="760" height="200" viewBox="0 0 760 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="brandGrad" x1="20" y1="12" x2="168" y2="188" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="0.5" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="12" width="176" height="176" rx="44" fill="#09090B"/>
+  <path d="M100 24L42 52V101C42 138 66 170 100 180C134 170 158 138 158 101V52L100 24Z" fill="url(#brandGrad)"/>
+  <path d="M72 74H103C121 74 133 86 133 101C133 116 121 128 103 128H88V154H72V74ZM103 116C112 116 117 110 117 101C117 92 112 86 103 86H88V116H103Z" fill="white"/>
+  <path d="M240 124V72H278C301 72 317 88 317 108C317 128 301 144 278 144H260V124H278C288 124 295 117 295 108C295 99 288 92 278 92H260V124H240Z" fill="#18181B"/>
+  <path d="M333 144V72H354V144H333Z" fill="#18181B"/>
+  <path d="M373 144V72H394L436 120V72H457V144H437L394 95V144H373Z" fill="#18181B"/>
+  <path d="M478 144V72H499V144H478Z" fill="#18181B"/>
+  <path d="M518 144V72H539L566 113L593 72H614V144H593V106L572 137H560L539 106V144H518Z" fill="#18181B"/>
+  <path d="M639 144V72H660L702 120V72H723V144H703L660 95V144H639Z" fill="#18181B"/>
+</svg>

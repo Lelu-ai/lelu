@@ -98,6 +98,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
         trace_id: string;
         requires_human_review: boolean;
         confidence_used: number;
+        confidence_verified: boolean;
         downgraded_scope?: string;
       }>("/v1/agent/authorize", {
         actor,
@@ -127,6 +128,10 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
                 reason:               data.reason,
                 trace_id:             data.trace_id,
                 confidence_used:      data.confidence_used,
+                // false whenever this decision relied on a self-reported
+                // confidence number (or none at all) rather than a real
+                // provider signal — see the `confidence` param description.
+                confidence_verified:  data.confidence_verified,
                 ...(data.downgraded_scope ? { downgraded_scope: data.downgraded_scope } : {}),
               },
               null,

@@ -3,11 +3,14 @@
  *
  * When no engine URL is configured, lelu-mcp downloads the static engine
  * binary for this platform from GitHub Releases (cached in ~/.lelu/bin),
- * writes a starter policy to ~/.lelu/policy.yaml on first run, spawns the
- * engine as a child process on a free localhost port, and waits for /healthz.
+ * verifies it against the release's published SHA256SUMS.txt before writing
+ * it to disk, writes a starter policy to ~/.lelu/policy.yaml on first run,
+ * spawns the engine as a child process on a free localhost port, and waits
+ * for /healthz.
  *
  * Everything runs on the user's machine — no account, no cloud calls beyond
- * the one-time binary download.
+ * the one-time binary download (plus a GitHub API call to resolve the latest
+ * engine release, skipped when LELU_ENGINE_VERSION pins a version).
  *
  * Environment overrides:
  *   LELU_HOME            data dir (default ~/.lelu)
@@ -17,7 +20,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import * as net from "node:net";
@@ -165,27 +168,104 @@ function assetName(): string {
   return `lelu-engine-${osName}-${arch}${osName === "windows" ? ".exe" : ""}`;
 }
 
-async function downloadEngine(dest: string): Promise<void> {
-  const asset = assetName();
-  const version = process.env["LELU_ENGINE_VERSION"];
-  const url = version
-    ? `https://github.com/${REPO}/releases/download/engine-v${version}/${asset}`
-    : `https://github.com/${REPO}/releases/latest/download/${asset}`;
+const ENGINE_RELEASE_TAG_PREFIX = "engine-v";
 
-  console.error(`[lelu-mcp] First run: downloading Lelu engine → ${url}`);
-  const res = await fetch(url);
+// Resolves the release tag to download from. Pinned versions go straight to
+// their tag (no network call). Unpinned installs must NOT use GitHub's
+// generic `releases/latest` — a second, separate workflow (oss-release.yml)
+// also publishes `lelu-engine-*` binaries under a `v*` tag but without a
+// checksums file, and "latest" can resolve to either. Querying the release
+// list and filtering by prefix guarantees we always land on a release that
+// has a matching SHA256SUMS.txt.
+async function resolveEngineReleaseTag(): Promise<string> {
+  const pinned = process.env["LELU_ENGINE_VERSION"];
+  if (pinned) return `${ENGINE_RELEASE_TAG_PREFIX}${pinned}`;
+
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases`, {
+    headers: { "User-Agent": "lelu-mcp", Accept: "application/vnd.github+json" },
+  });
   if (!res.ok) {
     throw new Error(
-      `Engine download failed (HTTP ${res.status}) from ${url}. ` +
+      `Could not list Lelu engine releases (HTTP ${res.status}). ` +
+      `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
+    );
+  }
+  const releases = (await res.json()) as Array<{ tag_name?: string }>;
+  const engineRelease = releases.find((r) => r.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX));
+  if (!engineRelease?.tag_name) {
+    throw new Error(
+      `No "${ENGINE_RELEASE_TAG_PREFIX}*" release found for ${REPO}. ` +
+      `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
+    );
+  }
+  return engineRelease.tag_name;
+}
+
+// Parses `sha256sum`-style checksum output ("<hex digest>  <filename>" per
+// line, optionally with a "*" binary-mode marker before the filename) and
+// returns the expected digest for `filename`, or null if it isn't listed.
+export function findChecksum(checksumsText: string, filename: string): string | null {
+  for (const line of checksumsText.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = trimmed.match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/);
+    if (!match) continue;
+    const [, hash, name] = match;
+    if (name === filename) return hash.toLowerCase();
+  }
+  return null;
+}
+
+export function sha256Hex(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+async function downloadEngine(dest: string): Promise<void> {
+  const asset = assetName();
+  const tag = await resolveEngineReleaseTag();
+  const baseUrl = `https://github.com/${REPO}/releases/download/${tag}`;
+
+  console.error(`[lelu-mcp] First run: downloading Lelu engine → ${baseUrl}/${asset}`);
+
+  // Fetch and verify the checksum BEFORE writing anything to disk — refuse to
+  // install an engine binary whose integrity can't be confirmed.
+  const checksumsUrl = `${baseUrl}/SHA256SUMS.txt`;
+  const checksumsRes = await fetch(checksumsUrl);
+  if (!checksumsRes.ok) {
+    throw new Error(
+      `Could not download checksums (HTTP ${checksumsRes.status}) from ${checksumsUrl} — ` +
+      `refusing to install an unverified engine binary. Set LELU_ENGINE_BINARY to a locally built engine instead.`
+    );
+  }
+  const expected = findChecksum(await checksumsRes.text(), asset);
+  if (!expected) {
+    throw new Error(
+      `No checksum entry for "${asset}" in ${checksumsUrl} — refusing to install an unverified engine binary.`
+    );
+  }
+
+  const res = await fetch(`${baseUrl}/${asset}`);
+  if (!res.ok) {
+    throw new Error(
+      `Engine download failed (HTTP ${res.status}) from ${baseUrl}/${asset}. ` +
       `Set LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
     );
   }
   const buf = Buffer.from(await res.arrayBuffer());
+
+  const actual = sha256Hex(buf);
+  if (actual !== expected) {
+    throw new Error(
+      `Checksum mismatch for ${asset}: expected ${expected}, got ${actual}. ` +
+      `The download may be corrupted or tampered with — refusing to install it.`
+    );
+  }
+
   await fsp.mkdir(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.download-${process.pid}`;
   await fsp.writeFile(tmp, buf, { mode: 0o755 });
   await fsp.rename(tmp, dest);
-  console.error(`[lelu-mcp] Engine cached at ${dest}`);
+  console.error(`[lelu-mcp] Engine cached at ${dest} (checksum verified)`);
 }
 
 async function resolveBinary(): Promise<string> {

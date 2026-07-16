@@ -185,31 +185,50 @@ func (e *Evaluator) LoadPolicyBytes(data []byte) error {
 
 // matchAction checks whether a policy pattern matches an action string.
 //
-// Supported pattern syntax:
+// Supported pattern syntax: "*" is a multi-character wildcard, usable any
+// number of times and in any position:
 //
-//	"*"           — matches everything
-//	"read_*"      — prefix wildcard (action must start with "read_")
-//	"*_prod"      — suffix wildcard (action must end with "_prod")
-//	"*_prod_*"    — contains wildcard (action must contain "_prod_")
-//	"read_file"   — exact match (no wildcards)
+//	"*"             — matches everything
+//	"read_*"        — prefix wildcard (action must start with "read_")
+//	"*_prod"        — suffix wildcard (action must end with "_prod")
+//	"*_prod_*"      — contains wildcard (action must contain "_prod_")
+//	"write_*_prod"  — wildcard in the middle (action must start with "write_"
+//	                  and end with "_prod", in that order)
+//	"read_file"     — exact match (no wildcards)
 func matchAction(pattern, action string) bool {
 	if pattern == "*" {
 		return true
 	}
-	// Both prefix and suffix wildcard → contains check.
-	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(pattern, "*") && len(pattern) > 1 {
-		middle := pattern[1 : len(pattern)-1]
-		return strings.Contains(action, middle)
+	if !strings.Contains(pattern, "*") {
+		return pattern == action
 	}
-	// Prefix wildcard → suffix check on action.
-	if strings.HasSuffix(pattern, "*") {
-		return strings.HasPrefix(action, pattern[:len(pattern)-1])
+
+	segments := strings.Split(pattern, "*")
+	anchoredStart := segments[0] != ""             // pattern does not start with "*"
+	anchoredEnd := segments[len(segments)-1] != "" // pattern does not end with "*"
+
+	rest := action
+	for i, seg := range segments {
+		if seg == "" {
+			continue
+		}
+		if i == 0 && anchoredStart {
+			if !strings.HasPrefix(rest, seg) {
+				return false
+			}
+			rest = rest[len(seg):]
+			continue
+		}
+		if i == len(segments)-1 && anchoredEnd {
+			return strings.HasSuffix(rest, seg)
+		}
+		idx := strings.Index(rest, seg)
+		if idx == -1 {
+			return false
+		}
+		rest = rest[idx+len(seg):]
 	}
-	// Suffix wildcard → prefix check on action.
-	if strings.HasPrefix(pattern, "*") {
-		return strings.HasSuffix(action, pattern[1:])
-	}
-	return pattern == action
+	return true
 }
 
 // Evaluate checks a human auth request against the loaded policy.
@@ -323,7 +342,14 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 		}
 	}
 
-	// Confidence gates from constraints.
+	// Confidence gates from constraints — checked strictest-first in three
+	// separate passes, independent of the order constraints happen to be
+	// listed in the policy file. A single combined pass that returns on the
+	// first HardDeny/Downgrade match it sees would let a later, stricter
+	// constraint never be reached just because a looser one was listed
+	// earlier — e.g. downgrade_to_read_only_if_confidence_below: 0.70 listed
+	// before hard_deny_if_confidence_below: 0.50 would catch confidence 0.40
+	// first and return, so the hard-deny constraint would never fire.
 	dec := &Decision{Allowed: true, ConfidenceUsed: req.Confidence, PolicyDigest: e.policyDigest}
 	for _, c := range scope.Constraints {
 		if c.HardDenyIfConf != nil && req.Confidence < *c.HardDenyIfConf {
@@ -331,15 +357,20 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 			dec.Reason = fmt.Sprintf("confidence %.0f%% is below hard-deny threshold %.0f%%", req.Confidence*100, *c.HardDenyIfConf*100)
 			return dec, nil
 		}
+	}
+	for _, c := range scope.Constraints {
 		if c.DowngradeToReadOnlyIfConf != nil && req.Confidence < *c.DowngradeToReadOnlyIfConf {
 			dec.Allowed = false
 			dec.DowngradedScope = "read_only"
 			dec.Reason = fmt.Sprintf("confidence %.0f%% requires read-only downgrade (threshold %.0f%%)", req.Confidence*100, *c.DowngradeToReadOnlyIfConf*100)
 			return dec, nil
 		}
+	}
+	for _, c := range scope.Constraints {
 		if c.RequireHumanApprovalIfConf != nil && req.Confidence < *c.RequireHumanApprovalIfConf {
 			dec.RequiresHumanReview = true
 			dec.Reason = fmt.Sprintf("confidence %.0f%% requires human approval (threshold %.0f%%)", req.Confidence*100, *c.RequireHumanApprovalIfConf*100)
+			break
 		}
 	}
 

@@ -1,14 +1,11 @@
 # ── Build stage ────────────────────────────────────────────────────────────────
-FROM golang:1.23-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
-ENV GOPROXY=https://proxy.golang.org,direct
-ENV GOTOOLCHAIN=auto
+ENV GOTOOLCHAIN=local
 
 WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor \
     -ldflags="-s -w" \
     -o /platform ./cmd/api
 

@@ -98,8 +98,12 @@ function localEvaluate(tool: string) {
 
 // ── Real engine proxy ─────────────────────────────────────────────────────────
 
-const ENGINE_URL = (process.env.ENGINE_URL ?? "http://localhost:8080").replace(/\/$/, "");
-const ENGINE_API_KEY = process.env.ENGINE_API_KEY ?? "";
+// Matches the ui service's actual env vars in docker-compose.production.yml —
+// this previously read ENGINE_URL/ENGINE_API_KEY, which are never set there,
+// so it silently fell back to localhost:8080 (unreachable from the ui
+// container) and always ran the local fallback ruleset instead of the real engine.
+const ENGINE_URL = (process.env.LELU_ENGINE_URL ?? "http://localhost:8080").replace(/\/$/, "");
+const ENGINE_API_KEY = process.env.LELU_API_KEY ?? "";
 
 async function callEngine(
   tool: string,

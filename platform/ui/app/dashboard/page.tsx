@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -28,6 +29,7 @@ interface ApiKey {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [agentCount, setAgentCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -56,6 +58,11 @@ export default function DashboardPage() {
         fetch("/api/dashboard/keys"),
         fetch("/api/agents"),
       ]);
+      // The dashboard requires an account — send anonymous visitors to sign in.
+      if (keysRes.status === 401) {
+        router.replace("/login?next=/dashboard");
+        return;
+      }
       if (!keysRes.ok) throw new Error("Failed to load keys");
       const keysData = await keysRes.json();
       setApiKeys((keysData.keys as ApiKey[]).filter((k) => !k.revoked));

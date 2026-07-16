@@ -83,6 +83,18 @@ variable "db_password" {
   sensitive   = true
 }
 
+variable "db_publicly_accessible" {
+  description = "Expose RDS with a public endpoint. Required when the frontend runs outside the VPC (e.g. Next.js API routes on Vercel). Keep false for all-in-VPC deployments where ECS reaches RDS privately."
+  type        = bool
+  default     = false
+}
+
+variable "db_allowed_cidrs" {
+  description = "CIDR blocks allowed to reach Postgres on 5432 from outside the VPC. Empty = VPC-only. Prefer Vercel Secure Compute static egress IPs; otherwise [\"0.0.0.0/0\"] (works, but exposes the DB to the internet — rely on strong creds + forced SSL)."
+  type        = list(string)
+  default     = []
+}
+
 # ── Cache ─────────────────────────────────────────────────────────────────────
 
 variable "redis_node_type" {

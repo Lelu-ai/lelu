@@ -157,14 +157,29 @@ resource "aws_security_group" "ecs" {
 
 resource "aws_security_group" "rds" {
   name        = "${local.name}-rds"
-  description = "RDS — allow PostgreSQL from ECS tasks only"
+  description = "RDS — PostgreSQL from ECS tasks, plus optional external allowlist"
   vpc_id      = aws_vpc.main.id
 
   ingress {
+    description     = "PostgreSQL from ECS tasks"
     from_port       = 5432
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [aws_security_group.ecs.id]
+  }
+
+  # Optional: external clients outside the VPC (e.g. Vercel functions). Only
+  # created when db_allowed_cidrs is non-empty. Tighten to static egress IPs
+  # if available; SSL is force-enabled on the DB regardless.
+  dynamic "ingress" {
+    for_each = length(var.db_allowed_cidrs) > 0 ? [1] : []
+    content {
+      description = "PostgreSQL from allowlisted external CIDRs"
+      from_port   = 5432
+      to_port     = 5432
+      protocol    = "tcp"
+      cidr_blocks = var.db_allowed_cidrs
+    }
   }
 }
 
@@ -210,8 +225,22 @@ resource "aws_ecr_repository" "mcp" {
 # ── RDS PostgreSQL ────────────────────────────────────────────────────────────
 
 resource "aws_db_subnet_group" "main" {
-  name       = "${local.name}-db"
-  subnet_ids = aws_subnet.private[*].id
+  name = "${local.name}-db"
+  # Public subnets are required for a publicly_accessible instance (they have an
+  # internet gateway route); otherwise stay in private subnets.
+  subnet_ids = var.db_publicly_accessible ? aws_subnet.public[*].id : aws_subnet.private[*].id
+}
+
+# Force TLS on all connections — important when the DB has a public endpoint.
+resource "aws_db_parameter_group" "main" {
+  name        = "${local.name}-pg15"
+  family      = "postgres15"
+  description = "Lelu Postgres 15 — force SSL"
+
+  parameter {
+    name  = "rds.force_ssl"
+    value = "1"
+  }
 }
 
 resource "aws_db_instance" "main" {
@@ -226,6 +255,8 @@ resource "aws_db_instance" "main" {
   password               = var.db_password
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.rds.id]
+  parameter_group_name   = aws_db_parameter_group.main.name
+  publicly_accessible    = var.db_publicly_accessible
   skip_final_snapshot    = false
   final_snapshot_identifier = "${local.name}-final-snapshot"
   deletion_protection    = true

@@ -7,27 +7,19 @@
 # ── Builder ───────────────────────────────────────────────────────────────────
 FROM golang:1.24-alpine AS builder
 
-# Install git + ca-certs (needed for go module downloads over HTTPS)
-RUN apk add --no-cache git ca-certificates tzdata
+# Install ca-certs (no git or network downloads needed — using vendor/)
+RUN apk add --no-cache ca-certificates tzdata
 
-ENV GOPROXY=https://proxy.golang.org,direct
 ENV GOTOOLCHAIN=auto
 
 WORKDIR /build
 
-# Cache dependency downloads separately from source changes.
-COPY engine/go.mod engine/go.sum ./
-RUN go mod download
-
-# Copy source
+# Copy source + pre-vendored dependencies (no network access required)
 COPY engine/ .
 
-# Ensure all dependencies are properly tracked
-RUN go mod tidy
-
-# Build a fully static binary
+# Build a fully static binary using the vendor directory
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w -extldflags '-static'" \
+    go build -mod=vendor -ldflags="-s -w -extldflags '-static'" \
     -o /engine ./cmd/engine
 
 # ── Runtime ───────────────────────────────────────────────────────────────────

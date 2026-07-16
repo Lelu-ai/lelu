@@ -13,6 +13,10 @@
 #
 set -euo pipefail
 
+# Always run from the repo root regardless of where the script is invoked from
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/../.."
+
 # ─── Config ───────────────────────────────────────────────────────────────────
 
 REGION="${AWS_REGION:-us-east-1}"
@@ -33,7 +37,7 @@ for svc in lelu-engine lelu-platform lelu-ui lelu-mcp; do
     --repository-name "$svc" \
     --image-scanning-configuration scanOnPush=true \
     --region "$REGION" \
-    --output none
+    > /dev/null
   log "  ECR: $svc ready"
 done
 
@@ -49,7 +53,7 @@ ECR="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
 build_push() {
   local name=$1 context=$2 dockerfile=$3
   log "Building $name..."
-  docker build -t "$name:$TAG" -f "$dockerfile" "$context"
+  docker build --network=host -t "$name:$TAG" -f "$dockerfile" "$context"
   docker tag "$name:$TAG" "$ECR/$name:$TAG"
   docker push "$ECR/$name:$TAG"
   log "  Pushed $ECR/$name:$TAG"
@@ -159,7 +163,7 @@ aws rds create-db-subnet-group \
   --db-subnet-group-name "$DB_SUBNET_GROUP" \
   --db-subnet-group-description "Lelu RDS subnet group" \
   --subnet-ids "$SUBNET_PRIVATE_1" "$SUBNET_PRIVATE_2" \
-  --region "$REGION" --output none
+  --region "$REGION" > /dev/null
 
 aws rds describe-db-instances --db-instance-identifier "lelu-postgres" \
   --region "$REGION" > /dev/null 2>&1 || \
@@ -178,7 +182,7 @@ aws rds create-db-instance \
   --db-subnet-group-name "$DB_SUBNET_GROUP" \
   --backup-retention-period 7 \
   --deletion-protection \
-  --region "$REGION" --output none
+  --region "$REGION" > /dev/null
 
 log "  RDS instance created (takes ~5 min to become available)"
 
@@ -192,7 +196,7 @@ aws elasticache create-cache-subnet-group \
   --cache-subnet-group-name "$REDIS_SUBNET_GROUP" \
   --cache-subnet-group-description "Lelu Redis subnet group" \
   --subnet-ids "$SUBNET_PRIVATE_1" "$SUBNET_PRIVATE_2" \
-  --region "$REGION" --output none
+  --region "$REGION" > /dev/null
 
 aws elasticache describe-replication-groups --replication-group-id "lelu-redis" \
   --region "$REGION" > /dev/null 2>&1 || \
@@ -207,7 +211,7 @@ aws elasticache create-replication-group \
   --security-group-ids "$SG_REDIS" \
   --at-rest-encryption-enabled \
   --transit-encryption-enabled \
-  --region "$REGION" --output none
+  --region "$REGION" > /dev/null
 
 log "  Redis cluster created (takes ~3 min to become available)"
 
@@ -221,7 +225,7 @@ create_secret() {
   aws secretsmanager create-secret \
     --name "lelu/$name" \
     --secret-string "$value" \
-    --region "$REGION" --output none
+    --region "$REGION" > /dev/null
   log "  Secret: lelu/$name"
 }
 
@@ -254,7 +258,7 @@ create_role() {
   local name=$1
   aws iam get-role --role-name "$name" > /dev/null 2>&1 || \
   aws iam create-role --role-name "$name" \
-    --assume-role-policy-document "$TRUST_POLICY" --output none
+    --assume-role-policy-document "$TRUST_POLICY" > /dev/null
 }
 
 create_role "lelu-ecs-execution-role"
@@ -285,7 +289,7 @@ aws ecs describe-clusters --clusters "$CLUSTER" --region "$REGION" \
 aws ecs create-cluster \
   --cluster-name "$CLUSTER" \
   --capacity-providers FARGATE FARGATE_SPOT \
-  --region "$REGION" --output none
+  --region "$REGION" > /dev/null
 
 # ─── Step 10: Register task definitions ───────────────────────────────────────
 
@@ -301,7 +305,7 @@ for svc in engine platform ui mcp; do
     -e "s|__PLATFORM_INTERNAL_URL__|${PLATFORM_INTERNAL_URL:-http://platform.lelu.internal:9090}|g" \
     "$TASK_DEF" > /tmp/task-${svc}.json
   aws ecs register-task-definition --cli-input-json "file:///tmp/task-${svc}.json" \
-    --region "$REGION" --output none
+    --region "$REGION" > /dev/null
   log "  Registered task: lelu-${svc}"
 done
 

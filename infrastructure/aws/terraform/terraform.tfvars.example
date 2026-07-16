@@ -9,6 +9,13 @@ availability_zones = ["us-east-1a", "us-east-1b"]
 # Database — use a strong password, store it in a password manager
 db_password        = "change-me-strong-password"
 
+# Expose RDS to a frontend running outside the VPC (e.g. Next.js API routes on
+# Vercel). Leave both unset/false for an all-in-VPC deployment.
+#   db_publicly_accessible = true
+# Allowlist who can reach Postgres from outside. Prefer Vercel Secure Compute
+# static egress IPs; 0.0.0.0/0 works but exposes the DB (SSL is forced).
+#   db_allowed_cidrs = ["0.0.0.0/0"]
+
 # TLS — create a certificate in AWS Certificate Manager first, then paste the ARN
 acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 domain              = "lelu-ai.com"

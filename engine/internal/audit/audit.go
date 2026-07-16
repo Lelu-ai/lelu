@@ -26,10 +26,13 @@ type Event struct {
 	Action          string            `json:"action"`
 	Resource        map[string]string `json:"resource,omitempty"`
 	ConfidenceScore float64           `json:"confidence_score,omitempty"`
-	Decision        string            `json:"decision"` // "allowed" | "denied" | "human_review" | "compute" | "shadow_detected"
-	Reason          string            `json:"reason,omitempty"`
-	DowngradedScope string            `json:"downgraded_scope,omitempty"`
-	LatencyMS       float64           `json:"latency_ms"`
+	// ConfidenceVerified is true only when ConfidenceScore came from a verified
+	// provider signal rather than a self-reported/unverified fallback.
+	ConfidenceVerified bool    `json:"confidence_verified,omitempty"`
+	Decision           string  `json:"decision"` // "allowed" | "denied" | "human_review" | "compute" | "shadow_detected"
+	Reason             string  `json:"reason,omitempty"`
+	DowngradedScope    string  `json:"downgraded_scope,omitempty"`
+	LatencyMS          float64 `json:"latency_ms"`
 	// InputHash is the SHA-256 of the normalized request payload — tamper-proof
 	// record of exactly what the agent asked for.
 	InputHash string `json:"input_hash,omitempty"`

@@ -1,22 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
+import { checkQuota } from "@/lib/quota";
 
-// TODO: Replace with actual database/Redis integration
-// This is a placeholder implementation
+export async function GET() {
+  const session = await getCurrentUser();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-export async function GET(request: NextRequest) {
   try {
-    // TODO: Get user/tenant from session
-    // TODO: Fetch usage stats from Redis/database
+    const quota = await checkQuota(session.userId);
 
-    const usage = {
-      authRequests: 1234,
-      tokenMints: 56,
-      authQuota: 10000,
-      tokenQuota: 1000,
-      resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    };
+    const now = new Date();
+    const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-    return NextResponse.json(usage);
+    return NextResponse.json({
+      plan: quota.plan,
+      authRequests: quota.used,
+      authQuota: quota.limit,
+      resetDate: resetDate.toISOString(),
+    });
   } catch (error) {
     console.error("Failed to fetch usage stats:", error);
     return NextResponse.json({ error: "Failed to fetch usage stats" }, { status: 500 });

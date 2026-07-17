@@ -46,6 +46,12 @@ export function UserMenu() {
     return (
       <div className="flex items-center gap-2">
         <Link
+          href="/login"
+          className="px-3 py-1.5 text-[13px] font-medium text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+        >
+          Sign in
+        </Link>
+        <Link
           href="/docs/quickstart"
           className="px-3 py-1.5 text-[13px] font-semibold bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] rounded-md hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
         >

@@ -183,6 +183,12 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Link
+              href="/login"
+              className="hidden sm:block text-[13px] font-medium text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
               href="/docs/quickstart"
               className="rounded-md bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 transition-opacity"
             >

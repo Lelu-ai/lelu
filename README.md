@@ -157,6 +157,7 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 | Example | What it shows |
 |---|---|
 | [quickstart](examples/quickstart) | The real engine on SQLite — one request per outcome, live prompt-injection catch |
+| [langchain](examples/langchain) | Gate a plain LangChain `StructuredTool` before execution |
 | [crewai](examples/crewai) | Gate CrewAI tool calls — a prompt-injected refund agent gets stopped |
 | [bedrock](examples/bedrock) | Gate Amazon Bedrock agents on the model's *own verified* confidence |
 | [agentgateway](examples/agentgateway) | Lelu as the decision brain behind agentgateway (ext-authz PEP) |

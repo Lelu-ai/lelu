@@ -49,7 +49,7 @@
 
 - ✅ **`allow`** — the action runs
 - ⛔ **`deny`** — blocked, with a reason
-- 🙋 **`human_review`** — the agent pauses until a human approves
+- 🙋 **`human_review`** — the agent pauses until a human approve
 - 🧪 **`compute`** — redirected to a safer alternative or sandbox
 
 It's one HTTP call from any language or framework, every decision is written to an audit log, and the engine runs entirely on your own machine or infrastructure.

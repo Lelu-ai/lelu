@@ -8,7 +8,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  passwordHash: string;
+  // Null for OAuth-only accounts (no password ever set).
+  passwordHash: string | null;
   emailVerified: boolean;
   createdAt: string;
 }
@@ -137,10 +138,81 @@ export async function findUserByEmail(email: string): Promise<User | null> {
     id: r.id as string,
     name: r.name as string,
     email: r.email as string,
-    passwordHash: r.password_hash as string,
+    passwordHash: r.password_hash as string | null,
     emailVerified: r.email_verified as boolean,
     createdAt: r.created_at as string,
   };
+}
+
+// ── OAuth (Google / GitHub) ─────────────────────────────────────────────────────
+
+export type OAuthProviderName = "google" | "github";
+
+export interface OAuthProfileInput {
+  providerAccountId: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+}
+
+// Finds the user for an OAuth login, linking or creating as needed:
+//   1. This (provider, provider_account_id) already linked → that user.
+//   2. Not linked, but a user with this email already exists (password
+//      signup, or a different provider) → link this provider to it.
+//   3. Neither → create a new, password-less user (trusts the provider's own
+//      email verification instead of running our own verification flow).
+export async function findOrCreateOAuthUser(
+  provider: OAuthProviderName,
+  profile: OAuthProfileInput
+): Promise<User> {
+  await ensureSchema();
+  const sql = db();
+  const norm = profile.email.toLowerCase().trim();
+
+  const linked = await sql`
+    SELECT u.id, u.name, u.email, u.password_hash, u.email_verified, u.created_at
+    FROM lelu_oauth_accounts o
+    JOIN lelu_users u ON u.id = o.user_id
+    WHERE o.provider = ${provider} AND o.provider_account_id = ${profile.providerAccountId}
+  `;
+  if (linked.length > 0) {
+    const r = linked[0];
+    return {
+      id: r.id as string,
+      name: r.name as string,
+      email: r.email as string,
+      passwordHash: r.password_hash as string | null,
+      emailVerified: r.email_verified as boolean,
+      createdAt: r.created_at as string,
+    };
+  }
+
+  const existing = await findUserByEmail(norm);
+  if (existing) {
+    await sql`
+      INSERT INTO lelu_oauth_accounts (id, user_id, provider, provider_account_id)
+      VALUES (${randomBytes(16).toString("hex")}, ${existing.id}, ${provider}, ${profile.providerAccountId})
+    `;
+    return existing;
+  }
+
+  const user: User = {
+    id: randomBytes(16).toString("hex"),
+    name: profile.name.trim(),
+    email: norm,
+    passwordHash: null,
+    emailVerified: profile.emailVerified,
+    createdAt: new Date().toISOString(),
+  };
+  await sql`
+    INSERT INTO lelu_users (id, name, email, password_hash, email_verified, created_at)
+    VALUES (${user.id}, ${user.name}, ${user.email}, ${user.passwordHash}, ${user.emailVerified}, NOW())
+  `;
+  await sql`
+    INSERT INTO lelu_oauth_accounts (id, user_id, provider, provider_account_id)
+    VALUES (${randomBytes(16).toString("hex")}, ${user.id}, ${provider}, ${profile.providerAccountId})
+  `;
+  return user;
 }
 
 export async function markEmailVerified(userId: string): Promise<void> {

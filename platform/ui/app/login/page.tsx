@@ -4,6 +4,7 @@ import { useState, FormEvent, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LeluMark } from "@/components/ui/LeluMark";
+import { OAuthButtons } from "@/components/OAuthButtons";
 
 const inputCls =
   "w-full h-11 px-3.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2A2C] bg-white dark:bg-[#13151C] text-[#0A0A0A] dark:text-white placeholder:text-[#A3A3A3] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#0A0A0A]/20 dark:focus:ring-white/10 focus:border-[#0A0A0A] dark:focus:border-white/30 transition-all";
@@ -81,6 +82,8 @@ function LoginForm() {
   }
 
   return (
+    <>
+      <OAuthButtons next={next} />
     <form onSubmit={submit} className="space-y-5">
       {(verified || registered || reset) && (
         <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200/70 dark:border-emerald-800/40 text-[13px] text-emerald-700 dark:text-emerald-400">
@@ -203,6 +206,7 @@ function LoginForm() {
         )}
       </button>
     </form>
+    </>
   );
 }
 

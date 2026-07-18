@@ -27,8 +27,10 @@ export async function POST(req: NextRequest) {
   try {
     const user = await findUserByEmail(email);
 
-    // Always run verifyPassword to prevent timing attacks
-    const valid = user
+    // Always run verifyPassword to prevent timing attacks. OAuth-only users
+    // (passwordHash null) fall through to the dummy hash just like a
+    // nonexistent user — same failure, same timing, no password to check.
+    const valid = user?.passwordHash
       ? verifyPassword(password, user.passwordHash)
       : verifyPassword(password, DUMMY_HASH);
 

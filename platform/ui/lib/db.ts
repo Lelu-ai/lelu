@@ -28,7 +28,7 @@ export async function ensureSchema(): Promise<void> {
       id             TEXT PRIMARY KEY,
       name           TEXT NOT NULL,
       email          TEXT UNIQUE NOT NULL,
-      password_hash  TEXT NOT NULL,
+      password_hash  TEXT,
       email_verified BOOLEAN NOT NULL DEFAULT FALSE,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_login_at  TIMESTAMPTZ
@@ -46,6 +46,26 @@ export async function ensureSchema(): Promise<void> {
   `;
   await sql`
     ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ
+  `;
+
+  // Backfill for databases created before OAuth-only (no password) users existed.
+  await sql`
+    ALTER TABLE lelu_users ALTER COLUMN password_hash DROP NOT NULL
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_oauth_accounts (
+      id                  TEXT PRIMARY KEY,
+      user_id             TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      provider            TEXT NOT NULL,
+      provider_account_id TEXT NOT NULL,
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (provider, provider_account_id)
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_oauth_accounts_user ON lelu_oauth_accounts (user_id)
   `;
 
   await sql`

@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LeluMark } from "@/components/ui/LeluMark";
+import { OAuthButtons } from "@/components/OAuthButtons";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -102,6 +103,7 @@ export default function RegisterPage() {
           </div>
 
           <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-8 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)] dark:shadow-none">
+            <OAuthButtons />
             <form onSubmit={submit} className="space-y-5">
               {error && (
                 <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200/70 dark:border-red-800/40 text-[13px] text-red-700 dark:text-red-400">

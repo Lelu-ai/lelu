@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "destructive_commands": [
+    {
+      "name": "recursive-force-delete",
+      "command": "rm",
+      "require_flags": ["r", "f"],
+      "long_flags": ["recursive", "force"],
+      "severity": "deny_if_protected"
+    },
+    {
+      "name": "force-push",
+      "command": "git",
+      "subcommand": "push",
+      "require_any_flag": ["f"],
+      "long_flags": ["force"],
+      "severity": "ask"
+    }
+  ],
+  "protected_paths": [
+    { "exact": "$HOME" },
+    { "exact": "/" },
+    { "contains": ".env" },
+    { "contains": ".git" },
+    { "contains": ".ssh" },
+    { "contains": "id_rsa" },
+    { "contains": "id_ed25519" },
+    { "contains": ".aws/credentials" }
+  ]
+}

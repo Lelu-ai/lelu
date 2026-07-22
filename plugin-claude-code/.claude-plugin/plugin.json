@@ -1,0 +1,10 @@
+{
+  "name": "lelu",
+  "description": "Runtime authorization for Claude Code — expansion-aware policy checks before every Bash, Edit, Write, and MCP tool call. Shadow mode by default.",
+  "version": "0.1.0",
+  "author": { "name": "Lelu", "email": "abenezergetachew1990@gmail.com" },
+  "homepage": "https://lelu-ai.com",
+  "repository": "https://github.com/lelu-ai/lelu",
+  "license": "MIT",
+  "keywords": ["security", "authorization", "guardrails", "policy", "data-loss-prevention"]
+}

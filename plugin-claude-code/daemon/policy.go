@@ -58,16 +58,18 @@ type Decision struct {
 }
 
 // Evaluate applies the policy set to an already-expanded command Analysis.
-// Unresolvable (Dynamic) or unparseable commands fail closed to "ask" rather
-// than silently allowing — never deny outright, since a false positive there
+// Unparseable commands fail closed to "ask". Unresolvable (Dynamic) content
+// only escalates to "ask" when the call it's part of ALSO matches a
+// destructive command class — a bare `echo $(date)` or `pgrep ... | wc -l`
+// has nothing destructive for the unresolved part to hide inside, so it
+// stays a silent allow. `rm -rf "$(...)"` still asks, since here the
+// unresolved content could be concealing a protected-path target we can't
+// verify. Never deny outright on unresolved content — a false positive there
 // would be indistinguishable from a real block with no way for the model to
 // self-correct.
 func (ps *PolicySet) Evaluate(a Analysis, home string) Decision {
 	if a.ParseErr {
 		return Decision{Outcome: OutcomeAsk, Reason: "could not parse this command's shell syntax; routing to human review"}
-	}
-	if a.Dynamic {
-		return Decision{Outcome: OutcomeAsk, Reason: "command contains a dynamic subexpression ($(...) or similar) that can't be safely analyzed without executing it"}
 	}
 
 	for _, call := range a.Calls {
@@ -98,6 +100,10 @@ func (ps *PolicySet) evaluateCall(call CommandCall, home string) (Decision, bool
 		}
 		if !flagsSatisfy(rule, flags, longFlags) {
 			continue
+		}
+
+		if call.Dynamic {
+			return Decision{Outcome: OutcomeAsk, Rule: rule.Name, Reason: "matched policy rule " + rule.Name + ", but part of this command contains an unresolvable dynamic subexpression — routing to human review"}, true
 		}
 
 		switch rule.Severity {

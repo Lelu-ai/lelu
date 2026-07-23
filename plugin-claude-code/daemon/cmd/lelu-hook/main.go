@@ -15,11 +15,14 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/lelu-ai/lelu/plugin-claude-code/daemon"
@@ -27,6 +30,7 @@ import (
 
 const dialTimeout = 300 * time.Millisecond
 const roundTripTimeout = 2 * time.Second
+const spawnRetryDelay = 200 * time.Millisecond
 
 // hookInput mirrors Claude Code's PreToolUse stdin schema.
 type hookInput struct {
@@ -114,7 +118,29 @@ func print_(out hookOutput) {
 	_ = enc.Encode(out)
 }
 
+// askDaemon tries the socket once; if nothing is listening (as opposed to a
+// slow/hung daemon — see shouldSpawn), it makes one best-effort attempt to
+// start the daemon itself and retries a single time after a short delay.
+// This is the lazy self-start: it closes the window between "daemon crashed"
+// and "user notices and reruns install.sh" down to about spawnRetryDelay,
+// without needing OS-specific supervision (systemd/launchd) for the wedge
+// stage.
 func askDaemon(req daemon.Request) (daemon.Response, error) {
+	resp, err := dialOnce(req)
+	if err == nil {
+		return resp, nil
+	}
+	if !shouldSpawn(err) {
+		return daemon.Response{}, err
+	}
+
+	spawnDaemon()
+	time.Sleep(spawnRetryDelay)
+
+	return dialOnce(req)
+}
+
+func dialOnce(req daemon.Request) (daemon.Response, error) {
 	conn, err := net.DialTimeout("unix", socketPath(), dialTimeout)
 	if err != nil {
 		return daemon.Response{}, err
@@ -147,15 +173,73 @@ func askDaemon(req daemon.Request) (daemon.Response, error) {
 	return resp, nil
 }
 
-func socketPath() string {
+// shouldSpawn reports whether a dial error means "nothing is listening"
+// (worth trying to start) as opposed to "something's there but slow/hung"
+// (spawning a second daemon would be wrong — it would just fail to bind the
+// socket and exit, but there's no point trying).
+func shouldSpawn(err error) bool {
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return false
+	}
+	return errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ENOENT) || os.IsNotExist(err)
+}
+
+func spawnDaemon() {
+	bin := daemonBinaryPath()
+	if bin == "" {
+		return
+	}
+	if _, err := os.Stat(bin); err != nil {
+		return
+	}
+
+	logPath := filepath.Join(dataDir(), "daemon.log")
+	logFile, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+
+	cmd := exec.Command(bin)
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	// Setsid detaches the daemon into its own session so it outlives this
+	// short-lived hook process — a plain background "&" is not enough; it
+	// stays in the same process group and can be reaped along with it.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	_ = cmd.Start()
+	// Deliberately not Wait()'d: a Setsid child is no longer this process's
+	// responsibility, and this process is about to exit anyway.
+}
+
+// daemonBinaryPath resolves the daemon binary the same way for a real
+// install (relative to CLAUDE_PLUGIN_ROOT) and for local dev/testing
+// (relative to this hook binary's own location, mirroring install.sh's
+// hooks/ + bin/ sibling layout).
+func daemonBinaryPath() string {
+	if root := os.Getenv("CLAUDE_PLUGIN_ROOT"); root != "" {
+		return filepath.Join(root, "bin", "lelu-daemon")
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(exe), "..", "bin", "lelu-daemon")
+}
+
+func dataDir() string {
 	if d := os.Getenv("LELU_DATA_DIR"); d != "" {
-		return filepath.Join(d, "daemon.sock")
+		return d
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(".lelu-claude-plugin", "daemon.sock")
+		return ".lelu-claude-plugin"
 	}
-	return filepath.Join(home, ".lelu", "claude-plugin", "daemon.sock")
+	return filepath.Join(home, ".lelu", "claude-plugin")
+}
+
+func socketPath() string {
+	return filepath.Join(dataDir(), "daemon.sock")
 }
 
 func currentEnv() map[string]string {

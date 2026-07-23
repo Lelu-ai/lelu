@@ -65,12 +65,26 @@ func TestEvaluate_PlainPushAllowed(t *testing.T) {
 	}
 }
 
-func TestEvaluate_DynamicContentAsksForReview(t *testing.T) {
+func TestEvaluate_DynamicContentOnDestructiveCommandAsksForReview(t *testing.T) {
 	ps := loadTestPolicy(t)
 	a := AnalyzeCommand(`rm -rf "$(echo pwned)"`, "/home/testuser", testEnv("/home/testuser"))
 	d := ps.Evaluate(a, "/home/testuser")
 	if d.Outcome != OutcomeAsk {
-		t.Errorf("outcome = %q, want ask for unresolvable dynamic content; decision=%+v", d.Outcome, d)
+		t.Errorf("outcome = %q, want ask when unresolvable content hides inside a destructive command; decision=%+v", d.Outcome, d)
+	}
+}
+
+// TestEvaluate_DynamicContentOnBenignCommandAllowed guards against the exact
+// false positive found while dogfooding this: ordinary command substitution
+// in a totally harmless command (counting lines, printing a date, etc.) has
+// nothing destructive for the unresolved part to hide inside, so it should
+// not nag for review just because SOME command on the machine used $(...).
+func TestEvaluate_DynamicContentOnBenignCommandAllowed(t *testing.T) {
+	ps := loadTestPolicy(t)
+	a := AnalyzeCommand(`echo "count: $(pgrep -f foo | wc -l)"`, "/home/testuser", testEnv("/home/testuser"))
+	d := ps.Evaluate(a, "/home/testuser")
+	if d.Outcome != OutcomeAllow {
+		t.Errorf("outcome = %q, want allow — echo is not a destructive command, dynamic content elsewhere shouldn't matter; decision=%+v", d.Outcome, d)
 	}
 }
 

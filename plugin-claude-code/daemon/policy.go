@@ -29,6 +29,7 @@ type PolicySet struct {
 	DestructiveCommands []destructiveRule   `json:"destructive_commands"`
 	ProtectedPaths      []protectedPathRule `json:"protected_paths"`
 	LoopDetection       LoopConfig          `json:"loop_detection"`
+	SessionBudget       SessionBudgetConfig `json:"session_budget"`
 }
 
 // LoadPolicySet reads and parses a policy file (JSON).

@@ -8,15 +8,16 @@ import (
 
 // Request is the decoded PreToolUse payload the hook adapter forwards.
 type Request struct {
-	SessionID string            `json:"session_id"`
-	Tool      string            `json:"tool"`
-	Command   string            `json:"command,omitempty"`   // Bash
-	FilePath  string            `json:"file_path,omitempty"` // Edit/Write
-	NewString string            `json:"new_string,omitempty"` // Edit
-	OldString string            `json:"old_string,omitempty"` // Edit
-	Content   string            `json:"content,omitempty"`    // Write
-	Cwd       string            `json:"cwd"`
-	Env       map[string]string `json:"env,omitempty"`
+	SessionID      string            `json:"session_id"`
+	Tool           string            `json:"tool"`
+	Command        string            `json:"command,omitempty"`   // Bash
+	FilePath       string            `json:"file_path,omitempty"` // Edit/Write
+	NewString      string            `json:"new_string,omitempty"` // Edit
+	OldString      string            `json:"old_string,omitempty"` // Edit
+	Content        string            `json:"content,omitempty"`    // Write
+	Cwd            string            `json:"cwd"`
+	TranscriptPath string            `json:"transcript_path,omitempty"`
+	Env            map[string]string `json:"env,omitempty"`
 }
 
 // Response is what goes back to the hook adapter, which translates it into
@@ -34,6 +35,7 @@ type Engine struct {
 	Policy *PolicySet
 	Ledger *Ledger
 	Loop   *LoopTracker
+	Budget *BudgetTracker
 	Home   string
 
 	// ShadowMode returns whether decisions should be logged but not enforced.
@@ -46,9 +48,9 @@ func (e *Engine) Decide(req Request) Response {
 	shadow := e.ShadowMode()
 	real := e.decideReal(req)
 
-	// Loop detection runs on top of an otherwise-clean allow, not instead of
-	// Tier 1 — if Tier 1 already denied or asked, that stands on its own
-	// merits regardless of repetition.
+	// Loop detection and session-budget checks both run on top of an
+	// otherwise-clean allow, not instead of Tier 1/hookify — if either
+	// already denied or asked, that stands on its own merits.
 	if real.Outcome == OutcomeAllow && e.Loop != nil {
 		if isLoop, count := e.Loop.Check(e.Policy.LoopDetection, req.SessionID, LoopKey(req), time.Now()); isLoop {
 			real = Response{
@@ -56,6 +58,16 @@ func (e *Engine) Decide(req Request) Response {
 				Rule:    "loop-detection",
 				Reason: fmt.Sprintf("this exact action has repeated %d times in this session within the last %ds — possible runaway loop, routing to human review",
 					count, e.Policy.LoopDetection.WindowSeconds),
+			}
+		}
+	}
+	if real.Outcome == OutcomeAllow && e.Budget != nil {
+		if exceeded, elapsed := e.Budget.EvaluateSessionBudget(e.Policy.SessionBudget, req.SessionID, req.TranscriptPath, time.Now()); exceeded {
+			real = Response{
+				Outcome: OutcomeAsk,
+				Rule:    "session-budget",
+				Reason: fmt.Sprintf("this session has been running for %s, past the %s budget — confirm this is still an intended long-running task",
+					elapsed.Round(time.Minute), (time.Duration(e.Policy.SessionBudget.MaxDurationSecs) * time.Second)),
 			}
 		}
 	}

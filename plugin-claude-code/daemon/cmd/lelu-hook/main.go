@@ -34,9 +34,10 @@ const spawnRetryDelay = 200 * time.Millisecond
 
 // hookInput mirrors Claude Code's PreToolUse stdin schema.
 type hookInput struct {
-	SessionID string `json:"session_id"`
-	Cwd       string `json:"cwd"`
-	ToolName  string `json:"tool_name"`
+	SessionID      string `json:"session_id"`
+	Cwd            string `json:"cwd"`
+	TranscriptPath string `json:"transcript_path"`
+	ToolName       string `json:"tool_name"`
 	ToolInput struct {
 		Command   string `json:"command"`
 		FilePath  string `json:"file_path"`
@@ -71,14 +72,15 @@ func main() {
 	}
 
 	req := daemon.Request{
-		SessionID: in.SessionID,
-		Tool:      in.ToolName,
-		Command:   in.ToolInput.Command,
-		FilePath:  in.ToolInput.FilePath,
-		NewString: in.ToolInput.NewString,
-		OldString: in.ToolInput.OldString,
-		Content:   in.ToolInput.Content,
-		Cwd:       in.Cwd,
+		SessionID:      in.SessionID,
+		Tool:           in.ToolName,
+		Command:        in.ToolInput.Command,
+		FilePath:       in.ToolInput.FilePath,
+		NewString:      in.ToolInput.NewString,
+		OldString:      in.ToolInput.OldString,
+		Content:        in.ToolInput.Content,
+		Cwd:            in.Cwd,
+		TranscriptPath: in.TranscriptPath,
 		Env:       currentEnv(),
 	}
 

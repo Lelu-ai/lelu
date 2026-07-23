@@ -31,5 +31,9 @@
     "enabled": true,
     "repeat_threshold": 5,
     "window_seconds": 300
+  },
+  "session_budget": {
+    "enabled": true,
+    "max_duration_seconds": 14400
   }
 }

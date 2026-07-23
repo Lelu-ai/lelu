@@ -49,6 +49,7 @@ func main() {
 		Policy:     policy,
 		Ledger:     ledger,
 		Loop:       daemon.NewLoopTracker(),
+		Budget:     daemon.NewBudgetTracker(),
 		Home:       home,
 		ShadowMode: shadowModeReader(modePath),
 	}

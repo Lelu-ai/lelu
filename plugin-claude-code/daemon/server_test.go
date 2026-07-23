@@ -25,6 +25,7 @@ func newTestEngine(t *testing.T, shadow bool) (*Engine, string) {
 		Policy:     ps,
 		Ledger:     ledger,
 		Loop:       NewLoopTracker(),
+		Budget:     NewBudgetTracker(),
 		Home:       "/home/testuser",
 		ShadowMode: func() bool { return shadow },
 	}, dir

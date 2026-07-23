@@ -3,6 +3,7 @@ package daemon
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -23,6 +24,7 @@ func newTestEngine(t *testing.T, shadow bool) (*Engine, string) {
 	return &Engine{
 		Policy:     ps,
 		Ledger:     ledger,
+		Loop:       NewLoopTracker(),
 		Home:       "/home/testuser",
 		ShadowMode: func() bool { return shadow },
 	}, dir
@@ -93,6 +95,54 @@ func TestEngine_UnknownToolDefaultsToAllow(t *testing.T) {
 	resp := engine.Decide(Request{SessionID: "s1", Tool: "mcp__something__weird"})
 	if resp.Outcome != OutcomeAllow {
 		t.Errorf("outcome = %q, want allow (no Tier-1 rule covers this tool yet)", resp.Outcome)
+	}
+}
+
+// TestEngine_SimulatedRetryStormStoppedAfterNRepeats reproduces the failure
+// mode behind the real, verified GitHub incidents this feature targets
+// (unbounded sub-agent recursion, a model re-suggesting the same completed
+// action forever): the same benign, individually-harmless command fired
+// repeatedly should keep being allowed right up to the configured
+// threshold, then flip to "ask" — not silently keep going forever, and not
+// an outright deny that a legitimate retry-until-ready poll could never
+// recover from.
+func TestEngine_SimulatedRetryStormStoppedAfterNRepeats(t *testing.T) {
+	engine, _ := newTestEngine(t, false)
+	threshold := engine.Policy.LoopDetection.RepeatThreshold
+
+	req := Request{
+		SessionID: "storm-session", Tool: "Bash", Command: "curl -s https://api.example.com/status",
+		Cwd: "/home/testuser", Env: map[string]string{"HOME": "/home/testuser"},
+	}
+
+	for i := 1; i < threshold; i++ {
+		resp := engine.Decide(req)
+		if resp.Outcome != OutcomeAllow {
+			t.Fatalf("call %d/%d: outcome = %q, want allow (below threshold)", i, threshold, resp.Outcome)
+		}
+	}
+
+	final := engine.Decide(req)
+	if final.Outcome != OutcomeAsk {
+		t.Errorf("call %d/%d: outcome = %q, want ask (retry storm should now be flagged)", threshold, threshold, final.Outcome)
+	}
+	if final.Rule != "loop-detection" {
+		t.Errorf("rule = %q, want loop-detection", final.Rule)
+	}
+}
+
+func TestEngine_DifferentCommandsNeverLookLikeARetryStorm(t *testing.T) {
+	engine, _ := newTestEngine(t, false)
+	threshold := engine.Policy.LoopDetection.RepeatThreshold
+
+	for i := 0; i < threshold+5; i++ {
+		resp := engine.Decide(Request{
+			SessionID: "s1", Tool: "Bash", Command: fmt.Sprintf("echo call-%d", i),
+			Cwd: "/home/testuser", Env: map[string]string{"HOME": "/home/testuser"},
+		})
+		if resp.Outcome != OutcomeAllow {
+			t.Fatalf("call %d: distinct commands should never trigger loop detection, got %q", i, resp.Outcome)
+		}
 	}
 }
 

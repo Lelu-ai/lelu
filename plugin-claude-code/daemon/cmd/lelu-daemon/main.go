@@ -48,6 +48,7 @@ func main() {
 	engine := &daemon.Engine{
 		Policy:     policy,
 		Ledger:     ledger,
+		Loop:       daemon.NewLoopTracker(),
 		Home:       home,
 		ShadowMode: shadowModeReader(modePath),
 	}

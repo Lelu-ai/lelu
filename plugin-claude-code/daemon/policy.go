@@ -21,11 +21,14 @@ type protectedPathRule struct {
 	Contains string `json:"contains,omitempty"`
 }
 
-// PolicySet is the loaded Tier-1 deterministic rule set.
+// PolicySet is the loaded Tier-1 deterministic rule set, plus the Tier-2
+// loop-detection config (still deterministic and local, just stateful across
+// requests rather than judged from one request alone).
 type PolicySet struct {
 	Version             string              `json:"version"`
 	DestructiveCommands []destructiveRule   `json:"destructive_commands"`
 	ProtectedPaths      []protectedPathRule `json:"protected_paths"`
+	LoopDetection       LoopConfig          `json:"loop_detection"`
 }
 
 // LoadPolicySet reads and parses a policy file (JSON).

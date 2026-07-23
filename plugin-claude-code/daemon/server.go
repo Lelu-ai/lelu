@@ -1,7 +1,9 @@
 package daemon
 
 import (
+	"fmt"
 	"strings"
+	"time"
 )
 
 // Request is the decoded PreToolUse payload the hook adapter forwards.
@@ -28,6 +30,7 @@ type Response struct {
 type Engine struct {
 	Policy *PolicySet
 	Ledger *Ledger
+	Loop   *LoopTracker
 	Home   string
 
 	// ShadowMode returns whether decisions should be logged but not enforced.
@@ -39,6 +42,20 @@ type Engine struct {
 func (e *Engine) Decide(req Request) Response {
 	shadow := e.ShadowMode()
 	real := e.decideReal(req)
+
+	// Loop detection runs on top of an otherwise-clean allow, not instead of
+	// Tier 1 — if Tier 1 already denied or asked, that stands on its own
+	// merits regardless of repetition.
+	if real.Outcome == OutcomeAllow && e.Loop != nil {
+		if isLoop, count := e.Loop.Check(e.Policy.LoopDetection, req.SessionID, LoopKey(req), time.Now()); isLoop {
+			real = Response{
+				Outcome: OutcomeAsk,
+				Rule:    "loop-detection",
+				Reason: fmt.Sprintf("this exact action has repeated %d times in this session within the last %ds — possible runaway loop, routing to human review",
+					count, e.Policy.LoopDetection.WindowSeconds),
+			}
+		}
+	}
 
 	_ = e.Ledger.Record(LedgerEntry{
 		SessionID: req.SessionID,

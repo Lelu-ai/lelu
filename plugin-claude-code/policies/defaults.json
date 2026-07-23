@@ -26,5 +26,10 @@
     { "contains": "id_rsa" },
     { "contains": "id_ed25519" },
     { "contains": ".aws/credentials" }
-  ]
+  ],
+  "loop_detection": {
+    "enabled": true,
+    "repeat_threshold": 5,
+    "window_seconds": 300
+  }
 }

@@ -38,8 +38,11 @@ type hookInput struct {
 	Cwd       string `json:"cwd"`
 	ToolName  string `json:"tool_name"`
 	ToolInput struct {
-		Command  string `json:"command"`
-		FilePath string `json:"file_path"`
+		Command   string `json:"command"`
+		FilePath  string `json:"file_path"`
+		NewString string `json:"new_string"`
+		OldString string `json:"old_string"`
+		Content   string `json:"content"`
 	} `json:"tool_input"`
 }
 
@@ -72,6 +75,9 @@ func main() {
 		Tool:      in.ToolName,
 		Command:   in.ToolInput.Command,
 		FilePath:  in.ToolInput.FilePath,
+		NewString: in.ToolInput.NewString,
+		OldString: in.ToolInput.OldString,
+		Content:   in.ToolInput.Content,
 		Cwd:       in.Cwd,
 		Env:       currentEnv(),
 	}

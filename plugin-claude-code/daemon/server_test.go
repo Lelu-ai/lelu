@@ -146,6 +146,56 @@ func TestEngine_DifferentCommandsNeverLookLikeARetryStorm(t *testing.T) {
 	}
 }
 
+// TestEngine_HookifyRuleFromRealFileIsHonored proves a hookify rule sitting
+// in a project's real .claude/ directory actually flows through the full
+// Engine (not just EvaluateHookify in isolation) — including combining with
+// Tier 1 and going through shadow-mode.
+func TestEngine_HookifyRuleFromRealFileIsHonored(t *testing.T) {
+	engine, _ := newTestEngine(t, true) // shadow mode
+	projectDir := t.TempDir()
+	writeHookifyFixture(t, projectDir, "hookify.dangerous-rm.local.md", hookifySimpleRuleFixture)
+
+	resp := engine.Decide(Request{
+		SessionID: "s1", Tool: "Bash", Command: "rm -rf /tmp/build", Cwd: projectDir,
+		Env: map[string]string{"HOME": "/home/testuser"},
+	})
+
+	if resp.Outcome != OutcomeAllow {
+		t.Errorf("shadow mode must still allow, got %q", resp.Outcome)
+	}
+	if !strings.Contains(resp.Reason, "would have been ask") {
+		t.Errorf("expected the imported hookify warn-rule to surface as a shadow 'would have been ask', got: %q", resp.Reason)
+	}
+}
+
+// TestEngine_Tier1WinsOverHookifyWhenMoreRestrictive confirms the
+// most-restrictive-wins merge actually picks Tier 1's deny over a hookify
+// rule that would have only asked.
+func TestEngine_Tier1WinsOverHookifyWhenMoreRestrictive(t *testing.T) {
+	engine, _ := newTestEngine(t, false) // enforce mode
+	projectDir := t.TempDir()
+	// A hookify rule that only warns on any "rm" — weaker than Tier 1's
+	// deny for a recursive-force-delete against the home directory.
+	writeHookifyFixture(t, projectDir, "hookify.warn-rm.local.md", `---
+name: warn-any-rm
+enabled: true
+event: bash
+pattern: rm
+---
+
+Careful with rm.
+`)
+
+	resp := engine.Decide(Request{
+		SessionID: "s1", Tool: "Bash", Command: "rm -rf ~/", Cwd: projectDir,
+		Env: map[string]string{"HOME": "/home/testuser"},
+	})
+
+	if resp.Outcome != OutcomeDeny {
+		t.Errorf("outcome = %q, want deny — Tier 1's stricter verdict should win over hookify's weaker warn", resp.Outcome)
+	}
+}
+
 // TestDaemonSocket_EndToEnd starts the real unix-socket wire protocol (not
 // just the in-process Engine) to prove the hook adapter's actual transport
 // works, using the same newline-delimited JSON framing as cmd/lelu-daemon.

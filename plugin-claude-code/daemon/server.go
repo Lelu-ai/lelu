@@ -12,6 +12,9 @@ type Request struct {
 	Tool      string            `json:"tool"`
 	Command   string            `json:"command,omitempty"`   // Bash
 	FilePath  string            `json:"file_path,omitempty"` // Edit/Write
+	NewString string            `json:"new_string,omitempty"` // Edit
+	OldString string            `json:"old_string,omitempty"` // Edit
+	Content   string            `json:"content,omitempty"`    // Write
 	Cwd       string            `json:"cwd"`
 	Env       map[string]string `json:"env,omitempty"`
 }
@@ -76,7 +79,21 @@ func (e *Engine) Decide(req Request) Response {
 	return real
 }
 
+// decideReal combines Tier 1 (this plugin's own deterministic rules) with
+// any imported hookify rules, taking whichever is more restrictive —
+// consistent with the rest of Lelu, where the strictest applicable layer
+// always wins rather than the first or last one evaluated.
 func (e *Engine) decideReal(req Request) Response {
+	tier1 := e.decideTier1(req)
+	hookify := e.decideHookify(req)
+
+	if severityRank(hookify.Outcome) > severityRank(tier1.Outcome) {
+		return hookify
+	}
+	return tier1
+}
+
+func (e *Engine) decideTier1(req Request) Response {
 	switch req.Tool {
 	case "Bash":
 		a := AnalyzeCommand(req.Command, req.Cwd, req.Env)
@@ -91,6 +108,32 @@ func (e *Engine) decideReal(req Request) Response {
 
 	default:
 		return Response{Outcome: OutcomeAllow}
+	}
+}
+
+// decideHookify evaluates any imported hookify rules found under the
+// request's own working directory — see hookify.go for why these are
+// loaded fresh per request rather than cached.
+func (e *Engine) decideHookify(req Request) Response {
+	rules := LoadHookifyRules(req.Cwd)
+	if len(rules) == 0 {
+		return Response{Outcome: OutcomeAllow}
+	}
+	d, matched := EvaluateHookify(rules, req)
+	if !matched {
+		return Response{Outcome: OutcomeAllow}
+	}
+	return Response{Outcome: d.Outcome, Reason: d.Reason, Rule: d.Rule}
+}
+
+func severityRank(o Outcome) int {
+	switch o {
+	case OutcomeDeny:
+		return 2
+	case OutcomeAsk:
+		return 1
+	default:
+		return 0
 	}
 }
 

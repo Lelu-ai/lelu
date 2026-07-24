@@ -69,6 +69,38 @@ func TestDaemonBinaryPath_FallsBackToSiblingOfExecutable(t *testing.T) {
 	}
 }
 
+func TestUnreachableMessage_BinaryMissingPointsToInstallScript(t *testing.T) {
+	pluginRoot := t.TempDir()
+	t.Setenv("CLAUDE_PLUGIN_ROOT", pluginRoot) // bin/lelu-daemon deliberately not created
+
+	msg := unreachableMessage(errors.New("connect: no such file or directory"))
+	if !strings.Contains(msg, "install.sh") {
+		t.Errorf("message should point at install.sh when the daemon binary doesn't exist yet, got: %q", msg)
+	}
+	if !strings.Contains(msg, filepath.Join(pluginRoot, "install.sh")) {
+		t.Errorf("message should include the concrete install.sh path, got: %q", msg)
+	}
+}
+
+func TestUnreachableMessage_BinaryPresentReportsDialError(t *testing.T) {
+	pluginRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(pluginRoot, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginRoot, "bin", "lelu-daemon"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PLUGIN_ROOT", pluginRoot)
+
+	msg := unreachableMessage(errors.New("connect: connection refused"))
+	if strings.Contains(msg, "install.sh") {
+		t.Errorf("message should not mention install.sh when the binary already exists, got: %q", msg)
+	}
+	if !strings.Contains(msg, "connection refused") {
+		t.Errorf("message should surface the real dial error when the binary exists, got: %q", msg)
+	}
+}
+
 // TestAskDaemon_SpawnsAndRecoversWhenDaemonIsDown builds the real
 // lelu-daemon binary, points everything at an isolated data dir with no
 // daemon running, and confirms askDaemon's lazy self-start actually brings

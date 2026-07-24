@@ -1,0 +1,87 @@
+# Builds static lelu-daemon/lelu-hook binaries for every platform the plugin
+# targets and attaches them to a GitHub Release. This is the fallback path
+# install.sh uses when no local Go toolchain is available — the common case
+# for someone installing the plugin via the marketplace rather than checking
+# out the repo to develop it.
+#
+# Trigger: push a tag like plugin-claude-code-v0.1.0 (or run manually via
+# workflow_dispatch). Deliberately a distinct tag prefix from this repo's
+# other release tracks (engine-v*, sdk/go/v*) — GitHub's "latest release"
+# is repo-wide, not per-prefix, so install.sh resolves the latest release
+# under THIS prefix specifically rather than trusting /releases/latest/.
+#
+# No CGO in this module (unlike the engine, which needs it for
+# mattn/go-sqlite3), so every platform cross-compiles from one Linux runner.
+
+name: plugin-claude-code-release
+
+on:
+  push:
+    tags:
+      - "plugin-claude-code-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: plugin-claude-code/daemon/go.mod
+          cache-dependency-path: plugin-claude-code/daemon/go.sum
+
+      - name: Build
+        working-directory: plugin-claude-code/daemon
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w" -o "dist/lelu-daemon-${GOOS}-${GOARCH}" ./cmd/lelu-daemon
+          go build -trimpath -ldflags "-s -w" -o "dist/lelu-hook-${GOOS}-${GOARCH}" ./cmd/lelu-hook
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lelu-plugin-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: plugin-claude-code/daemon/dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: binaries
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: binaries
+        run: sha256sum lelu-daemon-* lelu-hook-* > SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: binaries/*
+          generate_release_notes: true
+          # workflow_dispatch runs (no tag) publish a draft you can name yourself
+          draft: ${{ github.ref_type != 'tag' }}

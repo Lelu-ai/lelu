@@ -21,7 +21,7 @@
     { "exact": "$HOME" },
     { "exact": "/" },
     { "contains": ".env" },
-    { "contains": ".git" },
+    { "contains": ".git/" },
     { "contains": ".ssh" },
     { "contains": "id_rsa" },
     { "contains": "id_ed25519" },

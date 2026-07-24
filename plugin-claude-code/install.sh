@@ -1,25 +1,82 @@
 #!/usr/bin/env bash
-# install.sh — builds the Lelu Claude Code plugin's daemon + hook adapter and
-# (re)starts the background daemon. Idempotent: safe to run again after an
-# update, won't touch an existing mode file or ledger.
+# install.sh — builds (or downloads) the Lelu Claude Code plugin's daemon +
+# hook adapter and (re)starts the background daemon. Idempotent: safe to run
+# again after an update, won't touch an existing mode file or ledger.
 #
-# Requires a local Go toolchain for now (this is the wedge stage — prebuilt
-# per-platform binary downloads are a follow-up, not faked here).
+# If a Go toolchain is on PATH, builds from the source sitting right next to
+# this script — always exactly the code you have checked out, whether that's
+# a git clone or a marketplace-cached copy. Only falls back to downloading a
+# prebuilt binary from GitHub Releases when Go isn't available, so someone
+# without a Go toolchain (the common case for a plugin install) still ends
+# up with a working plugin instead of a hard failure.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${LELU_DATA_DIR:-$HOME/.lelu/claude-plugin}"
+REPO="lelu-ai/lelu"
+TAG_PREFIX="plugin-claude-code-v"
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "error: the Lelu Claude Code plugin currently builds from source and needs a Go toolchain (go.dev/dl) on PATH." >&2
+mkdir -p "$SCRIPT_DIR/bin"
+
+build_from_source() {
+  echo "==> Building lelu-hook and lelu-daemon from source"
+  cd "$SCRIPT_DIR/daemon"
+  go build -o "$SCRIPT_DIR/hooks/lelu-hook" ./cmd/lelu-hook
+  go build -o "$SCRIPT_DIR/bin/lelu-daemon" ./cmd/lelu-daemon
+}
+
+# download_prebuilt fetches lelu-daemon/lelu-hook for this OS/arch from the
+# latest plugin-claude-code-v* GitHub release. Deliberately NOT
+# /releases/latest/download/ — this repo also ships engine and SDK releases
+# under their own tag prefixes, and "latest" is whichever of THOSE was
+# published most recently, not necessarily this component's.
+download_prebuilt() {
+  case "$(uname -s)" in
+    Linux)  os="linux" ;;
+    Darwin) os="darwin" ;;
+    *) echo "error: no prebuilt binary for $(uname -s); install Go from https://go.dev/dl to build from source instead." >&2; return 1 ;;
+  esac
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) echo "error: no prebuilt binary for $(uname -m); install Go from https://go.dev/dl to build from source instead." >&2; return 1 ;;
+  esac
+
+  if [ -n "${LELU_PLUGIN_VERSION:-}" ]; then
+    tag="${TAG_PREFIX}${LELU_PLUGIN_VERSION}"
+  else
+    tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" 2>/dev/null \
+      | grep -o "\"tag_name\": *\"${TAG_PREFIX}[^\"]*\"" \
+      | head -1 | sed -E 's/.*"([^"]+)"$/\1/' || true)"
+  fi
+  if [ -z "${tag:-}" ]; then
+    echo "error: could not find a published ${TAG_PREFIX}* release to download a prebuilt binary from." >&2
+    return 1
+  fi
+
+  base="https://github.com/${REPO}/releases/download/${tag}"
+  tmp_daemon="$(mktemp)"
+  tmp_hook="$(mktemp)"
+  echo "==> Downloading prebuilt binaries (${tag}, ${os}/${arch})"
+  if ! curl -fsSL -o "$tmp_daemon" "${base}/lelu-daemon-${os}-${arch}" \
+    || ! curl -fsSL -o "$tmp_hook" "${base}/lelu-hook-${os}-${arch}"; then
+    echo "error: failed to download prebuilt binaries from ${base}" >&2
+    rm -f "$tmp_daemon" "$tmp_hook"
+    return 1
+  fi
+
+  mv "$tmp_daemon" "$SCRIPT_DIR/bin/lelu-daemon"
+  mv "$tmp_hook" "$SCRIPT_DIR/hooks/lelu-hook"
+  chmod +x "$SCRIPT_DIR/bin/lelu-daemon" "$SCRIPT_DIR/hooks/lelu-hook"
+}
+
+if command -v go >/dev/null 2>&1; then
+  build_from_source
+elif ! download_prebuilt; then
+  echo "error: no Go toolchain found and no prebuilt binary could be downloaded." >&2
+  echo "       Install Go from https://go.dev/dl and rerun, or set LELU_PLUGIN_VERSION to a published release." >&2
   exit 1
 fi
-
-echo "==> Building lelu-hook and lelu-daemon"
-cd "$SCRIPT_DIR/daemon"
-mkdir -p "$SCRIPT_DIR/bin"
-go build -o "$SCRIPT_DIR/hooks/lelu-hook" ./cmd/lelu-hook
-go build -o "$SCRIPT_DIR/bin/lelu-daemon" ./cmd/lelu-daemon
 
 mkdir -p "$DATA_DIR"
 if [ ! -f "$DATA_DIR/mode" ]; then

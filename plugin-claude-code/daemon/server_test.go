@@ -91,6 +91,30 @@ func TestEngine_EditNormalFileAllowed(t *testing.T) {
 	}
 }
 
+func TestEngine_EditGitInternalsDenied(t *testing.T) {
+	engine, _ := newTestEngine(t, false)
+	resp := engine.Decide(Request{
+		SessionID: "s1", Tool: "Edit", FilePath: "/home/testuser/project/.git/config",
+	})
+	if resp.Outcome != OutcomeDeny {
+		t.Errorf("outcome = %q, want deny for an edit inside .git/", resp.Outcome)
+	}
+}
+
+// TestEngine_EditGithubWorkflowNotDenied is a real false positive found by
+// dogfooding this exact plugin while writing a .github/workflows/*.yml file:
+// ".github" contains the substring ".git", so a naive `contains: ".git"`
+// protected-path rule flags routine CI config as if it were repo internals.
+func TestEngine_EditGithubWorkflowNotDenied(t *testing.T) {
+	engine, _ := newTestEngine(t, false)
+	resp := engine.Decide(Request{
+		SessionID: "s1", Tool: "Edit", FilePath: "/home/testuser/project/.github/workflows/release.yml",
+	})
+	if resp.Outcome != OutcomeAllow {
+		t.Errorf("outcome = %q, want allow — .github is not .git, this should never have been flagged", resp.Outcome)
+	}
+}
+
 func TestEngine_UnknownToolDefaultsToAllow(t *testing.T) {
 	engine, _ := newTestEngine(t, false)
 	resp := engine.Decide(Request{SessionID: "s1", Tool: "mcp__something__weird"})

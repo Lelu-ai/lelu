@@ -86,11 +86,25 @@ func main() {
 
 	resp, err := askDaemon(req)
 	if err != nil {
-		allowWithWarning("Lelu daemon unreachable (" + err.Error() + ") — this action was not checked")
+		allowWithWarning(unreachableMessage(err))
 		return
 	}
 
 	print_(decisionFor(resp))
+}
+
+// unreachableMessage distinguishes "nothing has been built/installed here
+// yet" from "the daemon just isn't running right now" — a stranger's very
+// first tool call after installing the plugin via the marketplace (before
+// ever running install.sh) should get a clear next step, not a generic
+// connectivity warning that doesn't say what to do about it.
+func unreachableMessage(dialErr error) string {
+	bin := daemonBinaryPath()
+	if _, statErr := os.Stat(bin); statErr != nil {
+		installScript := filepath.Join(filepath.Dir(filepath.Dir(bin)), "install.sh")
+		return "Lelu isn't set up yet — run " + installScript + " once, then this warning goes away. This action was not checked."
+	}
+	return "Lelu daemon unreachable (" + dialErr.Error() + ") — this action was not checked"
 }
 
 func decisionFor(resp daemon.Response) hookOutput {

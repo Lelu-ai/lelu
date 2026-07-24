@@ -81,7 +81,7 @@ func main() {
 		Content:        in.ToolInput.Content,
 		Cwd:            in.Cwd,
 		TranscriptPath: in.TranscriptPath,
-		Env:       currentEnv(),
+		Env:            currentEnv(),
 	}
 
 	resp, err := askDaemon(req)

@@ -1,0 +1,29 @@
+#!/bin/bash
+# Extends terminal_bench's own claude-code-setup.sh.j2 (installed-agents/
+# claude_code/claude-code-setup.sh.j2 in harbor-framework/terminal-bench,
+# fetched and copied verbatim below) with the Lelu plugin, installed from
+# the real public repo exactly as a real user would — shadow mode by
+# default, nothing blocked, every decision logged.
+set -e
+
+apt-get update
+apt-get install -y curl git golang-go
+
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
+source "$HOME/.nvm/nvm.sh"
+
+nvm install 22
+npm -v
+
+npm install -g @anthropic-ai/claude-code@{{ version }}
+
+# --- Lelu plugin (added) ---
+# http.version pinned to HTTP/1.1: this container's network occasionally
+# drops the HTTP/2 stream mid-clone ("stream was not closed cleanly").
+git -c http.version=HTTP/1.1 clone --depth 1 https://github.com/lelu-ai/lelu.git /opt/lelu
+cd /opt/lelu/plugin-claude-code
+./install.sh
+
+claude plugin marketplace add /opt/lelu --scope user
+claude plugin install lelu@lelu --scope user

@@ -21,6 +21,7 @@
 <p align="center">
   <a href="https://lelu-ai.com/sandbox"><b>Live Sandbox</b></a> ·
   <a href="#try-it-in-one-command"><b>One-Command Start</b></a> ·
+  <a href="plugin-claude-code"><b>Claude Code Plugin</b></a> ·
   <a href="examples/"><b>Examples</b></a> ·
   <a href="sdk/mcp"><b>MCP Server</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
@@ -94,6 +95,19 @@ claude mcp add lelu -- npx -y lelu-mcp start --transport stdio
 ```
 
 Your agent gets a `lelu_agent_authorize` tool: destructive actions denied, payments and outbound email routed to human review, production writes redirected to a sandbox, everything else default-denied. Rules live in `~/.lelu/policy.yaml`. Cursor / Claude Desktop setup and full docs → [sdk/mcp](sdk/mcp)
+
+### Claude Code plugin — no tool-calling required
+
+The MCP server above gives your agent a tool it can *choose* to call. The Claude Code plugin goes further: it hooks directly into every `Bash`, `Edit`, and `Write` call via Claude Code's own `PreToolUse` hook, so protection doesn't depend on the agent remembering to ask.
+
+```bash
+git clone https://github.com/lelu-ai/lelu.git && cd lelu
+claude plugin marketplace add .
+claude plugin install lelu@lelu
+./plugin-claude-code/install.sh
+```
+
+Expansion-aware — `rm -rf ~/`, `rm -rf $HOME`, and reversed/separated/long-form flag variants are all caught, where a regex on the raw command text [catches 7/10 and false-positives on 4/4 benign commands](plugin-claude-code/benchmarks/report.md) — plus retry-storm detection and a session budget for runaway unattended sessions. **Shadow mode by default**, nothing blocks until you ask it to. Full docs → [plugin-claude-code](plugin-claude-code)
 
 ---
 

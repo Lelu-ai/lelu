@@ -283,7 +283,7 @@ class SimulatorDecision(BaseModel):
     requires_human_review: bool
     downgraded_scope: str | None = None
     reason: str
-    outcome: Literal["allow", "human_review", "deny"]
+    outcome: Literal["allow", "review", "deny"]
     confidence_used: float | None = None
 
 

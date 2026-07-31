@@ -653,7 +653,7 @@ export interface SimulatorDecision {
   requires_human_review: boolean;
   downgraded_scope?: string;
   reason: string;
-  outcome: "allow" | "human_review" | "deny";
+  outcome: "allow" | "review" | "deny";
   confidence_used?: number;
 }
 

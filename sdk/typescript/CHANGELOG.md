@@ -7,6 +7,10 @@
 * **Engine policy management** — `getEnginePolicy()` (`GET /v1/policy`), `validatePolicy(yaml)` (`POST /v1/policy/validate`), and `putEnginePolicy(yaml, ifMatch?)` (`PUT /v1/policy`, admin key + optimistic concurrency via `If-Match`). New `EnginePolicyInfo` / `PolicyValidationResult` / `PolicyUpdateResult` types. These target the engine's live policy — distinct from `listPolicies`/`getPolicy`/`upsertPolicy`/`deletePolicy`, which manage the platform's stored policies via `/api/policies`.
 * **LangGraph.js integration** (`lelu-agent-auth/langgraph`) — `secureNode()` gates any LangGraph.js node through Lelu's Confidence-Aware Auth before it runs, returning augmented state (`leluDenied`/`leluPendingReview`/`leluReason`) or throwing `LeluDeniedError`. Mirrors the Python SDK's `lelu.langgraph.secure_node`. Framework-agnostic — no dependency on `@langchain/langgraph`.
 
+### Bug Fixes
+
+* **`SimulatorDecision.outcome` corrected to `"allow" | "review" | "deny"`.** It was typed as `"allow" | "human_review" | "deny"`, but the engine's `POST /v1/simulator/replay` has always emitted `"review"` for the human-review outcome (confirmed against `engine/internal/server/server.go`'s `simulatorOutcome()` and the platform's own simulator UI) — `"human_review"` never actually appears on the wire. Found via a live smoke test against a running engine while adding root-level exports for these types.
+
 ### Documentation
 
 * `SimulatorReplayRequest` / `SimulatorReplayResponse` are now exported from the package root (previously only reachable via a deep import despite `simulatorReplay()` requiring them).

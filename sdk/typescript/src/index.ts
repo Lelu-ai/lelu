@@ -52,6 +52,11 @@ export type {
   ToolOutputScanResult,
   ReviewQueueItem,
   QueueItemStatus,
+  EnginePolicyInfo,
+  PolicyValidationResult,
+  PolicyUpdateResult,
+  SimulatorReplayRequest,
+  SimulatorReplayResponse,
 } from "./types.js";
 
 export {

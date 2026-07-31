@@ -52,6 +52,9 @@ import {
   type NHIStats,
   type ToolOutputScanResult,
   type ConfidenceSignal,
+  type EnginePolicyInfo,
+  type PolicyValidationResult,
+  type PolicyUpdateResult,
 } from "./types.js";
 import { agentTracer } from "./observability/tracer.js";
 import { discoverLocalEngine } from "./local.js";
@@ -585,6 +588,53 @@ export class LeluClient {
     return this.post<SimulatorReplayResponse>("/v1/simulator/replay", req);
   }
 
+  // ── Engine policy (engine /v1/policy) ──────────────────────────────────────
+
+  /** Digest and source of the policy currently loaded in the engine. */
+  async getEnginePolicy(): Promise<EnginePolicyInfo> {
+    return this.get<EnginePolicyInfo>("/v1/policy");
+  }
+
+  /** Validate policy bytes without touching the live policy. */
+  async validatePolicy(policy: string): Promise<PolicyValidationResult> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.baseUrl}/v1/policy/validate`, {
+        method: "POST",
+        headers: this.headers("application/x-yaml"),
+        body: policy,
+        signal: ctrl.signal,
+      });
+      return await this.parseResponse<PolicyValidationResult>(res);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Replace the engine's active policy (requires the admin API key).
+   * Pass `ifMatch` (the digest from `getEnginePolicy()`) for optimistic
+   * concurrency — the engine rejects the write if the policy changed.
+   */
+  async putEnginePolicy(policy: string, ifMatch?: string): Promise<PolicyUpdateResult> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+    try {
+      const headers = this.headers("application/x-yaml");
+      if (ifMatch) headers["If-Match"] = ifMatch;
+      const res = await fetch(`${this.baseUrl}/v1/policy`, {
+        method: "PUT",
+        headers,
+        body: policy,
+        signal: ctrl.signal,
+      });
+      return await this.parseResponse<PolicyUpdateResult>(res);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // ── Fallback status ────────────────────────────────────────────────────────
 
   async getFallbackStatus(): Promise<{ status: string }> {
@@ -1014,8 +1064,8 @@ export class LeluClient {
 
   // ── HTTP helpers ───────────────────────────────────────────────────────────
 
-  private headers(): Record<string, string> {
-    const h: Record<string, string> = { "Content-Type": "application/json" };
+  private headers(contentType = "application/json"): Record<string, string> {
+    const h: Record<string, string> = { "Content-Type": contentType };
     if (this.apiKey) h["Authorization"] = `Bearer ${this.apiKey}`;
     return h;
   }

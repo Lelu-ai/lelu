@@ -1,6 +1,6 @@
 {
   "name": "lelu-agent-auth",
-  "version": "0.0.33",
+  "version": "0.0.34",
   "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer Getachew",
   "contributors": [
@@ -29,6 +29,11 @@
       "types": "./dist/langchain/index.d.ts",
       "import": "./dist/langchain/index.js",
       "require": "./dist/langchain/index.js"
+    },
+    "./langgraph": {
+      "types": "./dist/langgraph/index.d.ts",
+      "import": "./dist/langgraph/index.js",
+      "require": "./dist/langgraph/index.js"
     },
     "./react": {
       "types": "./dist/react/index.d.ts",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from datetime import datetime, timezone
@@ -56,6 +57,8 @@ from .models import (
     EnginePolicyInfo,
     PolicyValidationResult,
     PolicyUpdateResult,
+    SimulatorReplayRequest,
+    SimulatorReplayResponse,
 )
 from .local import discover_local_engine
 from .observability import (
@@ -66,6 +69,66 @@ from .observability import (
 )
 
 LELU_CLOUD_URL = "https://lelu-ai.com"
+
+
+class ConfidenceFrom:
+    """Derives a verified confidence score from an LLM provider response.
+
+    Use the result as ``context.confidence`` in authorize calls — never let
+    the agent supply its own confidence value. Mirrors the TypeScript SDK's
+    ``LeluClient.confidenceFrom``.
+    """
+
+    @staticmethod
+    def openai(response: Any) -> float | None:
+        """Derive confidence from OpenAI chat-completion logprobs (requires
+        ``logprobs=True`` in the API call). Returns ``None`` when logprobs are
+        absent — never returns a fabricated default."""
+        try:
+            tokens = response.choices[0].logprobs.content
+        except (AttributeError, IndexError, TypeError):
+            return None
+        if not tokens:
+            return None
+        avg = sum(t.logprob for t in tokens) / len(tokens)
+        return max(0.0, min(1.0, math.exp(avg)))
+
+    @staticmethod
+    def anthropic(_response: Any) -> None:
+        """Anthropic does not expose token-level log-probs.
+        Always returns ``None`` — use a judge-model scorer instead."""
+        return None
+
+    @staticmethod
+    def bedrock(response: Any) -> float | None:
+        """Derive confidence from an Amazon Bedrock model response, for model
+        families that expose token-level data — e.g. Cohere
+        ``token_likelihoods``, or a raw ``logprobs`` list. Returns ``None``
+        when no token signal is present (notably Anthropic Claude on Bedrock,
+        which has no log-probs): omit the signal and let the engine's
+        ``MissingSignalMode`` decide rather than fabricating a value."""
+        logprobs: list[float] | None = None
+        if isinstance(response, dict):
+            logprobs = response.get("logprobs")
+            if not logprobs:
+                generations = response.get("generations") or []
+                first = generations[0] if generations else None
+                likelihoods = (first or {}).get("token_likelihoods")
+                if likelihoods:
+                    logprobs = [t["likelihood"] for t in likelihoods]
+        else:
+            logprobs = getattr(response, "logprobs", None)
+            if not logprobs:
+                try:
+                    generations = response.generations
+                    likelihoods = generations[0].token_likelihoods
+                    logprobs = [t.likelihood for t in likelihoods] if likelihoods else None
+                except (AttributeError, IndexError, TypeError):
+                    logprobs = None
+        if not logprobs:
+            return None
+        avg = sum(logprobs) / len(logprobs)
+        return max(0.0, min(1.0, math.exp(avg)))
 
 
 class LeluClient:
@@ -85,6 +148,10 @@ class LeluClient:
         result = await lelu.authorize(AuthorizeRequest(tool="send_email"))
         await lelu.aclose()
     """
+
+    #: Derives a verified confidence score from an LLM provider response —
+    #: e.g. ``LeluClient.confidence_from.openai(response)``.
+    confidence_from = ConfidenceFrom
 
     def __init__(
         self,
@@ -351,6 +418,14 @@ class LeluClient:
         resp = await self._client.put("/v1/policy", content=content, headers=headers)
         await self._raise_for_status(resp)
         return PolicyUpdateResult(**resp.json())
+
+    # ── Policy simulator (engine /v1/simulator/replay) ────────────────────────
+
+    async def simulator_replay(self, req: SimulatorReplayRequest) -> SimulatorReplayResponse:
+        """Replay historical traces against a proposed policy to preview its
+        impact before promoting it live."""
+        data = await self._post("/v1/simulator/replay", req.model_dump())
+        return SimulatorReplayResponse(**data)
 
     # ── Engine status ──────────────────────────────────────────────────────────
 

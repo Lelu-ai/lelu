@@ -70,6 +70,13 @@ from .models import (
     EnginePolicyInfo,
     PolicyValidationResult,
     PolicyUpdateResult,
+    # Policy simulator
+    SimulatorTraceItem,
+    SimulatorDecision,
+    SimulatorReplayDelta,
+    SimulatorReplaySummary,
+    SimulatorReplayRequest,
+    SimulatorReplayResponse,
 )
 
 # Enhanced Observability
@@ -143,6 +150,13 @@ __all__ = [
     "EnginePolicyInfo",
     "PolicyValidationResult",
     "PolicyUpdateResult",
+    # Policy simulator
+    "SimulatorTraceItem",
+    "SimulatorDecision",
+    "SimulatorReplayDelta",
+    "SimulatorReplaySummary",
+    "SimulatorReplayRequest",
+    "SimulatorReplayResponse",
     # Vault
     "VaultStoreRequest",
     "VaultStoreResult",
@@ -162,4 +176,4 @@ __all__ = [
     "CrewAIPermissionDeniedError",
 ]
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"

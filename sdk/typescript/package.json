@@ -16,8 +16,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "lelu": "./scripts/lelu.js",
-    "lelu-init": "./scripts/init.js"
+    "lelu": "scripts/lelu.js",
+    "lelu-init": "scripts/init.js"
   },
   "exports": {
     ".": {

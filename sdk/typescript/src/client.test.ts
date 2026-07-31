@@ -242,4 +242,55 @@ describe("LeluClient", () => {
       expect(await client.isHealthy()).toBe(false);
     });
   });
+
+  // ── Engine policy ─────────────────────────────────────────────────────────
+
+  describe("getEnginePolicy()", () => {
+    it("returns policy digest info", async () => {
+      mockOK({ digest: "sha256:abc", policy_path: "/etc/lelu/policy.yaml", source: "engine" });
+      const info = await client.getEnginePolicy();
+      expect(info.digest).toBe("sha256:abc");
+      expect(info.source).toBe("engine");
+    });
+  });
+
+  describe("validatePolicy()", () => {
+    it("posts raw YAML and returns the validation result", async () => {
+      mockOK({ valid: true, digest: "sha256:def" });
+      const result = await client.validatePolicy("rules: []");
+      expect(result.valid).toBe(true);
+
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toBe("http://localhost:8080/v1/policy/validate");
+      expect(init.method).toBe("POST");
+      expect(init.headers["Content-Type"]).toBe("application/x-yaml");
+      expect(init.body).toBe("rules: []");
+    });
+
+    it("surfaces validation failures", async () => {
+      mockOK({ valid: false });
+      const result = await client.validatePolicy("not: valid: yaml:");
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  describe("putEnginePolicy()", () => {
+    it("puts raw YAML with an If-Match header", async () => {
+      mockOK({ digest: "sha256:new", previous_digest: "sha256:def" });
+      const result = await client.putEnginePolicy("rules: []", "sha256:def");
+      expect(result.digest).toBe("sha256:new");
+
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toBe("http://localhost:8080/v1/policy");
+      expect(init.method).toBe("PUT");
+      expect(init.headers["If-Match"]).toBe("sha256:def");
+    });
+
+    it("omits If-Match when not provided", async () => {
+      mockOK({ digest: "sha256:new" });
+      await client.putEnginePolicy("rules: []");
+      const [, init] = mockFetch.mock.calls[0];
+      expect(init.headers["If-Match"]).toBeUndefined();
+    });
+  });
 });

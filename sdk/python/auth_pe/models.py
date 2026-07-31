@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -256,6 +256,77 @@ class PolicyUpdateResult(BaseModel):
     digest: str
     previous_digest: str | None = None
     loaded_at: str | None = None
+
+
+# ─── Policy simulator (engine /v1/simulator/replay) ───────────────────────────
+
+
+class SimulatorTraceItem(BaseModel):
+    """One historical trace replayed against a proposed policy."""
+
+    id: str | None = None
+    kind: Literal["human", "agent"]
+    tenant_id: str
+    user_id: str | None = None
+    actor: str | None = None
+    action: str
+    resource: dict[str, str] | None = None
+    acting_for: str | None = None
+    scope: str | None = None
+    confidence: float | None = None
+
+
+class SimulatorDecision(BaseModel):
+    """A single before/after decision within a replayed trace."""
+
+    allowed: bool
+    requires_human_review: bool
+    downgraded_scope: str | None = None
+    reason: str
+    outcome: Literal["allow", "human_review", "deny"]
+    confidence_used: float | None = None
+
+
+class SimulatorReplayDelta(BaseModel):
+    """Before/after decision pair for one replayed trace."""
+
+    id: str | None = None
+    index: int
+    kind: str
+    action: str
+    actor: str | None = None
+    user_id: str | None = None
+    changed: bool
+    before: SimulatorDecision
+    after: SimulatorDecision
+
+
+class SimulatorReplaySummary(BaseModel):
+    """Aggregate counts across all replayed traces."""
+
+    total: int
+    changed: int
+    allow_to_deny: int
+    allow_to_review: int
+    review_to_deny: int
+    deny_to_allow: int
+    review_to_allow: int
+    deny_to_review: int
+    other_changes: int
+
+
+class SimulatorReplayRequest(BaseModel):
+    """Replay historical traces against a proposed policy before promoting it."""
+
+    proposed_policy_yaml: str
+    traces: list[SimulatorTraceItem]
+
+
+class SimulatorReplayResponse(BaseModel):
+    """Result of a policy simulator replay."""
+
+    summary: SimulatorReplaySummary
+    items: list[SimulatorReplayDelta]
 
 
 # ─── Audit ────────────────────────────────────────────────────────────────────

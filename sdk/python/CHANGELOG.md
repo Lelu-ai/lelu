@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.2] (2026-07-31)
+
+### Features — parity with the TypeScript SDK
+
+* **Policy simulator** — `simulator_replay(req)` (`POST /v1/simulator/replay`) replays historical traces against a proposed policy to preview its impact before promoting it live. New `SimulatorTraceItem`, `SimulatorDecision`, `SimulatorReplayDelta`, `SimulatorReplaySummary`, `SimulatorReplayRequest`, `SimulatorReplayResponse` models.
+* **`LeluClient.confidence_from`** — derives a verified confidence score from an LLM provider response: `.openai(response)` (chat-completion logprobs) and `.bedrock(response)` (Cohere `token_likelihoods`, or a passed-through logprobs list). `.anthropic(response)` always returns `None` — Anthropic exposes no token-level log-probs. All three return `None` rather than a fabricated default when no signal is present, so the engine's `MissingSignalMode` decides.
+* **`lelu().handler`** — an ASGI 3 application on the shared `LeluInstance`, mountable with `app.mount("/api/lelu", auth.handler)` in FastAPI/Starlette. Exposes `POST /authorize`, `GET /queue`, `POST /queue/{id}/approve`, `POST /queue/{id}/deny`, and `GET /ok`, so a browser-facing approval UI never sees the engine URL or API key. Mirrors the TypeScript SDK's fetch-style `lelu().handler`.
+
+## [0.4.1] (2026-07-13)
+
+### Features
+
+* **`lelu(actor=...)` shared-instance factory** — parity with the TypeScript SDK: `.api` exposes the full `LeluClient`, and `.authorize()` fills in a default `actor` when the request omits one.
+* **`discover_local_engine()`** — connects automatically to the engine `npx lelu-mcp start` runs locally, reading `~/.lelu/engine.json` + `~/.lelu/engine.key` with a PID-liveness check before trusting them.
+
+### Bug Fixes
+
+* **`is_healthy()` now probes the right endpoint.** It was hitting `/api/config-check` (a platform route) and always returned `False` against a real engine; it now probes the engine's `/healthz`.
+
 ## [0.4.0] (2026-07-13)
 
 ### Features — full alignment with the current engine API

@@ -611,6 +611,28 @@ export interface ToolOutputScanResult {
   score?: number;
 }
 
+// ─── Engine Policy (engine /v1/policy) ────────────────────────────────────────
+
+/** Metadata about the policy currently loaded in the engine. */
+export interface EnginePolicyInfo {
+  digest: string;
+  policy_path?: string;
+  source?: string;
+}
+
+/** Result of validating policy bytes against a throwaway evaluator. */
+export interface PolicyValidationResult {
+  valid: boolean;
+  digest?: string;
+}
+
+/** Result of replacing the engine's active policy. */
+export interface PolicyUpdateResult {
+  digest: string;
+  previous_digest?: string;
+  loaded_at?: string;
+}
+
 // ─── Policy Simulator ─────────────────────────────────────────────────────────
 
 export interface SimulatorTraceItem {

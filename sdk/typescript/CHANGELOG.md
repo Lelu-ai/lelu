@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.0.34] (2026-07-31)
+
+### Features — parity with the Python SDK
+
+* **Engine policy management** — `getEnginePolicy()` (`GET /v1/policy`), `validatePolicy(yaml)` (`POST /v1/policy/validate`), and `putEnginePolicy(yaml, ifMatch?)` (`PUT /v1/policy`, admin key + optimistic concurrency via `If-Match`). New `EnginePolicyInfo` / `PolicyValidationResult` / `PolicyUpdateResult` types. These target the engine's live policy — distinct from `listPolicies`/`getPolicy`/`upsertPolicy`/`deletePolicy`, which manage the platform's stored policies via `/api/policies`.
+* **LangGraph.js integration** (`lelu-agent-auth/langgraph`) — `secureNode()` gates any LangGraph.js node through Lelu's Confidence-Aware Auth before it runs, returning augmented state (`leluDenied`/`leluPendingReview`/`leluReason`) or throwing `LeluDeniedError`. Mirrors the Python SDK's `lelu.langgraph.secure_node`. Framework-agnostic — no dependency on `@langchain/langgraph`.
+
+### Documentation
+
+* `SimulatorReplayRequest` / `SimulatorReplayResponse` are now exported from the package root (previously only reachable via a deep import despite `simulatorReplay()` requiring them).
+
+## [0.0.33] (2026-07-14)
+
+### Miscellaneous
+
+* **Republished with a corrected README.** No functional SDK changes — 0.0.32 shipped with a stale README, 0.0.33 corrects it.
+
+## [0.0.32] (2026-07-14)
+
+### Bug Fixes
+
+* **`LocalStorage` no longer crashes a plain import.** It eagerly imported `better-sqlite3` (an optional peer dependency with native bindings) from the package's main entry point, so `import { lelu } from "lelu-agent-auth"` threw `MODULE_NOT_FOUND` for anyone who hadn't separately installed it — which is everyone on the zero-config path. `better-sqlite3` is now loaded lazily inside the `LocalStorage` constructor; only callers who actually construct it need the dependency.
+
+## [0.0.31] (2026-07-13)
+
+### Features
+
+* **`lelu(options)` shared-instance factory** — `.api` exposes the full `LeluClient`, `.authorize()` fills in a default `actor` when the request omits one, and `.handler` is a fetch-style (`Request → Response`) handler you can mount in any Web-standard framework route (Next.js, Hono, Bun, Deno) to expose `authorize`/`queue`/`approve`/`deny`/`ok` without the browser ever seeing the engine URL or API key.
+* **`discoverLocalEngine()`** — connects automatically to the engine `npx lelu-mcp start` runs locally, reading `~/.lelu/engine.json` + `~/.lelu/engine.key` with a PID-liveness check before trusting them.
+* **Express adapter accepts a `lelu()` instance** — new `toNodeHandler(auth)` bridges the fetch-style handler onto Express's `(req, res)` signature.
+
+## [0.0.30] (2026-07-03)
+
+### Features
+
+* **Verified confidence signals.** `authorize()` can now send a verified `confidence_signal` (`provider` + `tokenLogProbs`/`tokenProbabilities`/`entropy`) instead of a bare self-reported `confidence` — previously the `confidenceFrom` extractors existed but the client had no way to send the underlying signal, so production engines (which treat unverified `confidence` as untrusted) denied every call. New `LeluClient.signalFrom.{openai,anthropic,bedrock,local}` builders return a `ConfidenceSignal` for `context.signal`; `confidence` remains dev-mode-only (honored when the engine runs with `CONFIDENCE_ALLOW_UNVERIFIED=true`).
+
+### Bug Fixes
+
+* **Honest default `baseUrl`.** The default is now always `http://localhost:8080` — passing an `apiKey` alone no longer silently targets `https://lelu-ai.com`, which serves no `/v1/*` engine endpoints and 404ed on every call. `CLOUD_URL` docs corrected to clarify it only serves the platform's `/api/v1/*` audit API.
+* **Missing `@opentelemetry/api` dependency declared** — it's imported by the exported `AgentTracer` but was absent from `package.json`, breaking fresh installs since 0.0.29.
+
+### Platform
+
+* `/api/policies` and `/api/policies/[id]` now accept `Authorization: Bearer lelu_sk_...` API keys (in addition to the session cookie), so SDK policy management actually works — previously every SDK call 401ed.
+
 ## [0.0.29] (2026-06-16)
 
 ### Bug Fixes

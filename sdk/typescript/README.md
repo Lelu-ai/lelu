@@ -171,6 +171,20 @@ const safeTool = secureTool(auth.api, "research-agent", myLangChainTool, {
 });
 ```
 
+### LangGraph.js
+
+```ts
+import { secureNode } from "lelu-agent-auth/langgraph";
+import { auth } from "./lib/lelu";
+
+const approveInvoice = secureNode(
+  { client: auth.api, actor: "invoice_bot", action: "invoice:approve" },
+  async (state) => ({ ...state, approved: true }), // only runs when Lelu allows it
+);
+
+graph.addNode("approve", approveInvoice);
+```
+
 ## All methods
 
 Everything below lives on `auth.api` (a `LeluClient`):

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FaGithub, FaNpm, FaPython } from "react-icons/fa6";
-import { FiBook, FiExternalLink, FiMail, FiShield } from "react-icons/fi";
+import { FiBook, FiExternalLink, FiFileText, FiMail, FiShield } from "react-icons/fi";
 
 const TEAM = [
   {
@@ -62,7 +62,16 @@ const LINKS = [
   { name: "npm Package", icon: <FaNpm />, href: "https://www.npmjs.com/package/lelu-agent-auth" },
   { name: "PyPI Package", icon: <FaPython />, href: "https://pypi.org/project/lelu-agent-auth-sdk" },
   { name: "Documentation", icon: <FiBook />, href: "/docs" },
+  { name: "Research Paper", icon: <FiFileText />, href: "/paper.pdf" },
 ];
+
+const PAPER = {
+  title: "A Confidence You Can Measure",
+  subtitle: "Validating Confidence-Gated Authorization for AI Agents",
+  abstract:
+    "Authorization systems for AI agents increasingly propose gating actions on model confidence — allow a tool call when the model is confident, escalate or deny when it isn't. We test that premise directly: a reproducible AUROC benchmark over 321,105 real answers from 15 chat models shows confidence separates correct from incorrect actions with an overall AUROC of 0.709, reaching 0.83 on the strongest models (GPT-4o).",
+  author: "Abenezer Getachew",
+};
 
 const WHAT_WE_BUILT = [
   { title: "Confidence-Aware Gating", desc: "Every agent action carries a confidence score. Low-confidence actions route to human review automatically — no code change needed." },
@@ -163,6 +172,40 @@ export default function AboutPage() {
                 <p className="text-[13px] text-[#737373] leading-relaxed">{item.desc}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* ── Research ───────────────────────────────────────────────── */}
+        <section>
+          <h2 className="text-[18px] font-bold tracking-[-0.01em] text-[#0A0A0A] dark:text-white mb-5">
+            Research
+          </h2>
+          <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-6 sm:p-7">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[#F4F4F5] dark:bg-[#12141A] flex items-center justify-center shrink-0">
+                <FiFileText className="text-[#737373]" size={16} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[16px] font-bold text-[#0A0A0A] dark:text-white leading-snug">
+                  {PAPER.title}
+                </p>
+                <p className="text-[13px] font-medium text-[#737373] mb-3">{PAPER.subtitle}</p>
+                <p className="text-[13px] text-[#737373] leading-relaxed mb-4">{PAPER.abstract}</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <a
+                    href="/paper.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#0A0A0A] dark:bg-white text-white dark:text-[#0A0A0A] text-[12px] font-bold hover:bg-zinc-800 dark:hover:bg-zinc-100 transition-colors"
+                  >
+                    <FiFileText size={13} /> Read the paper (PDF)
+                  </a>
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-[#A3A3A3]">
+                    {PAPER.author}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

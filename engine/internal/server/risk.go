@@ -133,6 +133,13 @@ func newRiskModel(cfg RiskConfig) *riskModel {
 	return &riskModel{cfg: cfg}
 }
 
+// riskScoreEpsilon absorbs float64 representation error at exact band
+// boundaries — e.g. 0.5*(1-0.70) computes to 0.15000000000000002, a hair
+// above the literal 0.15 threshold, which would review at confidence 0.70
+// and allow at 0.71 for no reason anyone configured. See
+// https://github.com/Lelu-ai/lelu/issues/44.
+const riskScoreEpsilon = 1e-9
+
 func (m *riskModel) evaluate(action string, confidenceScore float64, reliability float64, anomalyFactor float64) riskDecision {
 	criticality := actionCriticality(action)
 	riskScore := riskScore(criticality, confidenceScore, reliability, anomalyFactor)
@@ -153,19 +160,37 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 
 	var outcome decisionOutcome
 	switch {
-	case riskScore <= allowThreshold:
+	case riskScore <= allowThreshold+riskScoreEpsilon:
 		outcome = outcomeAllow
-	case riskScore <= reviewThreshold:
+	case riskScore <= reviewThreshold+riskScoreEpsilon:
 		outcome = outcomeReview
-	case riskScore <= readOnlyThreshold:
+	case riskScore <= readOnlyThreshold+riskScoreEpsilon:
 		outcome = outcomeReadOnly
 	default:
 		outcome = outcomeDeny
 	}
 
+	reason := fmt.Sprintf("risk score %.3f (criticality=%.2f, confidence=%.2f, reliability=%.2f, anomaly_factor=%.2f)", riskScore, criticality, confidenceScore, reliability, anomalyFactor)
+
+	// Criticality floor: the risk score is criticality * (1-confidence) * ...,
+	// so a high enough confidence always drives the score toward zero
+	// regardless of criticality — the band-threshold ratio (0.30/0.08=3.75)
+	// nearly cancels the criticality ratio (0.90/0.25=3.6) besides, so the
+	// score alone stops reflecting what the action actually does well before
+	// confidence reaches 1.0. For the highest-criticality tier, never let the
+	// outcome go below review no matter how confident the model claims to be.
+	// See https://github.com/Lelu-ai/lelu/issues/44.
+	if criticality >= m.cfg.HighCriticalityMin {
+		floored := moreRestrictive(outcome, outcomeReview)
+		if floored != outcome {
+			outcome = floored
+			reason += " — floored to review: criticality at or above the high-criticality threshold is never auto-allowed or read-only-only, regardless of confidence"
+		}
+	}
+
 	return riskDecision{
 		Outcome:       outcome,
-		Reason:        fmt.Sprintf("risk score %.3f (criticality=%.2f, confidence=%.2f, reliability=%.2f, anomaly_factor=%.2f)", riskScore, criticality, confidenceScore, reliability, anomalyFactor),
+		Reason:        reason,
 		Score:         riskScore,
 		Criticality:   criticality,
 		Reliability:   reliability,
@@ -176,7 +201,15 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 func actionCriticality(action string) float64 {
 	a := strings.ToLower(strings.TrimSpace(action))
 
-	highRisk := []string{"delete", "approve", "refund", "transfer", "payment", "wire", "revoke", "grant", "admin"}
+	// disable/drop/shell/exec/sudo/root cover security-control-disabling and
+	// destructive-infrastructure actions (disable_mfa, drop_table,
+	// execute_shell, ...) that don't contain any of the original keywords
+	// and were silently inheriting the medium-criticality default — see
+	// https://github.com/Lelu-ai/lelu/issues/44.
+	highRisk := []string{
+		"delete", "approve", "refund", "transfer", "payment", "wire", "revoke", "grant", "admin",
+		"disable", "drop", "shell", "exec", "sudo", "root",
+	}
 	mediumRisk := []string{"update", "write", "create", "modify", "issue", "change"}
 	lowRisk := []string{"read", "view", "list", "search", "get", "fetch"}
 

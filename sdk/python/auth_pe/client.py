@@ -268,6 +268,7 @@ class LeluClient:
             confidence_used=data.get("confidence_used", 0.0),
             effective_scope=data.get("effective_scope"),
             downgraded_scope=data.get("downgraded_scope"),
+            review_id=data.get("review_id"),
             risk_score=data.get("risk_score"),
             risk_criticality=data.get("risk_criticality"),
             risk_reliability=data.get("risk_reliability"),
@@ -317,7 +318,10 @@ class LeluClient:
                 timestamp=decision.timestamp,
                 confidence_used=confidence_used,
                 trace_id=decision.request_id,
-                downgraded_scope=None,
+                downgraded_scope=decision.downgraded_scope,
+                safe_tool=decision.safe_tool,
+                safe_args=decision.safe_args,
+                review_id=decision.review_id,
             )
 
     # ── Human review queue (engine /v1/queue) ─────────────────────────────────

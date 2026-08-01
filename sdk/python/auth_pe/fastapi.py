@@ -87,12 +87,19 @@ def Authorize(
                 detail=f"Lelu engine error: {exc}",
             ) from exc
 
-        if not decision.allowed:
+        # `allowed` is also true for a scope downgrade or a compute redirect —
+        # neither means "let the endpoint run unrestricted." This dependency
+        # has no way to run the endpoint under a restricted scope or a
+        # different safe tool, so both must block the request, same as a deny.
+        if not decision.allowed or decision.downgraded_scope or decision.computed:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "allowed": decision.allowed,
                     "reason": decision.reason,
+                    "downgraded_scope": decision.downgraded_scope,
+                    "computed": decision.computed,
+                    "safe_tool": decision.safe_tool,
                     "actor": actor,
                     "action": action,
                 },

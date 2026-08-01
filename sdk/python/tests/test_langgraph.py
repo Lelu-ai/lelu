@@ -8,11 +8,19 @@ from auth_pe.langgraph import (
     was_denied,
     pending_review,
     denial_reason,
+    review_id,
 )
 from auth_pe.models import AgentAuthDecision
 
 
-def _make_decision(*, decision: str, reason: str = "ok") -> AgentAuthDecision:
+def _make_decision(
+    *,
+    decision: str,
+    reason: str = "ok",
+    downgraded_scope: str | None = None,
+    safe_tool: str | None = None,
+    review_id: str | None = None,
+) -> AgentAuthDecision:
     """Build an AgentAuthDecision with the new required fields."""
     return AgentAuthDecision(
         request_id="req-test",
@@ -25,13 +33,28 @@ def _make_decision(*, decision: str, reason: str = "ok") -> AgentAuthDecision:
         timestamp="2024-01-01T00:00:00Z",
         confidence_used=0.85,
         trace_id="trace-test",
-        downgraded_scope=None,
+        downgraded_scope=downgraded_scope,
+        safe_tool=safe_tool,
+        review_id=review_id,
     )
 
 
-def _mock_client(*, decision: str, reason: str = "ok") -> MagicMock:
+def _mock_client(
+    *,
+    decision: str,
+    reason: str = "ok",
+    downgraded_scope: str | None = None,
+    safe_tool: str | None = None,
+    review_id: str | None = None,
+) -> MagicMock:
     """Return a mock LeluClient whose agent_authorize returns the given decision."""
-    dec = _make_decision(decision=decision, reason=reason)
+    dec = _make_decision(
+        decision=decision,
+        reason=reason,
+        downgraded_scope=downgraded_scope,
+        safe_tool=safe_tool,
+        review_id=review_id,
+    )
     client = MagicMock()
     client.agent_authorize = AsyncMock(return_value=dec)
     client.__aenter__ = AsyncMock(return_value=client)
@@ -81,7 +104,9 @@ async def test_secure_node_denied_throw():
 
 @pytest.mark.asyncio
 async def test_secure_node_requires_human_review():
-    client = _mock_client(decision="human_review", reason="needs approval")
+    client = _mock_client(
+        decision="human_review", reason="needs approval", review_id="rev-99"
+    )
 
     @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
     async def my_node(state: dict) -> dict:
@@ -91,6 +116,63 @@ async def test_secure_node_requires_human_review():
     assert was_denied(result) is True
     assert pending_review(result) is True
     assert denial_reason(result) == "needs approval"
+    assert review_id(result) == "rev-99"
+
+
+# `decision.allowed` is also true for a scope downgrade or a compute redirect
+# — neither means "run the node as requested." A secure_node that branched
+# only on `allowed` would run the node unrestricted in both cases. This is
+# the invariant that matters most: for every outcome other than a clean
+# allow, the wrapped function must never run.
+
+
+@pytest.mark.asyncio
+async def test_secure_node_does_not_run_on_scope_downgrade():
+    client = _mock_client(
+        decision="allow",
+        reason="confidence below full-permission threshold",
+        downgraded_scope="read_only",
+    )
+
+    @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
+    async def my_node(state: dict) -> dict:
+        pytest.fail("should not execute on a scope downgrade")
+
+    result = await my_node({"confidence": 0.75})
+    assert was_denied(result) is True
+
+
+@pytest.mark.asyncio
+async def test_secure_node_does_not_run_on_compute_redirect():
+    client = _mock_client(
+        decision="compute",
+        reason="redirected to sandbox",
+        safe_tool="invoice_approve_sandbox",
+    )
+
+    @secure_node(client=client, actor="invoice_bot", action="invoice:approve")
+    async def my_node(state: dict) -> dict:
+        pytest.fail("should not execute on a compute redirect")
+
+    result = await my_node({"confidence": 0.6})
+    assert was_denied(result) is True
+
+
+@pytest.mark.asyncio
+async def test_secure_node_throws_on_downgrade_when_throw_on_deny():
+    client = _mock_client(decision="allow", downgraded_scope="read_only")
+
+    @secure_node(
+        client=client,
+        actor="invoice_bot",
+        action="invoice:approve",
+        throw_on_deny=True,
+    )
+    async def my_node(state: dict) -> dict:
+        pytest.fail("should not execute on a scope downgrade")
+
+    with pytest.raises(PermissionDeniedError):
+        await my_node({"confidence": 0.75})
 
 
 @pytest.mark.asyncio

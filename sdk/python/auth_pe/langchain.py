@@ -220,6 +220,20 @@ class SecuredTool(LangChainBaseTool):  # type: ignore[misc]
             return await self._tool.arun(*args, **kwargs)
         return await asyncio.to_thread(functools.partial(self._execute_sync, *args, **kwargs))
 
+    def _check_executable(self, decision: Any) -> None:
+        """Raise unless `decision` is a clean allow.
+
+        ``allowed`` is also true for a scope downgrade (e.g. "read_only") or a
+        compute redirect — neither means "run the wrapped tool as requested."
+        This wrapper has no way to re-run an arbitrary tool under a restricted
+        scope or a different safe tool, so both must be treated as
+        non-executable, the same as a hard deny.
+        """
+        if getattr(decision, "downgraded_scope", None) or getattr(decision, "computed", False):
+            raise self._denial_error(decision)
+        if not getattr(decision, "allowed", False):
+            raise self._denial_error(decision)
+
     def _run(self, *args: Any, **kwargs: Any) -> Any:
         try:
             asyncio.get_running_loop()
@@ -230,14 +244,12 @@ class SecuredTool(LangChainBaseTool):  # type: ignore[misc]
                 "SecuredTool._run() was called from a running event loop; use _arun()."
             )
 
-        if not getattr(decision, "allowed", False):
-            raise self._denial_error(decision)
+        self._check_executable(decision)
         return self._execute_sync(*args, **kwargs)
 
     async def _arun(self, *args: Any, **kwargs: Any) -> Any:
         decision = await self._authorize(*args, **kwargs)
-        if not getattr(decision, "allowed", False):
-            raise self._denial_error(decision)
+        self._check_executable(decision)
         return await self._execute_async(*args, **kwargs)
 
 

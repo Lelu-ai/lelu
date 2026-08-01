@@ -4,6 +4,7 @@ import {
   wasDenied,
   pendingReview,
   denialReason,
+  reviewId,
   LeluDeniedError,
 } from "./secure-node.js";
 import type { LeluClient } from "../client.js";
@@ -74,11 +75,12 @@ describe("secureNode", () => {
     });
   });
 
-  it("returns pending-review state without running the node", async () => {
+  it("returns pending-review state without running the node, and surfaces reviewId", async () => {
     const client = mockClient({
       allowed: false,
       requiresHumanReview: true,
       reason: "confidence below threshold",
+      reviewId: "rev-42",
     });
     const node = secureNode<TestState>(
       { client, actor: "invoice_bot", action: "invoice:approve" },
@@ -89,6 +91,56 @@ describe("secureNode", () => {
     expect(wasDenied(result)).toBe(true);
     expect(pendingReview(result)).toBe(true);
     expect(denialReason(result)).toBe("confidence below threshold");
+    expect(reviewId(result)).toBe("rev-42");
+    expect(nodeFn).not.toHaveBeenCalled();
+  });
+
+  // `allowed: true` is also how the engine represents a scope downgrade or a
+  // compute redirect — neither means "run the node as requested." A wrapper
+  // that branches only on `allowed` would run the node unrestricted in both
+  // cases. This is the invariant that matters most: for every outcome other
+  // than a clean allow, the wrapped function must never run.
+  it("does NOT run the node when the engine downgrades the scope", async () => {
+    const client = mockClient({
+      allowed: true,
+      downgradedScope: "read_only",
+      reason: "confidence below full-permission threshold",
+    });
+    const node = secureNode<TestState>(
+      { client, actor: "invoice_bot", action: "invoice:approve" },
+      nodeFn
+    );
+
+    const result = await node({ confidence: 0.75 });
+    expect(wasDenied(result)).toBe(true);
+    expect(nodeFn).not.toHaveBeenCalled();
+  });
+
+  it("does NOT run the node when the engine redirects to a compute alternative", async () => {
+    const client = mockClient({
+      allowed: true,
+      computed: true,
+      safeTool: "invoice_approve_sandbox",
+      reason: "redirected to sandbox",
+    });
+    const node = secureNode<TestState>(
+      { client, actor: "invoice_bot", action: "invoice:approve" },
+      nodeFn
+    );
+
+    const result = await node({ confidence: 0.75 });
+    expect(wasDenied(result)).toBe(true);
+    expect(nodeFn).not.toHaveBeenCalled();
+  });
+
+  it("throws LeluDeniedError for a downgrade when throwOnDeny is set", async () => {
+    const client = mockClient({ allowed: true, downgradedScope: "read_only" });
+    const node = secureNode<TestState>(
+      { client, actor: "invoice_bot", action: "invoice:approve", throwOnDeny: true },
+      nodeFn
+    );
+
+    await expect(node({ confidence: 0.75 })).rejects.toThrow(LeluDeniedError);
     expect(nodeFn).not.toHaveBeenCalled();
   });
 

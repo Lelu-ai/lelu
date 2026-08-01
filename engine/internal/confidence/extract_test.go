@@ -61,6 +61,27 @@ func TestExtractScore_BedrockProbabilities(t *testing.T) {
 	assert.InDelta(t, 0.8, score, 0.0001)
 }
 
+func TestExtractScore_AnthropicNeverYieldsAScore(t *testing.T) {
+	// Anthropic's API exposes no token-level log-probs or probabilities at all —
+	// any token_logprobs attached to an "anthropic" signal is necessarily
+	// fabricated by the caller, not real provider data. Must always error, the
+	// same way Claude-on-Bedrock does, regardless of what data is attached.
+	_, err := confidence.ExtractScore(&confidence.Signal{
+		Provider:      confidence.ProviderAnthropic,
+		TokenLogProbs: []float64{-0.01, -0.02, -0.01},
+	})
+	assert.Error(t, err)
+
+	_, err = confidence.ExtractScore(&confidence.Signal{
+		Provider:           confidence.ProviderAnthropic,
+		TokenProbabilities: []float64{0.99, 0.98},
+	})
+	assert.Error(t, err)
+
+	_, err = confidence.ExtractScore(&confidence.Signal{Provider: confidence.ProviderAnthropic})
+	assert.Error(t, err)
+}
+
 func TestExtractScore_BedrockNoTokenSignal(t *testing.T) {
 	// Claude on Bedrock exposes no logprobs — must error rather than guess, so
 	// the caller falls back to MissingSignalMode.

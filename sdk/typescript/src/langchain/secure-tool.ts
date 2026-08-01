@@ -170,6 +170,38 @@ export class SecureTool {
         output: msg,
         requiresHumanReview: true,
         reason: decision.reason,
+        ...(decision.reviewId !== undefined ? { reviewId: decision.reviewId } : {}),
+      };
+    }
+
+    // Scope downgrade — `allowed` is true here, but the engine granted a
+    // restricted scope (e.g. "read_only"), not the action as requested. This
+    // wrapper has no way to re-run an arbitrary function under a restricted
+    // scope, so it must never fall through to a full-scope execution here.
+    if (decision.downgradedScope) {
+      const msg =
+        `[Lelu] Action "${this.name}" was downgraded to '${decision.downgradedScope}' scope. ` +
+        `Reason: ${decision.reason}. The original tool was not run.`;
+      return {
+        allowed: false,
+        output: msg,
+        requiresHumanReview: false,
+        reason: decision.reason,
+      };
+    }
+
+    // Compute — the engine redirected to a safer alternative rather than
+    // allowing this exact call. Surface it; never auto-run the original tool.
+    if (decision.computed) {
+      const msg =
+        `[Lelu] Action "${this.name}" was redirected to a safe alternative` +
+        `${decision.safeTool ? ` (${decision.safeTool})` : ""}. ` +
+        `Reason: ${decision.reason}. The original tool was not run.`;
+      return {
+        allowed: false,
+        output: msg,
+        requiresHumanReview: false,
+        reason: decision.reason,
       };
     }
 

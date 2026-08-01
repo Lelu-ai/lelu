@@ -134,8 +134,35 @@ def secure_node(
                     _DENIED_KEY: True,
                     _REVIEW_KEY: True,
                     _REASON_KEY: decision.reason,
+                    _REVIEW_ID_KEY: decision.review_id,
                 }
                 return augmented
+
+            # ── Scope downgrade / compute redirect ─────────────────────────────
+            # `allowed` is also true here, but the engine granted a restricted
+            # scope (e.g. "read_only") or redirected to a safer tool — neither
+            # means "run this node as requested." This node has no way to
+            # re-run an arbitrary function under a restricted scope or a
+            # different safe tool, so both must be treated as non-executable,
+            # the same as a hard deny.
+            if decision.downgraded_scope or decision.computed:
+                msg = (
+                    f"Lelu downgraded action '{action}' for actor '{actor}' to "
+                    f"'{decision.downgraded_scope}' scope: {decision.reason}"
+                    if decision.downgraded_scope
+                    else
+                    f"Lelu redirected action '{action}' for actor '{actor}' to a "
+                    f"safe alternative: {decision.reason}"
+                )
+                logger.warning("lelu: %s", msg)
+                if throw_on_deny:
+                    raise PermissionDeniedError(msg, decision.reason)
+                return {
+                    **state,
+                    _DENIED_KEY: True,
+                    _REVIEW_KEY: False,
+                    _REASON_KEY: decision.reason,
+                }
 
             # ── Hard deny ─────────────────────────────────────────────────────
             if not decision.allowed:
@@ -192,3 +219,10 @@ def pending_review(state: dict[str, Any]) -> bool:
 def denial_reason(state: dict[str, Any]) -> str:
     """Return the denial reason from state, or empty string."""
     return str(state.get(_REASON_KEY, ""))
+
+
+def review_id(state: dict[str, Any]) -> str | None:
+    """Return the queue item ID when pending_review(state) is True, so the
+    caller can poll get_review()/wait_review() or resolve it via
+    approve_review()/deny_review(). None otherwise."""
+    return state.get(_REVIEW_ID_KEY)

@@ -568,6 +568,11 @@ type agentAuthorizeResponse struct {
 	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
 	EffectiveScope      string  `json:"effective_scope,omitempty"`
 	RequiresHumanReview bool    `json:"requires_human_review"`
+	// ReviewID is the queue item ID when RequiresHumanReview is true — the
+	// caller needs this to poll GET /v1/queue/{id}, long-poll
+	// /v1/queue/{id}/wait, or resolve it via approve/deny. Without it, a
+	// human_review decision is unaddressable: nothing to poll or resolve.
+	ReviewID string `json:"review_id,omitempty"`
 	ConfidenceUsed      float64 `json:"confidence_used"`
 	// ConfidenceVerified is true only when ConfidenceUsed came from a verified
 	// provider signal (confidence.ExtractScore); false when it came from the
@@ -991,9 +996,19 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	authDecisionsTotal.WithLabelValues("agent", fmt.Sprintf("%t", allowed)).Inc()
 
 	// Phase 2 — enqueue for human review when flagged.
+	var reviewID string
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
 		observability.RecordHumanReview(req.Actor, finalReason)
-		_, _ = h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor)
+		id, err := h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor)
+		if err != nil {
+			// The decision itself still stands and is audit-logged below — but
+			// without an ID there is nothing for a caller to poll or resolve,
+			// so a human_review decision silently becomes unaddressable. Log
+			// it; don't fail the request over a queue write.
+			log.Printf("queue enqueue error for actor=%s action=%s: %v", req.Actor, req.Action, err)
+		} else {
+			reviewID = id
+		}
 	}
 
 	// Compute decision: evaluator approved but redirected to a safe alternative.
@@ -1008,6 +1023,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		DowngradedScope:     downgradedScope,
 		EffectiveScope:      effectiveScope,
 		RequiresHumanReview: requiresReview,
+		ReviewID:            reviewID,
 		ConfidenceUsed:      confidenceScore,
 		ConfidenceVerified:  confidenceVerified,
 		RiskScore:           riskDec.Score,
@@ -1331,8 +1347,14 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 	h.audit.LogDecision(ctx, req.TenantID, req.Actor, req.Action, req.Resource, allowed, reason, 0, ms(start))
 	authDecisionsTotal.WithLabelValues("agent", fmt.Sprintf("%t", allowed)).Inc()
 
+	var reviewID string
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
-		_, _ = h.queue.Enqueue(ctx, req.TenantID, req.Actor, req.Action, req.Resource, 0, reason, req.ActingFor)
+		id, err := h.queue.Enqueue(ctx, req.TenantID, req.Actor, req.Action, req.Resource, 0, reason, req.ActingFor)
+		if err != nil {
+			log.Printf("queue enqueue error for actor=%s action=%s: %v", req.Actor, req.Action, err)
+		} else {
+			reviewID = id
+		}
 	}
 
 	return agentAuthorizeResponse{
@@ -1341,6 +1363,7 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 		TraceID:             traceID,
 		DowngradedScope:     downgradedScope,
 		RequiresHumanReview: requiresReview,
+		ReviewID:            reviewID,
 		ConfidenceUsed:      0,
 		ConfidenceVerified:  false,
 	}

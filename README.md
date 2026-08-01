@@ -178,7 +178,7 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 
 SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp)
 
-Self-hosting: `docker run -p 8080:8080 ghcr.io/lelu-ai/lelu/engine:latest` — Helm chart in [helm/](helm/), full options in [examples/quickstart](examples/quickstart).
+Self-hosting: `npx -y lelu-mcp start` runs the real engine with no build step, or build it yourself from source — `go build ./cmd/engine` or `docker build -f engine/Dockerfile .` — full options in [examples/quickstart](examples/quickstart).
 
 ---
 
@@ -187,7 +187,7 @@ Self-hosting: `docker run -p 8080:8080 ghcr.io/lelu-ai/lelu/engine:latest` — H
 <details>
 <summary><b>Is it really free?</b></summary>
 
-Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start` or Docker. The hosted sandbox at lelu-ai.com is just a convenience.
+Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start`, or build the engine yourself from source. The hosted sandbox at lelu-ai.com is just a convenience.
 </details>
 
 <details>

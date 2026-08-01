@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.1] (2026-08-01)
+
+_Continues from the `engine-v0.1.0` tag (2026-07-04). The entries below (0.1.6 and earlier) predate the Lelu rename and the versioning restart that came with it — kept for history, but not a continuous sequence with this one._
+
+### Security Fixes
+
+* **Anthropic confidence signals could bypass verification.** `resolveConfidence` marked any `confidence_signal` as verified solely because the field was present, with no provider-capability check, and `ExtractScore` routed `provider: "anthropic"` through the same log-prob path as OpenAI — even though Anthropic exposes no token-level log-prob data on any model. A caller could attach a fabricated log-prob array tagged `"provider": "anthropic"` and have it accepted as a verified signal, bypassing `MissingSignalMode` entirely. Anthropic now always returns an explanatory error, the same pattern already used for Claude on Bedrock, so the signal is correctly treated as missing rather than trusted.
+* **Confidence calibrator could return a fully inverted score outside its fitted range.** The isotonic calibrator only ever trains on the review-queue band — scores that auto-allow or auto-deny never reach it — and previously clamped out-of-range inputs to the *terminal fitted value* instead of returning them unchanged. In an ordinary early-deployment state (the first several human reviews all approved), this could calibrate a raw confidence of 0.0 to roughly 1.0 — a full confidence-gate bypass. The calibrator now refuses to fit on a single-class buffer and returns the raw score unchanged for inputs outside its fitted support.
+* **`human_review` decisions didn't carry a review ID.** The queue item ID returned by `Enqueue` was discarded, so the response had no way to reference the pending review — `GET /v1/queue/{id}`, the long-poll `/wait` endpoint, and approve/deny could never be used to resolve it programmatically. The response now includes `review_id` whenever a decision requires human review.
+
+### Also fixed (client-side — requires SDK ≥ TS 0.0.35 / Python 0.4.3 to take effect)
+
+* A scope downgrade (`read_only`) and a `compute` redirect were both represented as `allowed: true` on the wire, same as a clean allow. This was always correct at the engine/API level, but existing SDK wrappers that branched only on `allowed` would run the original action at full, unrestricted scope in both cases — see the TypeScript and Python SDK changelogs for the client-side fix.
+
+We recommend upgrading promptly, especially if you run with `CONFIDENCE_ALLOW_UNVERIFIED=true` or accept `confidence_signal` from untrusted callers.
+
 ## [0.1.6](https://github.com/lelu-ai/lelu/compare/engine-v0.1.5...engine-v0.1.6) (2026-03-30)
 
 

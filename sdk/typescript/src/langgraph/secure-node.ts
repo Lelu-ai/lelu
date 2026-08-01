@@ -30,6 +30,12 @@ export const LELU_DENIED_KEY = "leluDenied";
 export const LELU_REVIEW_KEY = "leluPendingReview";
 /** Set on returned state to the engine's denial/review reason. */
 export const LELU_REASON_KEY = "leluReason";
+/**
+ * Set on returned state to the queue item ID when pending, so the caller can
+ * poll getQueueItem()/waitForApproval() or resolve via approveQueueItem()/
+ * denyQueueItem(). Undefined otherwise.
+ */
+export const LELU_REVIEW_ID_KEY = "leluReviewId";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
@@ -118,11 +124,28 @@ export function secureNode<S extends Record<string, unknown>>(
         [LELU_DENIED_KEY]: true,
         [LELU_REVIEW_KEY]: true,
         [LELU_REASON_KEY]: decision.reason,
+        [LELU_REVIEW_ID_KEY]: decision.reviewId,
       } as unknown as Partial<S>;
     }
 
     if (!decision.allowed) {
       const message = `Lelu denied action '${action}' for actor '${actor}': ${decision.reason}`;
+      if (throwOnDeny) throw new LeluDeniedError(message, decision.reason);
+      return {
+        [LELU_DENIED_KEY]: true,
+        [LELU_REVIEW_KEY]: false,
+        [LELU_REASON_KEY]: decision.reason,
+      } as unknown as Partial<S>;
+    }
+
+    // `allowed` is also true for a scope downgrade or a compute redirect —
+    // neither means "run the node as requested." This node has no way to
+    // re-run an arbitrary function under a restricted scope or a different
+    // safe tool, so both must be treated as non-executable, same as a deny.
+    if (decision.downgradedScope || decision.computed) {
+      const message = decision.downgradedScope
+        ? `Lelu downgraded action '${action}' for actor '${actor}' to '${decision.downgradedScope}' scope: ${decision.reason}`
+        : `Lelu redirected action '${action}' for actor '${actor}' to a safe alternative${decision.safeTool ? ` (${decision.safeTool})` : ""}: ${decision.reason}`;
       if (throwOnDeny) throw new LeluDeniedError(message, decision.reason);
       return {
         [LELU_DENIED_KEY]: true,
@@ -151,4 +174,13 @@ export function pendingReview(state: Record<string, unknown>): boolean {
 /** The denial/review reason from state, or an empty string. */
 export function denialReason(state: Record<string, unknown>): string {
   return String(state[LELU_REASON_KEY] ?? "");
+}
+
+/**
+ * The queue item ID when `pendingReview(state)` is true, so the caller can
+ * poll `getQueueItem()`/`waitForApproval()` or resolve via
+ * `approveQueueItem()`/`denyQueueItem()`. Undefined otherwise.
+ */
+export function reviewId(state: Record<string, unknown>): string | undefined {
+  return state[LELU_REVIEW_ID_KEY] as string | undefined;
 }

@@ -98,6 +98,70 @@ describe("secureTool()", () => {
         expect(fakeTool.execute).not.toHaveBeenCalled();
     });
 
+    // The engine represents a scope downgrade or a compute redirect with
+    // `allowed: true` too — neither means "run the original execute()." A
+    // wrapper that branches only on `allowed` would run the tool at full,
+    // unrestricted scope in both cases.
+    it("does NOT call execute when the engine downgrades the scope", async () => {
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                allowed: true,
+                requires_human_review: false,
+                compute: false,
+                downgraded_scope: "read_only",
+                reason: "confidence below full-permission threshold",
+                trace_id: "req-test",
+                confidence_used: 0.75,
+            }),
+        });
+
+        const secured = secureTool({
+            client,
+            actor: "invoice_bot",
+            action: "invoice:refund",
+            confidence: 0.75,
+            tool: fakeTool,
+        });
+
+        const result = (await secured.execute!({ invoiceId: "inv-004" })) as {
+            allowed: false;
+            downgradedScope?: string;
+        };
+        expect(result.allowed).toBe(false);
+        expect(result.downgradedScope).toBe("read_only");
+        expect(fakeTool.execute).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call execute when the engine redirects to a compute alternative", async () => {
+        mockFetch.mockResolvedValueOnce({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                allowed: true,
+                requires_human_review: false,
+                compute: true,
+                safe_tool: "process_refund_sandbox",
+                reason: "redirected to sandbox",
+                trace_id: "req-test",
+                confidence_used: 0.6,
+            }),
+        });
+
+        const secured = secureTool({
+            client,
+            actor: "invoice_bot",
+            action: "invoice:refund",
+            confidence: 0.6,
+            tool: fakeTool,
+        });
+
+        const result = (await secured.execute!({ invoiceId: "inv-005" })) as { allowed: false };
+        expect(result.allowed).toBe(false);
+        expect(fakeTool.execute).not.toHaveBeenCalled();
+    });
+
     it("supports dynamic confidence function", async () => {
         mockAuthorize("allow", 0.95);
 

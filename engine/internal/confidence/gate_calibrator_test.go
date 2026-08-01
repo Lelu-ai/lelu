@@ -57,3 +57,57 @@ func TestGateCalibrator_PipelineAfterFeedback(t *testing.T) {
 		t.Errorf("high calibrated confidence should gate to full_permission, got %s", dec.Level)
 	}
 }
+
+// The review queue only ever feeds RecordReview a censored band of scores —
+// items outside [MissingConfidenceReview's band] never reach a human
+// reviewer at all, so an ordinary early-deployment run of all-approved (or
+// all-denied) reviews is a single-class buffer, not a pathological one. A
+// monotone fit over one class is a flat curve at that class's value, which
+// interpolateLocked would previously extrapolate to any input, including
+// scores that were never part of the review band at all — e.g. Calibrate(0.0)
+// returning ~1.0 ("full_permission") after 50 all-approved reviews in the
+// [0.70, 0.90) band. The calibrator must refuse to fit until it has seen both
+// classes.
+func TestGateCalibrator_SingleClassBufferNeverFits(t *testing.T) {
+	gc := NewGateCalibrator()
+
+	// An ordinary early-deployment run: every reviewed action so far was
+	// approved. Vary the raw score within the plausible review band so this
+	// isn't just one repeated point.
+	for i := 0; i < 60; i++ {
+		score := 0.70 + 0.19*float64(i%5)/4.0 // spans [0.70, 0.89]
+		gc.RecordReview(score, true)          // true = "approved" (safe), per RecordReview's contract
+	}
+
+	if gc.IsFitted() {
+		t.Fatal("calibrator fitted on a single-class (all-approved) buffer — it should refuse until both classes are observed")
+	}
+
+	// Because it never fit, Calibrate must still be the raw-score no-op —
+	// specifically, a raw confidence of 0.0 (never part of the reviewed band)
+	// must not come back as anything close to "fully trusted."
+	if got := gc.Calibrate(0.0); got != 0.0 {
+		t.Fatalf("Calibrate(0.0) = %v after an all-approved review run, want 0.0 (raw, unfitted) — a full confidence-gate bypass", got)
+	}
+}
+
+// Once fitted, the calibrator must never claim calibration for raw scores
+// outside the range it was actually fitted on — that would be extrapolating
+// a curve fitted on, say, [0.70, 0.90) to scores like 0.0 or 1.0 that were
+// never observed.
+func TestGateCalibrator_NeverExtrapolatesOutsideFittedRange(t *testing.T) {
+	gc := NewGateCalibrator()
+	for i := 0; i < 120; i++ {
+		gc.RecordReview(0.88, true)
+		gc.RecordReview(0.55, false)
+	}
+	if !gc.IsFitted() {
+		t.Fatal("calibrator should be fitted after 240 mixed-outcome reviews")
+	}
+
+	for _, raw := range []float64{0.0, 0.05, 0.95, 1.0} {
+		if got := gc.Calibrate(raw); got != raw {
+			t.Errorf("Calibrate(%v) = %v outside the fitted support — want the raw score unchanged, not an extrapolated value", raw, got)
+		}
+	}
+}

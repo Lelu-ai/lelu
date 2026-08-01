@@ -9,7 +9,11 @@ import { z } from "zod";
  * or construct it directly for local models.
  */
 export const ConfidenceSignalSchema = z.object({
-  provider: z.enum(["openai", "anthropic", "bedrock", "local"]),
+  // "anthropic" is deliberately not a valid provider here: Anthropic's API
+  // exposes no token-level log-probs or probabilities on any model, so a
+  // signal claiming that provenance is necessarily fabricated by the caller,
+  // never real data. The engine rejects it too (confidence/extract.go).
+  provider: z.enum(["openai", "bedrock", "local"]),
   /** Token log-probs (OpenAI/Bedrock log-prob families). */
   tokenLogProbs: z.array(z.number()).optional(),
   /** Token probabilities in [0,1] (Bedrock/local). */
@@ -109,6 +113,21 @@ export interface AuthDecision {
   safeArgs?: Record<string, unknown>;
   /** True when decision === "compute" — agent should use safeTool/safeArgs. */
   computed: boolean;
+  /**
+   * Set when the engine downgraded the requested scope instead of a clean
+   * allow (e.g. "read_only") — `allowed` is still `true` in this case, so
+   * callers MUST check this field before running the original action at
+   * full scope, and MUST NOT run it unmodified when this is set.
+   */
+  downgradedScope?: string;
+  /** The scope the engine actually granted, when different from what was requested. */
+  effectiveScope?: string;
+  /**
+   * Queue item ID when decision === "human_review" — needed to poll
+   * getQueueItem()/waitForApproval(), or resolve via approveQueueItem()/
+   * denyQueueItem(). Without this, a human_review decision is unaddressable.
+   */
+  reviewId?: string;
   /** SHA-256 of the request payload — tamper-proof record of what was asked. */
   inputHash?: string;
   /** SHA-256 of the decision response — tamper-proof record of what was decided. */
@@ -122,7 +141,6 @@ export interface AgentAuthDecision extends AuthDecision {
   requiresHumanReview: boolean;
   confidenceUsed: number;
   traceId: string;
-  downgradedScope: string | undefined;
 }
 
 export interface MintTokenResult {

@@ -44,10 +44,13 @@ class AgentMiddleware(ABC):
             )
         )
         decision = await self.client.agent_authorize(request)
-        
-        if not decision.allowed:
+
+        # `allowed` is also true for a scope downgrade or a compute redirect —
+        # neither means the caller should proceed as requested. Subclasses
+        # only see a bool here, so both must resolve to False, same as a deny.
+        if not decision.allowed or decision.downgraded_scope or decision.computed:
             # In a real implementation, you might want to return the reason to the LLM
             # so it can self-correct, rather than just returning False.
             return False
-            
+
         return True

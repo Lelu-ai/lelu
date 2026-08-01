@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.3] (2026-08-01)
+
+### Security Fixes
+
+* **Enforcement inversion on scope downgrade / compute redirect.** `agent_authorize()` explicitly discarded `downgraded_scope`, `safe_tool`, and `safe_args` before they ever reached a caller. As a result, `SecuredTool`, `secure_node`, the FastAPI `Authorize` dependency, and `AgentMiddleware.authorize_action()` all branched only on `decision.allowed`, which the engine also sets to `true` for a `read_only` downgrade or a `compute` redirect. All four ran the wrapped tool/node/endpoint at full, unrestricted scope instead of respecting the restriction. `agent_authorize()` now correctly forwards these fields, and all four now refuse to execute/proceed unless the decision is a clean allow.
+* **Unaddressable human-review decisions.** `AuthDecision` now carries `review_id` (from the engine's new `review_id` field), and `secure_node` surfaces it via the previously-unused `_REVIEW_ID_KEY` state key (new `review_id(state)` helper), so a `human_review` decision can actually be resolved via `get_review()`/`wait_review()`/`approve_review()`/`deny_review()` instead of only carrying an unresolvable reason string.
+
+Requires engine ≥ 0.1.1 for the confidence-verification and review-ID fixes to take effect. We recommend upgrading promptly if you use `SecuredTool`, `secure_node`, the FastAPI `Authorize` dependency, or `AgentMiddleware` against a policy with `read_only` downgrades or `compute` redirects.
+
 ## [0.4.2] (2026-07-31)
 
 ### Features — parity with the TypeScript SDK

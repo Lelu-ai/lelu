@@ -28,8 +28,15 @@ func ExtractScore(sig *Signal) (float64, error) {
 	}
 
 	switch sig.Provider {
-	case ProviderOpenAI, ProviderAnthropic:
+	case ProviderOpenAI:
 		return scoreFromLogProbs(sig.TokenLogProbs)
+	case ProviderAnthropic:
+		// Anthropic's API exposes no token-level log-probs or probabilities at
+		// all, on any model. Any token_logprobs/token_probabilities attached to
+		// an "anthropic" signal cannot have come from a real API response —
+		// accepting them here would let a caller fabricate a "verified" score.
+		// Always fail so the caller omits the signal and MissingSignalMode decides.
+		return 0, fmt.Errorf("provider %q exposes no token-level confidence data — Anthropic models cannot yield a verified signal; omit the signal to use MissingSignalMode", sig.Provider)
 	case ProviderBedrock:
 		// Amazon Bedrock fronts many model families; token-level signals are only
 		// exposed by some (e.g. Cohere token likelihoods, Llama/Titan logprobs).

@@ -13,9 +13,11 @@ export {
   wasDenied,
   pendingReview,
   denialReason,
+  reviewId,
   LeluDeniedError,
   LELU_DENIED_KEY,
   LELU_REVIEW_KEY,
   LELU_REASON_KEY,
+  LELU_REVIEW_ID_KEY,
 } from "./secure-node.js";
 export type { SecureNodeOptions, LangGraphNode } from "./secure-node.js";

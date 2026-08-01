@@ -43,7 +43,14 @@ create_secured_tool = langchain_mod.create_secured_tool
 LangChainPermissionDeniedError = langchain_mod.LangChainPermissionDeniedError
 
 
-def _decision(*, decision: str, reason: str = "ok", request_id: str = "req-test") -> AuthDecision:
+def _decision(
+    *,
+    decision: str,
+    reason: str = "ok",
+    request_id: str = "req-test",
+    downgraded_scope: str | None = None,
+    safe_tool: str | None = None,
+) -> AuthDecision:
     return AuthDecision(
         request_id=request_id,
         tool="delete_record",
@@ -53,12 +60,27 @@ def _decision(*, decision: str, reason: str = "ok", request_id: str = "req-test"
         latency_ms=1.0,
         mode="live",
         timestamp="2024-01-01T00:00:00Z",
+        downgraded_scope=downgraded_scope,
+        safe_tool=safe_tool,
     )
 
 
-def _client(*, decision: str, reason: str = "ok") -> MagicMock:
+def _client(
+    *,
+    decision: str,
+    reason: str = "ok",
+    downgraded_scope: str | None = None,
+    safe_tool: str | None = None,
+) -> MagicMock:
     client = MagicMock()
-    client.authorize_tool = AsyncMock(return_value=_decision(decision=decision, reason=reason))
+    client.authorize_tool = AsyncMock(
+        return_value=_decision(
+            decision=decision,
+            reason=reason,
+            downgraded_scope=downgraded_scope,
+            safe_tool=safe_tool,
+        )
+    )
     return client
 
 
@@ -114,3 +136,55 @@ def test_create_secured_tool_raises_on_denial():
 
     assert "policy blocked" in str(exc_info.value)
     assert exc_info.value.reason == "policy blocked"
+
+
+# `decision.allowed` is also true for a scope downgrade or a compute redirect
+# — neither means "run the tool as requested." A SecuredTool that branched
+# only on `allowed` would run the underlying tool unrestricted in both
+# cases. This is the invariant that matters most: for every outcome other
+# than a clean allow, the wrapped tool must never run.
+
+
+def test_create_secured_tool_raises_on_scope_downgrade():
+    tool = create_secured_tool(
+        DeleteRecordTool(),
+        client=_client(
+            decision="allow",
+            reason="confidence below full-permission threshold",
+            downgraded_scope="read_only",
+        ),
+        actor="invoice_bot",
+        action="db:delete",
+    )
+
+    with pytest.raises(LangChainPermissionDeniedError):
+        tool._run(record_id="42")
+
+
+@pytest.mark.asyncio
+async def test_create_secured_tool_arun_raises_on_scope_downgrade():
+    tool = create_secured_tool(
+        DeleteRecordTool(),
+        client=_client(decision="allow", downgraded_scope="read_only"),
+        actor="invoice_bot",
+        action="db:delete",
+    )
+
+    with pytest.raises(LangChainPermissionDeniedError):
+        await tool._arun(record_id="42")
+
+
+def test_create_secured_tool_raises_on_compute_redirect():
+    tool = create_secured_tool(
+        DeleteRecordTool(),
+        client=_client(
+            decision="compute",
+            reason="redirected to sandbox",
+            safe_tool="delete_record_sandbox",
+        ),
+        actor="invoice_bot",
+        action="db:delete",
+    )
+
+    with pytest.raises(LangChainPermissionDeniedError):
+        tool._run(record_id="42")

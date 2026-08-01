@@ -100,6 +100,27 @@ func (c *Calibrator) fitLocked() {
 		return
 	}
 
+	// Refuse to fit on a single-class buffer. The review queue only ever
+	// feeds this a censored band of scores (auto-allow/auto-deny thresholds
+	// mean the extremes never reach here), so an early run of all-approved
+	// (or all-denied) reviews is an ordinary, not a pathological, state. A
+	// monotone fit over one class is a flat curve at that class's value —
+	// e.g. constant 1.0 if every review so far was approved — which
+	// interpolateLocked would then extrapolate to every unreviewed score,
+	// including scores far outside anything actually observed. Mirrors the
+	// same class-imbalance guard already in updateThresholdLocked.
+	hasPositive, hasNegative := false, false
+	for _, p := range c.buffer {
+		if p.threat {
+			hasPositive = true
+		} else {
+			hasNegative = true
+		}
+	}
+	if !hasPositive || !hasNegative {
+		return
+	}
+
 	// Sort by raw score ascending.
 	sorted := make([]calibrationPoint, len(c.buffer))
 	copy(sorted, c.buffer)
@@ -180,13 +201,21 @@ func (c *Calibrator) fitLocked() {
 
 // interpolateLocked linearly interpolates the fitted isotonic curve.
 // Must be called with c.mu held for reading.
+//
+// The fitted breakpoints only ever span the review-queue band (scores that
+// auto-allow or auto-deny never reach RecordReview, so the fit never sees
+// them) — returning the terminal fitted value for x outside that range would
+// extrapolate a curve fitted on, say, [0.70, 0.90) to a raw score of 0.0 or
+// 1.0 that was never observed. Return the raw score unchanged instead: no
+// claim of calibration outside the support the calibrator actually has data
+// for.
 func (c *Calibrator) interpolateLocked(x float64) float64 {
 	n := len(c.xBreaks)
 	if x <= c.xBreaks[0] {
-		return c.yBreaks[0]
+		return x
 	}
 	if x >= c.xBreaks[n-1] {
-		return c.yBreaks[n-1]
+		return x
 	}
 	// Binary search for the segment.
 	lo, hi := 0, n-1

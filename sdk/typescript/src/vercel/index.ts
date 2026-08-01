@@ -141,6 +141,33 @@ export function secureTool<TArgs = unknown, TResult = unknown>(
         };
       }
 
+      // ── Scope downgrade / compute redirect ──────────────────────────────
+      // `allowed` is also true for these — neither means "run the original
+      // tool." This wrapper has no way to re-run an arbitrary execute()
+      // under a restricted scope or a different safe tool, so both must
+      // never fall through to execution.
+      if (decision.downgradedScope !== undefined) {
+        return {
+          allowed: false,
+          reason:
+            `Action '${action}' for agent '${actor}' was downgraded to '${decision.downgradedScope}' scope. ` +
+            `Reason: ${decision.reason}. The original tool was not run.`,
+          requiresHumanReview: false,
+          downgradedScope: decision.downgradedScope,
+        };
+      }
+
+      if (decision.computed) {
+        return {
+          allowed: false,
+          reason:
+            `Action '${action}' for agent '${actor}' was redirected to a safe alternative` +
+            `${decision.safeTool ? ` (${decision.safeTool})` : ""}. ` +
+            `Reason: ${decision.reason}. The original tool was not run.`,
+          requiresHumanReview: false,
+        };
+      }
+
       // ── Hard deny ─────────────────────────────────────────────────────
       if (!decision.allowed) {
         const denied: LeluDeniedResult = {
@@ -150,9 +177,6 @@ export function secureTool<TArgs = unknown, TResult = unknown>(
             `Reason: ${decision.reason}.`,
           requiresHumanReview: false,
         };
-        if (decision.downgradedScope !== undefined) {
-          denied.downgradedScope = decision.downgradedScope;
-        }
         return {
           ...denied,
         };

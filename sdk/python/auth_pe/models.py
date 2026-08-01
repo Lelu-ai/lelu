@@ -120,6 +120,14 @@ class AuthDecision(BaseModel):
     confidence_used: float = Field(default=0.0, description="Confidence value the engine evaluated with")
     effective_scope: str | None = Field(default=None, description="Scope the engine actually granted")
     downgraded_scope: str | None = Field(default=None, description="Set when the requested scope was downgraded")
+    review_id: str | None = Field(
+        default=None,
+        description=(
+            "Queue item ID when decision == 'human_review' — needed to poll "
+            "get_review()/wait_review() or resolve via approve_review()/deny_review(). "
+            "Without this a human_review decision is unaddressable."
+        ),
+    )
     risk_score: float | None = Field(default=None, description="Composite risk score, when risk evaluation ran")
     risk_criticality: float | None = Field(default=None)
     risk_reliability: float | None = Field(default=None)

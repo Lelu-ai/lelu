@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.35] (2026-08-01)
+
+### Security Fixes
+
+* **Enforcement inversion on scope downgrade / compute redirect.** The primary `authorize()` method never surfaced `downgradedScope`/`effectiveScope` from the engine response at all, and the legacy `agentAuthorize()` explicitly discarded `downgradedScope`. As a result, every wrapper — `SecureTool`, `secureNode`, the Vercel AI SDK `secureTool`, and the Express `authorize()` middleware — branched only on `allowed`, which the engine also sets to `true` for a `read_only` downgrade or a `compute` redirect. All four ran the wrapped tool/node/route at full, unrestricted scope instead of respecting the restriction. `authorize()`/`agentAuthorize()` now correctly surface `downgradedScope`/`effectiveScope`/`computed`, and all four wrappers refuse to execute unless the decision is a clean allow.
+* **Unaddressable human-review decisions.** `AuthDecision`/`AgentAuthDecision` now carry `reviewId` (from the engine's new `review_id` field), and `SecureTool`/`secureNode` surface it, so a `human_review` decision can actually be resolved via `getQueueItem()`/`waitForApproval()`/`approveQueueItem()`/`denyQueueItem()` instead of returning an unaddressable string.
+* `ConfidenceSignalSchema` no longer accepts `provider: "anthropic"` — Anthropic exposes no token-level log-prob data on any model, so a signal claiming that provenance could never be genuine. This is client-side defense in depth; the fix that actually matters is server-side (see the engine changelog).
+
+Requires engine ≥ 0.1.1 for the confidence-verification and review-ID fixes to take effect. We recommend upgrading promptly if you use `SecureTool`, `secureNode`, the Vercel integration, or the Express middleware against a policy with `read_only` downgrades or `compute` redirects.
+
 ## [0.0.34] (2026-07-31)
 
 ### Features — parity with the Python SDK

@@ -748,6 +748,48 @@ agent_scopes:
 	assert.NotEmpty(t, body["risk_score"])
 }
 
+// A human_review decision must carry the queue item's ID: without it, a
+// caller has nothing to poll GET /v1/queue/{id}, long-poll
+// /v1/queue/{id}/wait, or resolve via approve/deny with — the decision is
+// unaddressable. Requires a real (in-memory) queue; the ID only exists once
+// something actually enqueues the item.
+func TestAgentAuthorize_HumanReviewCarriesReviewID(t *testing.T) {
+	policy := []byte(`
+version: "1.0"
+roles:
+  finance_manager:
+    allow: [approve_payments]
+agent_scopes:
+  invoice_bot:
+    inherits: finance_manager
+    constraints: []
+`)
+
+	srv := newTestHTTPServerWithConfig(t, policy, "", queue.NewInMemory())
+	defer srv.Close()
+
+	resp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
+		"actor":  "invoice_bot",
+		"action": "approve_payments",
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.094, -0.094, -0.094},
+		},
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.True(t, body["requires_human_review"].(bool))
+	reviewID, _ := body["review_id"].(string)
+	assert.NotEmpty(t, reviewID, "human_review response must carry a review_id or the decision is unaddressable")
+
+	// The ID must resolve against the queue — not just be a non-empty string.
+	getResp, err := http.Get(srv.URL + "/v1/queue/" + reviewID)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, getResp.StatusCode)
+}
+
 // ── Request body size limit (DoS guard) ─────────────────────────────────────────
 
 // TestRequestBodySizeLimit verifies that the shared bodyLimit middleware caps

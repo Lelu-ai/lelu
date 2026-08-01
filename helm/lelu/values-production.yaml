@@ -16,7 +16,9 @@ secrets:
 engine:
   enabled: true
   replicaCount: 2
-  image: ghcr.io/lelu-ai/lelu-engine:latest
+  # No public image is published yet — build engine/Dockerfile yourself,
+  # push it to your own registry, and set this to that path.
+  image: "REPLACE_ME"
   resources:
     requests:
       cpu: 100m
@@ -36,7 +38,9 @@ engine:
 platform:
   enabled: true
   replicaCount: 2
-  image: ghcr.io/lelu-ai/lelu-platform:latest
+  # No public image is published yet — build platform/Dockerfile yourself,
+  # push it to your own registry, and set this to that path.
+  image: "REPLACE_ME"
   resources:
     requests:
       cpu: 150m
@@ -54,7 +58,9 @@ platform:
 ui:
   enabled: true
   replicaCount: 2
-  image: ghcr.io/lelu-ai/lelu-ui:latest
+  # No public image is published yet — build platform/ui/Dockerfile yourself,
+  # push it to your own registry, and set this to that path.
+  image: "REPLACE_ME"
   resources:
     requests:
       cpu: 100m

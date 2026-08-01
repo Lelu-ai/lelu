@@ -39,6 +39,8 @@ const server = http.createServer(async (req, res) => {
       ? "compute"
       : d.requires_human_review
       ? "human_review"
+      : d.downgraded_scope
+      ? "downgraded"
       : d.allowed
       ? "allow"
       : "deny";
@@ -46,11 +48,14 @@ const server = http.createServer(async (req, res) => {
     res.setHeader("x-lelu-decision", decision);
     if (d.reason) res.setHeader("x-lelu-reason", d.reason);
     if (d.trace_id) res.setHeader("x-lelu-trace-id", d.trace_id);
+    if (d.downgraded_scope) res.setHeader("x-lelu-downgraded-scope", d.downgraded_scope);
 
-    // Only a clean allow lets the original action through the gateway. Anything
-    // that needs review, was redirected (compute), or denied is blocked here —
-    // the safe alternative / human step is handled out of band.
-    if (d.allowed && !d.requires_human_review && !d.compute) {
+    // Only a clean allow lets the original action through the gateway.
+    // `d.allowed` is also true for a scope downgrade (e.g. "read_only") — the
+    // gateway has no way to re-run the proxied request under a restricted
+    // scope, so a downgrade must be blocked here exactly like compute/review/
+    // deny; the safe alternative / restricted-scope call is handled out of band.
+    if (d.allowed && !d.requires_human_review && !d.compute && !d.downgraded_scope) {
       res.writeHead(200);
       res.end("ok");
     } else {

@@ -302,6 +302,9 @@ export class LeluClient {
       compute?: boolean;
       safe_tool?: string;
       safe_args?: Record<string, unknown>;
+      downgraded_scope?: string;
+      effective_scope?: string;
+      review_id?: string;
       input_hash?: string;
       output_hash?: string;
       policy_digest?: string;
@@ -324,8 +327,11 @@ export class LeluClient {
       timestamp: new Date().toISOString(),
       allowed:   data.allowed,
       computed:  !!data.compute,
-      ...(data.safe_tool     !== undefined ? { safeTool:     data.safe_tool     } : {}),
-      ...(data.safe_args     !== undefined ? { safeArgs:     data.safe_args     } : {}),
+      ...(data.safe_tool        !== undefined ? { safeTool:        data.safe_tool        } : {}),
+      ...(data.safe_args        !== undefined ? { safeArgs:        data.safe_args        } : {}),
+      ...(data.downgraded_scope !== undefined ? { downgradedScope: data.downgraded_scope } : {}),
+      ...(data.effective_scope  !== undefined ? { effectiveScope:  data.effective_scope  } : {}),
+      ...(data.review_id        !== undefined ? { reviewId:        data.review_id        } : {}),
       ...(data.input_hash    !== undefined ? { inputHash:    data.input_hash    } : {}),
       ...(data.output_hash   !== undefined ? { outputHash:   data.output_hash   } : {}),
       ...(data.policy_digest !== undefined ? { policyDigest: data.policy_digest } : {}),
@@ -361,7 +367,6 @@ export class LeluClient {
           requiresHumanReview: decision.decision === "human_review",
           confidenceUsed: validated.context.confidence ?? 0,
           traceId: decision.requestId,
-          downgradedScope: undefined,
         };
       }
     );

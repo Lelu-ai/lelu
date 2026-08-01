@@ -231,17 +231,6 @@ export default function DocsRiskAssessment() {
               </tbody>
             </table>
           </div>
-
-          <div className="mt-4 p-4 rounded-lg border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/10">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              <strong className="text-zinc-900 dark:text-white">Criticality floor:</strong> the
-              &ldquo;Allow&rdquo; column above for the High band is reachable by the risk score
-              alone, but a raw score is not the whole decision — for High-criticality actions
-              (≥0.80), the outcome is always floored to at least Review, regardless of how low the
-              computed score is or how confident the model reports being. A risk score of 0.01 on a
-              wire transfer still requires human review; it is never auto-allowed.
-            </p>
-          </div>
         </section>
 
         <section>

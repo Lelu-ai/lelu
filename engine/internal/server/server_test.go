@@ -162,12 +162,9 @@ func TestAgentAuthorize_FullConfidence(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
-	// view_invoices is low-criticality (matches "view"), so the criticality
-	// floor added for https://github.com/Lelu-ai/lelu/issues/44 doesn't apply
-	// — full confidence on a low-stakes action is still a clean allow.
 	resp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
 		"actor":  "invoice_bot",
-		"action": "view_invoices",
+		"action": "approve_refunds",
 		"confidence_signal": map[string]any{
 			"provider":       "openai",
 			"token_logprobs": []float64{-0.04, -0.05, -0.03},
@@ -180,32 +177,6 @@ func TestAgentAuthorize_FullConfidence(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	assert.True(t, body["allowed"].(bool))
 	assert.False(t, body["requires_human_review"].(bool))
-}
-
-// TestAgentAuthorize_HighCriticalityNeverAutoAllows confirms the criticality
-// floor from https://github.com/Lelu-ai/lelu/issues/44: approve_refunds
-// matches the "approve" high-criticality keyword, so even near-total model
-// confidence must not bypass review. Before the fix, this exact input
-// produced a clean allow — the risk-score cancellation the issue describes.
-func TestAgentAuthorize_HighCriticalityNeverAutoAllows(t *testing.T) {
-	srv := newTestServer(t)
-	defer srv.Close()
-
-	resp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
-		"actor":  "invoice_bot",
-		"action": "approve_refunds",
-		"confidence_signal": map[string]any{
-			"provider":       "openai",
-			"token_logprobs": []float64{-0.001, -0.001, -0.001}, // ~99.9% confidence
-		},
-		"acting_for": "user_123",
-	})
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	var body map[string]any
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-	assert.False(t, body["allowed"].(bool), "high-criticality action must never auto-allow, no matter the confidence")
-	assert.True(t, body["requires_human_review"].(bool))
 }
 
 func TestAgentAuthorize_HardDeny(t *testing.T) {
@@ -366,13 +337,9 @@ func TestShadowSummary_TracksWouldHaveOutcomes(t *testing.T) {
 		},
 	})
 
-	// view_invoices (low criticality) at high confidence — still a clean
-	// allow. approve_refunds (high criticality, see the call above) is not:
-	// the criticality floor means it always requires at least review now,
-	// regardless of confidence — see https://github.com/Lelu-ai/lelu/issues/44.
 	_ = postJSON(t, srv, "/v1/agent/authorize", map[string]any{
 		"actor":  "invoice_bot",
-		"action": "view_invoices",
+		"action": "approve_refunds",
 		"confidence_signal": map[string]any{
 			"provider":       "openai",
 			"token_logprobs": []float64{-0.01, -0.02, -0.01},

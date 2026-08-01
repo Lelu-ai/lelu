@@ -170,11 +170,11 @@ Every `POST /v1/agent/authorize` request flows through these layers in order:
 
 | # | Gap | File(s) | Notes |
 |---|-----|---------|-------|
-| H1 | `ExternalAuditor.Audit()` always returns 0.75 | `confidence/auditor.go` | Replace `computeDummyExternalScore` with a real Vertex AI / OpenAI call |
-| H2 | External audit + escalation not called from server | `server/server.go` | Wire `ExternalAuditor` + `Escalator.EnqueueReview` into `handleAgentAuthorize` (async) |
 | H3 | 7 drift-analysis methods in `BaselineManager` are empty stubs | `observability/baseline.go:519–557` | `analyzeConfidenceDrift`, `analyzeLatencyDrift`, `analyzePatternDrift`, etc. always return `"none"` |
 | H4 | 11 data-retrieval + model-training methods in `PredictiveAnalytics` are placeholders | `observability/predictive.go:587–634` | All return hardcoded values; training data is never read from DB |
 | H5 | Anomaly sequence features never computed | `observability/anomaly.go:279` | `RecentErrorRate`, `ConfidenceTrend`, `LatencyTrend` always 0 in `FeatureVector` |
+
+_Resolved as of 2026-08-01: H1 (`ExternalAuditor.Audit()` hardcoded score) and H2 (external audit pipeline not called from server) — both fixed; see `docs/CONFIDENCE_AUDITOR.md`._
 
 ### Medium priority
 
@@ -191,9 +191,10 @@ Every `POST /v1/agent/authorize` request flows through these layers in order:
 | # | Gap | File(s) | Notes |
 |---|-----|---------|-------|
 | L1 | `EvaluateAgent` with no `inherits` implicitly allows all non-denied actions | `evaluator/evaluator.go:205` | Misconfigured scopes silently allow everything |
-| L2 | `ProviderAnthropic` uses OpenAI logprob path | `confidence/extract.go:29` | Anthropic API format differs — produces incorrect scores |
 | L3 | No migration runner | `engine/cmd/engine/main.go` | `initDatabase` and SQL files in `db/migrations/` can drift |
 | L4 | gRPC not wired | `proto/auth.proto` | Proto stub exists but codegen + server wiring not done |
+
+_Resolved as of 2026-08-01: L2 (`ProviderAnthropic` reusing the OpenAI logprob path) — now always errors instead, since Anthropic exposes no token-level log-probs on any model; see `docs/CONFIDENCE_AUDITOR.md`._
 
 ---
 

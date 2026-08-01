@@ -4,7 +4,7 @@ Detects agents that misreport their confidence score to bypass authorization gat
 
 ## Status
 
-Core pipeline implemented. External auditor (`auditor.go`) is a stub returning a fixed score of `0.75` — replacing it with a real Vertex AI / LLM call is the remaining work.
+Fully implemented. The external auditor (`auditor.go`) makes a real HTTP call to OpenAI or Anthropic (`scoreOpenAI`/`scoreAnthropic`) and fails closed — propagating the error rather than returning a neutral score — if that call fails. It's wired into `handleAgentAuthorize` in `server.go` and runs asynchronously so it doesn't add latency to the decision path.
 
 ## Components
 
@@ -26,7 +26,7 @@ Converts raw model outputs to a `[0, 1]` confidence score:
 | Provider | Input | Method |
 |----------|-------|--------|
 | `openai` | `token_logprobs` | Mean of `exp(logprob)` per token |
-| `anthropic` | `token_logprobs` | Same path (see known gaps) |
+| `anthropic` | — | Always errors — Anthropic exposes no token-level log-probs on any model, so a signal claiming that provenance can't be genuine. Omit the signal and let `MissingSignalMode` decide. |
 | `local` | `token_probabilities` | Mean of probabilities |
 | `local` | `entropy` / `entropy_max` | `1 - (entropy / entropy_max)` |
 
@@ -43,7 +43,7 @@ type AuditResult struct {
 }
 ```
 
-**Current state:** `computeDummyExternalScore()` always returns `0.75` — a placeholder. Replace with a real HTTP call to Vertex AI or a similar service.
+**Current state:** implemented. `scoreFromLLM` dispatches to `scoreOpenAI` or `scoreAnthropic` depending on configured provider, each making a real API call and parsing the returned score from the model's response text.
 
 ### `scorer.go` — Drift scorer
 Classifies the drift magnitude:
@@ -101,9 +101,9 @@ Gate.Evaluate(score, policy)  ← confidence.go
       ├─ LevelReadOnly       → downgrade scope
       └─ LevelHardDeny       → deny
       
-      ↓ (optional external audit path)
+      ↓ (optional external audit path, runs async)
       
-ExternalAuditor.Audit(req)    ← auditor.go  [currently stubbed]
+ExternalAuditor.Audit(req)    ← auditor.go
       │ AuditResult
       ▼
 Scorer.AssessSeverity()       ← scorer.go
@@ -122,10 +122,4 @@ queue.Queue.Enqueue()         ← queue package
 
 ## Known gaps
 
-| Gap | File | Severity |
-|-----|------|----------|
-| `ExternalAuditor.Audit()` always returns 0.75 | `auditor.go` | High |
-| `ProviderAnthropic` uses OpenAI logprob path; Anthropic API format differs | `extract.go` | Low |
-| External audit pipeline not called from `server.go` — only `Gate` is used | `server.go` | Medium |
-
-To complete the external audit path, wire `ExternalAuditor` + `Escalator.EnqueueReview` into `handleAgentAuthorize` after the main decision, running asynchronously (goroutine) to avoid adding latency to the hot path.
+None currently open for this pipeline. The three previously listed here — `ExternalAuditor.Audit()` returning a hardcoded score, the Anthropic signal path reusing OpenAI's log-prob branch, and the external audit pipeline not being called from `server.go` — are all resolved as of 2026-08-01.

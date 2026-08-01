@@ -5,10 +5,13 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import HTTPException
 
-from auth_pe.fastapi import Authorize
-from auth_pe.models import AgentAuthDecision
+pytest.importorskip("fastapi", reason="fastapi is an optional extra ([fastapi]); skip when not installed")
+
+from fastapi import HTTPException  # noqa: E402
+
+from auth_pe.fastapi import Authorize  # noqa: E402
+from auth_pe.models import AgentAuthDecision  # noqa: E402
 
 
 def _decision(

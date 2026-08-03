@@ -25,7 +25,7 @@ var internalSamplePolicy = []byte(`
 version: "1.0"
 roles:
   refunds_agent:
-    allow: [approve_refunds]
+    allow: [approve_refunds, view_invoices]
     deny:  [delete_invoices]
 agent_scopes:
   invoice_bot:
@@ -39,9 +39,10 @@ agent_scopes:
 
 func newDecisionHandler(t *testing.T, confCfg ConfidenceConfig) *Handler {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(internalSamplePolicy))
-	return New(
+	h, err := New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -56,6 +57,8 @@ func newDecisionHandler(t *testing.T, confCfg ConfidenceConfig) *Handler {
 		nil, // telemetry
 		nil, // db
 	)
+	require.NoError(t, err)
+	return h
 }
 
 func f64(v float64) *float64 { return &v }
@@ -112,8 +115,12 @@ func evaluate(t *testing.T, h *Handler, req agentAuthorizeRequest) (agentDecisio
 
 func TestEvaluateAgentDecision_Allow(t *testing.T) {
 	h := newDecisionHandler(t, ConfidenceConfig{AllowUnverifiedConfidence: true})
+	// view_invoices is low-criticality — approve_refunds (high-criticality)
+	// can no longer reach a clean allow at any confidence, per the
+	// criticality floor added for https://github.com/Lelu-ai/lelu/issues/44;
+	// see TestEvaluateAgentDecision_HighCriticalityNeverAutoAllows below.
 	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
-		Actor: "invoice_bot", Action: "approve_refunds", Confidence: f64(0.95),
+		Actor: "invoice_bot", Action: "view_invoices", Confidence: f64(0.95),
 	})
 
 	assert.False(t, handled)
@@ -122,6 +129,20 @@ func TestEvaluateAgentDecision_Allow(t *testing.T) {
 	assert.Equal(t, "allowed", res.outcome)
 	assert.Equal(t, "test-input-hash", res.resp.InputHash)
 	assert.NotEmpty(t, res.resp.OutputHash)
+}
+
+// TestEvaluateAgentDecision_HighCriticalityNeverAutoAllows is the internal
+// counterpart to the HTTP-level test of the same fix in server_test.go.
+func TestEvaluateAgentDecision_HighCriticalityNeverAutoAllows(t *testing.T) {
+	h := newDecisionHandler(t, ConfidenceConfig{AllowUnverifiedConfidence: true})
+	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
+		Actor: "invoice_bot", Action: "approve_refunds", Confidence: f64(0.999),
+	})
+
+	assert.False(t, handled)
+	assert.False(t, res.allowed, "high-criticality action must never auto-allow, no matter the confidence")
+	assert.True(t, res.requiresReview)
+	assert.Equal(t, "review", res.outcome)
 }
 
 func TestEvaluateAgentDecision_HumanReview(t *testing.T) {

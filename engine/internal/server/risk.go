@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/lelu-ai/lelu/engine/internal/confidence"
 )
@@ -51,10 +52,17 @@ type riskDecision struct {
 	AnomalyFactor float64
 }
 
+// riskBandThresholds are score ceilings in ascending restrictiveness order:
+// Allow <= ReadOnly <= Review. ReadOnly is the softer outcome (the agent
+// keeps running, scope reduced) and Review is the harder one (the agent
+// stops for a human) — see decisionOutcome.severity(). Loading and
+// normalization must preserve that order or the switch in evaluate() and
+// severity() disagree about which of ReadOnly/Review is more restrictive.
+// See https://github.com/Lelu-ai/lelu/pull/45.
 type riskBandThresholds struct {
 	Allow    float64
-	Review   float64
 	ReadOnly float64
+	Review   float64
 }
 
 type RiskConfig struct {
@@ -68,46 +76,88 @@ type RiskConfig struct {
 
 func DefaultRiskConfig() RiskConfig {
 	return RiskConfig{
-		LowBand:  riskBandThresholds{Allow: 0.30, Review: 0.55, ReadOnly: 0.75},
-		MidBand:  riskBandThresholds{Allow: 0.15, Review: 0.35, ReadOnly: 0.55},
-		HighBand: riskBandThresholds{Allow: 0.08, Review: 0.22, ReadOnly: 0.40},
+		LowBand:  riskBandThresholds{Allow: 0.30, ReadOnly: 0.55, Review: 0.75},
+		MidBand:  riskBandThresholds{Allow: 0.15, ReadOnly: 0.35, Review: 0.55},
+		HighBand: riskBandThresholds{Allow: 0.08, ReadOnly: 0.22, Review: 0.40},
 
 		HighCriticalityMin: 0.80,
 		MidCriticalityMin:  0.50,
 	}
 }
 
-func NewRiskConfigFromEnv() RiskConfig {
+// NewRiskConfigFromEnv loads risk thresholds from the environment. It
+// returns an error rather than silently reordering a misconfigured band —
+// see loadBandFromEnv. A silent clamp would let a deployment carrying
+// pre-PR#45 RISK_REVIEW_THRESHOLD_*/RISK_READONLY_THRESHOLD_* overrides
+// start up with review collapsed into read_only for that band instead of
+// failing loudly, since the meaning of those two variables swapped, not
+// just their recommended values. See
+// https://github.com/Lelu-ai/lelu/pull/45.
+func NewRiskConfigFromEnv() (RiskConfig, error) {
 	cfg := DefaultRiskConfig()
 
-	cfg.LowBand = loadBandFromEnv("LOW", cfg.LowBand)
-	cfg.MidBand = loadBandFromEnv("MID", cfg.MidBand)
-	cfg.HighBand = loadBandFromEnv("HIGH", cfg.HighBand)
+	var err error
+	if cfg.LowBand, err = loadBandFromEnv("LOW", cfg.LowBand); err != nil {
+		return RiskConfig{}, err
+	}
+	if cfg.MidBand, err = loadBandFromEnv("MID", cfg.MidBand); err != nil {
+		return RiskConfig{}, err
+	}
+	if cfg.HighBand, err = loadBandFromEnv("HIGH", cfg.HighBand); err != nil {
+		return RiskConfig{}, err
+	}
 
 	cfg.HighCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_HIGH_MIN", cfg.HighCriticalityMin, 0, 1)
 	cfg.MidCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_MID_MIN", cfg.MidCriticalityMin, 0, 1)
 
-	if cfg.MidCriticalityMin > cfg.HighCriticalityMin {
-		cfg.MidCriticalityMin = cfg.HighCriticalityMin
+	// Same collapse shape as loadBandFromEnv, one level up: evaluate() picks
+	// the mid band via `else if criticality >= MidCriticalityMin`, which is
+	// only reachable when MidCriticalityMin < HighCriticalityMin. Clamping
+	// MidCriticalityMin down to HighCriticalityMin on a >= violation used to
+	// silently make that equal, deleting the mid band rather than shifting
+	// it — every action that should have used MidBand thresholds fell
+	// through to LowBand, the loosest of the three, with no error. See
+	// https://github.com/Lelu-ai/lelu/pull/45.
+	if cfg.MidCriticalityMin >= cfg.HighCriticalityMin {
+		return RiskConfig{}, fmt.Errorf(
+			"risk criticality boundaries misconfigured: no criticality value can resolve to the mid band, it is unreachable — RISK_CRITICALITY_MID_MIN (%.4f) must be strictly less than RISK_CRITICALITY_HIGH_MIN (%.4f)",
+			cfg.MidCriticalityMin, cfg.HighCriticalityMin,
+		)
 	}
 
-	return cfg
+	return cfg, nil
 }
 
-func loadBandFromEnv(prefix string, fallback riskBandThresholds) riskBandThresholds {
+// loadBandFromEnv requires strict ordering — Allow < ReadOnly < Review, not
+// merely non-decreasing. The switch in evaluate() uses <= at each boundary,
+// so an equal pair (e.g. ReadOnly == Review) isn't a no-op: whichever
+// outcome is checked first in the switch consumes the entire shared
+// boundary, and the other outcome becomes unreachable for that band with no
+// error and no visible sign anything is wrong. A non-strict Allow<=ReadOnly
+// <=Review check can't distinguish that collapse from a valid ordering,
+// since the collapsed state satisfies it too. See
+// https://github.com/Lelu-ai/lelu/pull/45.
+func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresholds, error) {
 	b := riskBandThresholds{
 		Allow:    getEnvFloatInRange("RISK_ALLOW_THRESHOLD_"+prefix, fallback.Allow, 0, 1),
-		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 		ReadOnly: getEnvFloatInRange("RISK_READONLY_THRESHOLD_"+prefix, fallback.ReadOnly, 0, 1),
+		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 	}
 
-	if b.Review < b.Allow {
-		b.Review = b.Allow
+	if b.ReadOnly <= b.Allow {
+		return riskBandThresholds{}, fmt.Errorf(
+			"risk band %s misconfigured: no risk score can resolve to read_only in this band — RISK_ALLOW_THRESHOLD_%s (%.4f) must be strictly less than RISK_READONLY_THRESHOLD_%s (%.4f)",
+			prefix, prefix, b.Allow, prefix, b.ReadOnly,
+		)
 	}
-	if b.ReadOnly < b.Review {
-		b.ReadOnly = b.Review
+	if b.Review <= b.ReadOnly {
+		return riskBandThresholds{}, fmt.Errorf(
+			"risk band %s misconfigured: no risk score in this band can resolve to review, human review is unreachable — RISK_READONLY_THRESHOLD_%s (%.4f) must be strictly less than RISK_REVIEW_THRESHOLD_%s (%.4f). "+
+				"If these were set before PR #45, note RISK_REVIEW_THRESHOLD_%s and RISK_READONLY_THRESHOLD_%s swapped meaning, they didn't just get new recommended values",
+			prefix, prefix, b.ReadOnly, prefix, b.Review, prefix, prefix,
+		)
 	}
-	return b
+	return b, nil
 }
 
 func getEnvFloatInRange(key string, fallback float64, minVal float64, maxVal float64) float64 {
@@ -133,39 +183,67 @@ func newRiskModel(cfg RiskConfig) *riskModel {
 	return &riskModel{cfg: cfg}
 }
 
+// riskScoreEpsilon absorbs float64 representation error at exact band
+// boundaries — e.g. 0.5*(1-0.70) computes to 0.15000000000000002, a hair
+// above the literal 0.15 threshold, which would review at confidence 0.70
+// and allow at 0.71 for no reason anyone configured. See
+// https://github.com/Lelu-ai/lelu/issues/44.
+const riskScoreEpsilon = 1e-9
+
 func (m *riskModel) evaluate(action string, confidenceScore float64, reliability float64, anomalyFactor float64) riskDecision {
 	criticality := actionCriticality(action)
 	riskScore := riskScore(criticality, confidenceScore, reliability, anomalyFactor)
 
 	allowThreshold := m.cfg.LowBand.Allow
-	reviewThreshold := m.cfg.LowBand.Review
 	readOnlyThreshold := m.cfg.LowBand.ReadOnly
+	reviewThreshold := m.cfg.LowBand.Review
 
 	if criticality >= m.cfg.HighCriticalityMin {
 		allowThreshold = m.cfg.HighBand.Allow
-		reviewThreshold = m.cfg.HighBand.Review
 		readOnlyThreshold = m.cfg.HighBand.ReadOnly
+		reviewThreshold = m.cfg.HighBand.Review
 	} else if criticality >= m.cfg.MidCriticalityMin {
 		allowThreshold = m.cfg.MidBand.Allow
-		reviewThreshold = m.cfg.MidBand.Review
 		readOnlyThreshold = m.cfg.MidBand.ReadOnly
+		reviewThreshold = m.cfg.MidBand.Review
 	}
 
+	// Ascending restrictiveness order must match decisionOutcome.severity()
+	// (allow < readOnly < review < deny), not the reverse — see the
+	// riskBandThresholds doc comment. See https://github.com/Lelu-ai/lelu/pull/45.
 	var outcome decisionOutcome
 	switch {
-	case riskScore <= allowThreshold:
+	case riskScore <= allowThreshold+riskScoreEpsilon:
 		outcome = outcomeAllow
-	case riskScore <= reviewThreshold:
-		outcome = outcomeReview
-	case riskScore <= readOnlyThreshold:
+	case riskScore <= readOnlyThreshold+riskScoreEpsilon:
 		outcome = outcomeReadOnly
+	case riskScore <= reviewThreshold+riskScoreEpsilon:
+		outcome = outcomeReview
 	default:
 		outcome = outcomeDeny
 	}
 
+	reason := fmt.Sprintf("risk score %.3f (criticality=%.2f, confidence=%.2f, reliability=%.2f, anomaly_factor=%.2f)", riskScore, criticality, confidenceScore, reliability, anomalyFactor)
+
+	// Criticality floor: the risk score is criticality * (1-confidence) * ...,
+	// so a high enough confidence always drives the score toward zero
+	// regardless of criticality — the band-threshold ratio (0.30/0.08=3.75)
+	// nearly cancels the criticality ratio (0.90/0.25=3.6) besides, so the
+	// score alone stops reflecting what the action actually does well before
+	// confidence reaches 1.0. For the highest-criticality tier, never let the
+	// outcome go below review no matter how confident the model claims to be.
+	// See https://github.com/Lelu-ai/lelu/issues/44.
+	if criticality >= m.cfg.HighCriticalityMin {
+		floored := moreRestrictive(outcome, outcomeReview)
+		if floored != outcome {
+			outcome = floored
+			reason += " — floored to review: criticality at or above the high-criticality threshold is never auto-allowed or read-only-only, regardless of confidence"
+		}
+	}
+
 	return riskDecision{
 		Outcome:       outcome,
-		Reason:        fmt.Sprintf("risk score %.3f (criticality=%.2f, confidence=%.2f, reliability=%.2f, anomaly_factor=%.2f)", riskScore, criticality, confidenceScore, reliability, anomalyFactor),
+		Reason:        reason,
 		Score:         riskScore,
 		Criticality:   criticality,
 		Reliability:   reliability,
@@ -173,30 +251,81 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 	}
 }
 
+const (
+	criticalityHigh    = 0.90
+	criticalityMedium  = 0.60
+	criticalityLow     = 0.25
+	criticalityDefault = 0.50
+)
+
+// actionCriticalityTiers enumerates every criticality value actionCriticality
+// can return, in ascending order, each paired with one representative action
+// that resolves to it. TestRiskModel_CriticalityMonotone iterates this slice
+// directly instead of a hand-maintained copy, so a tier added here is
+// automatically covered by the monotonicity property — the 0.60 mediumRisk
+// tier previously escaped that test simply because nobody remembered to add
+// it to a second, separate list. See https://github.com/Lelu-ai/lelu/pull/45.
+var actionCriticalityTiers = []struct {
+	Action      string
+	Criticality float64
+}{
+	{"read_public_doc", criticalityLow},
+	{"restart_service", criticalityDefault},
+	{"update_record", criticalityMedium},
+	{"delete_record", criticalityHigh},
+}
+
+// actionKeywordToken reports whether any of keywords appears as a whole
+// token in action, splitting on any non-alphanumeric rune. Whole-token
+// matching (rather than raw substring containment) avoids false positives
+// where a short keyword like "drop" or "exec" is embedded in an unrelated
+// word with no delimiter nearby — read_dropbox_file and list_execution_logs
+// are not high-criticality just because "dropbox" and "execution" happen to
+// contain those substrings. This does not help when the keyword genuinely
+// is its own delimited word with an unintended meaning — "root" in
+// view_root_cause_report still matches, since "root_cause" really is a
+// standalone "root" token; that's a keyword-taxonomy problem, not a
+// tokenization one. See https://github.com/Lelu-ai/lelu/pull/45.
+func actionKeywordToken(action string, keywords []string) bool {
+	tokens := strings.FieldsFunc(action, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	for _, tok := range tokens {
+		for _, k := range keywords {
+			if tok == k {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func actionCriticality(action string) float64 {
 	a := strings.ToLower(strings.TrimSpace(action))
 
-	highRisk := []string{"delete", "approve", "refund", "transfer", "payment", "wire", "revoke", "grant", "admin"}
+	// disable/drop/shell/exec/sudo/root cover security-control-disabling and
+	// destructive-infrastructure actions (disable_mfa, drop_table,
+	// execute_shell, ...) that don't contain any of the original keywords
+	// and were silently inheriting the medium-criticality default — see
+	// https://github.com/Lelu-ai/lelu/issues/44.
+	highRisk := []string{
+		"delete", "approve", "refund", "transfer", "payment", "wire", "revoke", "grant", "admin",
+		"disable", "drop", "shell", "exec", "sudo", "root",
+	}
 	mediumRisk := []string{"update", "write", "create", "modify", "issue", "change"}
 	lowRisk := []string{"read", "view", "list", "search", "get", "fetch"}
 
-	for _, k := range highRisk {
-		if strings.Contains(a, k) {
-			return 0.90
-		}
+	if actionKeywordToken(a, highRisk) {
+		return criticalityHigh
 	}
-	for _, k := range mediumRisk {
-		if strings.Contains(a, k) {
-			return 0.60
-		}
+	if actionKeywordToken(a, mediumRisk) {
+		return criticalityMedium
 	}
-	for _, k := range lowRisk {
-		if strings.Contains(a, k) {
-			return 0.25
-		}
+	if actionKeywordToken(a, lowRisk) {
+		return criticalityLow
 	}
 
-	return 0.50
+	return criticalityDefault
 }
 
 func riskScore(criticality float64, confidenceScore float64, reliability float64, anomalyFactor float64) float64 {

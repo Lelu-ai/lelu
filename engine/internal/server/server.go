@@ -269,7 +269,7 @@ func New(
 	fb *fallback.Strategy,
 	tp *telemetry.Provider,
 	db *sql.DB,
-) *Handler {
+) (*Handler, error) {
 	if mode == "" {
 		mode = EnforcementModeEnforce
 	}
@@ -326,12 +326,17 @@ func New(
 		log.Printf("external confidence auditor enabled")
 	}
 
+	riskCfg, err := NewRiskConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("risk config: %w", err)
+	}
+
 	return &Handler{
 		eval:           eval,
 		tokenSvc:       tokenSvc,
 		confGate:       confGate,
 		confCalibrator: confidence.NewGateCalibrator(),
-		riskModel:      newRiskModel(NewRiskConfigFromEnv()),
+		riskModel:      newRiskModel(riskCfg),
 		actorStat:      newActorStats(),
 		audit:          auditWriter,
 		queue:          q,
@@ -360,7 +365,7 @@ func New(
 		extAuditor:     extAuditor,
 		confScorer:     confScorer,
 		confEscalator:  confEscalator,
-	}
+	}, nil
 }
 
 // SetVault attaches an OAuth token vault to the handler after construction.

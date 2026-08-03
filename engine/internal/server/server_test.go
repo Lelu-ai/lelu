@@ -54,12 +54,30 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return newTestServerWithMode(t, server.EnforcementModeEnforce)
 }
 
+// clearRiskEnv resets every env var server.NewRiskConfigFromEnv reads, so
+// server.New() in these fixtures can't fail (or coincidentally succeed) on
+// an ambient RISK_* value left over in the developer's shell or CI
+// environment, now that a misordered or collapsed band is a hard startup
+// error rather than a silent clamp. Flagged by the Copilot review on PR #45.
+func clearRiskEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"RISK_ALLOW_THRESHOLD_LOW", "RISK_READONLY_THRESHOLD_LOW", "RISK_REVIEW_THRESHOLD_LOW",
+		"RISK_ALLOW_THRESHOLD_MID", "RISK_READONLY_THRESHOLD_MID", "RISK_REVIEW_THRESHOLD_MID",
+		"RISK_ALLOW_THRESHOLD_HIGH", "RISK_READONLY_THRESHOLD_HIGH", "RISK_REVIEW_THRESHOLD_HIGH",
+		"RISK_CRITICALITY_HIGH_MIN", "RISK_CRITICALITY_MID_MIN",
+	} {
+		t.Setenv(k, "")
+	}
+}
+
 func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.Server {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -74,6 +92,7 @@ func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -82,10 +101,11 @@ func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.
 
 func newTestHTTPServerWithConfig(t *testing.T, policy []byte, apiKey string, q *queue.Queue) *httptest.Server {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(policy))
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -100,6 +120,7 @@ func newTestHTTPServerWithConfig(t *testing.T, policy []byte, apiKey string, q *
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 
 	httpSrv := server.NewHTTPServer(":0", h)
 	return httptest.NewServer(httpSrv.Handler)
@@ -162,9 +183,12 @@ func TestAgentAuthorize_FullConfidence(t *testing.T) {
 	srv := newTestServer(t)
 	defer srv.Close()
 
+	// view_invoices is low-criticality (matches "view"), so the criticality
+	// floor added for https://github.com/Lelu-ai/lelu/issues/44 doesn't apply
+	// — full confidence on a low-stakes action is still a clean allow.
 	resp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
 		"actor":  "invoice_bot",
-		"action": "approve_refunds",
+		"action": "view_invoices",
 		"confidence_signal": map[string]any{
 			"provider":       "openai",
 			"token_logprobs": []float64{-0.04, -0.05, -0.03},
@@ -177,6 +201,32 @@ func TestAgentAuthorize_FullConfidence(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
 	assert.True(t, body["allowed"].(bool))
 	assert.False(t, body["requires_human_review"].(bool))
+}
+
+// TestAgentAuthorize_HighCriticalityNeverAutoAllows confirms the criticality
+// floor from https://github.com/Lelu-ai/lelu/issues/44: approve_refunds
+// matches the "approve" high-criticality keyword, so even near-total model
+// confidence must not bypass review. Before the fix, this exact input
+// produced a clean allow — the risk-score cancellation the issue describes.
+func TestAgentAuthorize_HighCriticalityNeverAutoAllows(t *testing.T) {
+	srv := newTestServer(t)
+	defer srv.Close()
+
+	resp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
+		"actor":  "invoice_bot",
+		"action": "approve_refunds",
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.001, -0.001, -0.001}, // ~99.9% confidence
+		},
+		"acting_for": "user_123",
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.False(t, body["allowed"].(bool), "high-criticality action must never auto-allow, no matter the confidence")
+	assert.True(t, body["requires_human_review"].(bool))
 }
 
 func TestAgentAuthorize_HardDeny(t *testing.T) {
@@ -337,9 +387,13 @@ func TestShadowSummary_TracksWouldHaveOutcomes(t *testing.T) {
 		},
 	})
 
+	// view_invoices (low criticality) at high confidence — still a clean
+	// allow. approve_refunds (high criticality, see the call above) is not:
+	// the criticality floor means it always requires at least review now,
+	// regardless of confidence — see https://github.com/Lelu-ai/lelu/issues/44.
 	_ = postJSON(t, srv, "/v1/agent/authorize", map[string]any{
 		"actor":  "invoice_bot",
-		"action": "approve_refunds",
+		"action": "view_invoices",
 		"confidence_signal": map[string]any{
 			"provider":       "openai",
 			"token_logprobs": []float64{-0.01, -0.02, -0.01},
@@ -568,6 +622,7 @@ func TestQueueGet_NotFound(t *testing.T) {
 // ─── Rate limiting integration tests ─────────────────────────────────────────
 
 func TestRateLimit_AuthEndpoint(t *testing.T) {
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
@@ -578,7 +633,7 @@ func TestRateLimit_AuthEndpoint(t *testing.T) {
 		},
 	})
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -593,6 +648,7 @@ func TestRateLimit_AuthEndpoint(t *testing.T) {
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
@@ -630,6 +686,7 @@ func TestFallbackStatus_NilFallback(t *testing.T) {
 }
 
 func TestFallbackStatus_WithStrategy(t *testing.T) {
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
@@ -638,7 +695,7 @@ func TestFallbackStatus_WithStrategy(t *testing.T) {
 		ControlPlaneMode: fallback.ModeClosed,
 	})
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -653,6 +710,7 @@ func TestFallbackStatus_WithStrategy(t *testing.T) {
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)

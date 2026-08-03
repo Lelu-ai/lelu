@@ -251,10 +251,13 @@ func main() {
 	}
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
-	h := server.New(eval, tokenSvc, confGate, auditWriter, reviewQueue, apiKey, server.ConfidenceConfig{
+	h, err := server.New(eval, tokenSvc, confGate, auditWriter, reviewQueue, apiKey, server.ConfidenceConfig{
 		AllowUnverifiedConfidence: allowUnverifiedConfidence,
 		MissingSignalMode:         missingConfidenceMode,
 	}, enforcementMode, incidentNotifier, rl, fb, tp, db)
+	if err != nil {
+		log.Fatalf("server init: %v", err)
+	}
 	h.SetPolicyPath(policyPath)
 	if vaultSvc != nil {
 		h.SetVault(vaultSvc)

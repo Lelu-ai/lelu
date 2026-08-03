@@ -182,7 +182,8 @@ export default function DocsRiskAssessment() {
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
             Different action criticality levels have different risk thresholds. High-criticality
-            actions require lower risk scores to be approved.
+            actions require lower risk scores to be approved. Outcomes get stricter left to right:
+            Read-Only lets the agent keep running with reduced scope, Review pauses it for a human.
           </p>
 
           <div className="overflow-x-auto">
@@ -196,10 +197,10 @@ export default function DocsRiskAssessment() {
                     Allow
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
-                    Review
+                    Read-Only
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
-                    Read-Only
+                    Review
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
                     Deny
@@ -230,6 +231,17 @@ export default function DocsRiskAssessment() {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 p-4 rounded-lg border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/10">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <strong className="text-zinc-900 dark:text-white">Criticality floor:</strong> the
+              &ldquo;Allow&rdquo; column above for the High band is reachable by the risk score
+              alone, but a raw score is not the whole decision — for High-criticality actions
+              (≥0.80), the outcome is always floored to at least Review, regardless of how low the
+              computed score is or how confident the model reports being. A risk score of 0.01 on a
+              wire transfer still requires human review; it is never auto-allowed.
+            </p>
           </div>
         </section>
 
@@ -294,7 +306,8 @@ export default function DocsRiskAssessment() {
                 risk = 0.252
               </div>
               <div className="text-sm font-medium text-amber-900 dark:text-amber-400">
-                Result: REVIEW (risk 0.252 &gt; 0.22, ≤ 0.40 threshold)
+                Result: REVIEW — risk 0.252 falls in the Read-Only band (0.22–0.40), but the
+                criticality floor requires at least Review whenever criticality ≥ 0.80
               </div>
             </div>
 
@@ -348,18 +361,18 @@ export default function DocsRiskAssessment() {
               <pre>
                 <code>{`# High criticality band (≥0.80)
 RISK_ALLOW_THRESHOLD_HIGH=0.08
-RISK_REVIEW_THRESHOLD_HIGH=0.22
-RISK_READONLY_THRESHOLD_HIGH=0.40
+RISK_READONLY_THRESHOLD_HIGH=0.22
+RISK_REVIEW_THRESHOLD_HIGH=0.40
 
 # Medium criticality band (0.50-0.79)
 RISK_ALLOW_THRESHOLD_MID=0.15
-RISK_REVIEW_THRESHOLD_MID=0.35
-RISK_READONLY_THRESHOLD_MID=0.55
+RISK_READONLY_THRESHOLD_MID=0.35
+RISK_REVIEW_THRESHOLD_MID=0.55
 
 # Low criticality band (<0.50)
 RISK_ALLOW_THRESHOLD_LOW=0.30
-RISK_REVIEW_THRESHOLD_LOW=0.55
-RISK_READONLY_THRESHOLD_LOW=0.75
+RISK_READONLY_THRESHOLD_LOW=0.55
+RISK_REVIEW_THRESHOLD_LOW=0.75
 
 # Criticality boundaries
 RISK_CRITICALITY_HIGH_MIN=0.80

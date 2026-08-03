@@ -117,6 +117,15 @@ func NewRiskConfigFromEnv() (RiskConfig, error) {
 	return cfg, nil
 }
 
+// loadBandFromEnv requires strict ordering — Allow < ReadOnly < Review, not
+// merely non-decreasing. The switch in evaluate() uses <= at each boundary,
+// so an equal pair (e.g. ReadOnly == Review) isn't a no-op: whichever
+// outcome is checked first in the switch consumes the entire shared
+// boundary, and the other outcome becomes unreachable for that band with no
+// error and no visible sign anything is wrong. A non-strict Allow<=ReadOnly
+// <=Review check can't distinguish that collapse from a valid ordering,
+// since the collapsed state satisfies it too. See
+// https://github.com/Lelu-ai/lelu/pull/45.
 func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresholds, error) {
 	b := riskBandThresholds{
 		Allow:    getEnvFloatInRange("RISK_ALLOW_THRESHOLD_"+prefix, fallback.Allow, 0, 1),
@@ -124,11 +133,17 @@ func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresh
 		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 	}
 
-	if b.ReadOnly < b.Allow || b.Review < b.ReadOnly {
+	if b.ReadOnly <= b.Allow {
 		return riskBandThresholds{}, fmt.Errorf(
-			"risk band %s misconfigured: need RISK_ALLOW_THRESHOLD_%s (%.4f) <= RISK_READONLY_THRESHOLD_%s (%.4f) <= RISK_REVIEW_THRESHOLD_%s (%.4f) — "+
-				"if these were set before PR #45, note RISK_REVIEW_THRESHOLD_%s and RISK_READONLY_THRESHOLD_%s swapped meaning, they didn't just get new recommended values",
-			prefix, prefix, b.Allow, prefix, b.ReadOnly, prefix, b.Review, prefix, prefix,
+			"risk band %s misconfigured: no risk score can resolve to read_only in this band — RISK_ALLOW_THRESHOLD_%s (%.4f) must be strictly less than RISK_READONLY_THRESHOLD_%s (%.4f)",
+			prefix, prefix, b.Allow, prefix, b.ReadOnly,
+		)
+	}
+	if b.Review <= b.ReadOnly {
+		return riskBandThresholds{}, fmt.Errorf(
+			"risk band %s misconfigured: no risk score in this band can resolve to review, human review is unreachable — RISK_READONLY_THRESHOLD_%s (%.4f) must be strictly less than RISK_REVIEW_THRESHOLD_%s (%.4f). "+
+				"If these were set before PR #45, note RISK_REVIEW_THRESHOLD_%s and RISK_READONLY_THRESHOLD_%s swapped meaning, they didn't just get new recommended values",
+			prefix, prefix, b.ReadOnly, prefix, b.Review, prefix, prefix,
 		)
 	}
 	return b, nil

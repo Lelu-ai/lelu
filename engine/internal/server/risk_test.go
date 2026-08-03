@@ -202,3 +202,33 @@ func TestNewRiskConfigFromEnv_RejectsMisconfiguredBand(t *testing.T) {
 		t.Fatal("expected an error for out-of-order HIGH band thresholds (stale pre-PR#45 overrides), got nil")
 	}
 }
+
+// TestNewRiskConfigFromEnv_RejectsCollapsedBoundary is the review finding on
+// top of TestNewRiskConfigFromEnv_RejectsMisconfiguredBand: a non-strict
+// Allow<=ReadOnly<=Review check is satisfied by ReadOnly == Review (or
+// Allow == ReadOnly), but the switch in evaluate() uses <= at each
+// boundary, so an equal pair silently deletes whichever outcome sits
+// between them — no error, no visible sign, same failure mode as the
+// strict-inversion case this is layered on. See
+// https://github.com/Lelu-ai/lelu/pull/45.
+func TestNewRiskConfigFromEnv_RejectsCollapsedBoundary(t *testing.T) {
+	t.Run("read_only equals review deletes review", func(t *testing.T) {
+		t.Setenv("RISK_ALLOW_THRESHOLD_MID", "0.15")
+		t.Setenv("RISK_READONLY_THRESHOLD_MID", "0.35")
+		t.Setenv("RISK_REVIEW_THRESHOLD_MID", "0.35")
+
+		if _, err := NewRiskConfigFromEnv(); err == nil {
+			t.Fatal("expected an error when ReadOnly == Review (review becomes unreachable), got nil")
+		}
+	})
+
+	t.Run("allow equals read_only deletes read_only", func(t *testing.T) {
+		t.Setenv("RISK_ALLOW_THRESHOLD_MID", "0.15")
+		t.Setenv("RISK_READONLY_THRESHOLD_MID", "0.15")
+		t.Setenv("RISK_REVIEW_THRESHOLD_MID", "0.35")
+
+		if _, err := NewRiskConfigFromEnv(); err == nil {
+			t.Fatal("expected an error when Allow == ReadOnly (read_only becomes unreachable), got nil")
+		}
+	})
+}

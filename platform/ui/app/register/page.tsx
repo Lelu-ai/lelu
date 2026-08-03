@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
@@ -39,6 +40,10 @@ export default function RegisterPage() {
     setError("");
     if (password.length < 8) {
       setError("Password must be at least 8 characters");
+      return;
+    }
+    if (password !== confirm) {
+      setError("Passwords don't match.");
       return;
     }
     setLoading(true);
@@ -218,6 +223,31 @@ export default function RegisterPage() {
                     </div>
                     <p className="text-[12px] text-[#737373]">{strengthLabel}</p>
                   </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  className="block text-[13px] font-medium text-[#0A0A0A] dark:text-[#E4E4E7]"
+                  htmlFor="confirm"
+                >
+                  Confirm password
+                </label>
+                <input
+                  id="confirm"
+                  type={showPw ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  placeholder="Re-enter your password"
+                  className={inputCls}
+                />
+                {confirm.length > 0 && password !== confirm && (
+                  <p className="text-[12px] text-red-600 dark:text-red-400">
+                    Passwords don&apos;t match
+                  </p>
                 )}
               </div>
 

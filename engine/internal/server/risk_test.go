@@ -10,23 +10,20 @@ import "testing"
 // outcome for A must never be less restrictive than the outcome for B.
 // Before the criticality floor, this failed on exactly the disable_mfa vs
 // delete_record row from the issue.
+//
+// Iterates actionCriticalityTiers (defined in risk.go, next to
+// actionCriticality itself) rather than a second hand-written list: an
+// earlier version of this test hard-coded three tiers and silently missed
+// the 0.60 mediumRisk tier, which let update_record (crit 0.60) resolve to
+// a less restrictive outcome than restart_service (crit 0.50) pass
+// unnoticed. See https://github.com/Lelu-ai/lelu/pull/45.
 func TestRiskModel_CriticalityMonotone(t *testing.T) {
 	m := newRiskModel(DefaultRiskConfig())
 
-	// One representative action per criticality tier actionCriticality can
-	// produce: 0.25 (lowRisk), 0.50 (unmatched default), 0.90 (highRisk).
-	tiers := []struct {
-		name        string
-		action      string
-		criticality float64
-	}{
-		{"low", "read_public_doc", 0.25},
-		{"default", "restart_service", 0.50},
-		{"high", "delete_record", 0.90},
-	}
+	tiers := actionCriticalityTiers
 	for _, tr := range tiers {
-		if got := actionCriticality(tr.action); got != tr.criticality {
-			t.Fatalf("actionCriticality(%q) = %.2f, want %.2f (fixture assumption broken)", tr.action, got, tr.criticality)
+		if got := actionCriticality(tr.Action); got != tr.Criticality {
+			t.Fatalf("actionCriticality(%q) = %.2f, want %.2f (fixture assumption broken)", tr.Action, got, tr.Criticality)
 		}
 	}
 
@@ -40,16 +37,16 @@ func TestRiskModel_CriticalityMonotone(t *testing.T) {
 				var prevSeverity int
 				var prevTier string
 				for i, tr := range tiers {
-					dec := m.evaluate(tr.action, conf, rel, anom)
+					dec := m.evaluate(tr.Action, conf, rel, anom)
 					sev := dec.Outcome.severity()
 					if i > 0 && sev < prevSeverity {
 						t.Errorf(
 							"monotonicity violated at confidence=%.3f reliability=%.2f anomaly=%.2f: %s (criticality %.2f) outcome severity %d is LESS restrictive than %s (lower criticality) severity %d",
-							conf, rel, anom, tr.action, tr.criticality, sev, prevTier, prevSeverity,
+							conf, rel, anom, tr.Action, tr.Criticality, sev, prevTier, prevSeverity,
 						)
 					}
 					prevSeverity = sev
-					prevTier = tr.action
+					prevTier = tr.Action
 				}
 			}
 		}
@@ -64,6 +61,40 @@ func TestRiskModel_SubstringGapActionsAreHighCriticality(t *testing.T) {
 	for _, action := range []string{"disable_mfa", "drop_table", "execute_shell"} {
 		if got := actionCriticality(action); got != 0.90 {
 			t.Errorf("actionCriticality(%q) = %.2f, want 0.90", action, got)
+		}
+	}
+}
+
+// TestRiskModel_KeywordsRequireWordBoundary locks in Mayur's PR #45 review
+// finding: raw substring matching on the taxonomy keywords made "drop" and
+// "exec" false-positive inside ordinary words that merely contain them as a
+// substring — "dropbox", "droplet", "execution" — forcing unrelated read
+// actions into permanent high criticality with no delimiter anywhere near
+// the keyword.
+//
+// view_root_cause_report is deliberately excluded here: "root" is a genuine
+// standalone token in "root_cause" (delimited by underscores on both
+// sides), so word-boundary matching does not and should not change its
+// result — it's still high criticality after this fix, same as before.
+// That's a keyword-taxonomy precision problem (bare "root" collides with
+// the ordinary phrase "root cause"), not the substring-boundary bug this
+// test covers, and is out of scope here.
+func TestRiskModel_KeywordsRequireWordBoundary(t *testing.T) {
+	cases := map[string]float64{
+		"read_dropbox_file":   criticalityLow, // "drop" inside "dropbox" — "read" still matches
+		"list_execution_logs": criticalityLow, // "exec" inside "execution" — "list" still matches
+		"get_droplet_status":  criticalityLow, // "drop" inside "droplet" — "get" still matches
+	}
+	for action, want := range cases {
+		if got := actionCriticality(action); got != want {
+			t.Errorf("actionCriticality(%q) = %.2f, want %.2f (word-boundary match should not fire on a keyword embedded in an unrelated word)", action, got, want)
+		}
+	}
+
+	// The real keywords must still match as their own token.
+	for _, action := range []string{"drop_table", "exec_command", "sudo_run", "chroot_exec"} {
+		if got := actionCriticality(action); got != criticalityHigh {
+			t.Errorf("actionCriticality(%q) = %.2f, want %.2f (real keyword token should still match)", action, got, criticalityHigh)
 		}
 	}
 }

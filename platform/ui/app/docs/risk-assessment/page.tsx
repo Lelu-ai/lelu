@@ -182,7 +182,8 @@ export default function DocsRiskAssessment() {
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
             Different action criticality levels have different risk thresholds. High-criticality
-            actions require lower risk scores to be approved.
+            actions require lower risk scores to be approved. Outcomes get stricter left to right:
+            Read-Only lets the agent keep running with reduced scope, Review pauses it for a human.
           </p>
 
           <div className="overflow-x-auto">
@@ -196,10 +197,10 @@ export default function DocsRiskAssessment() {
                     Allow
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
-                    Review
+                    Read-Only
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
-                    Read-Only
+                    Review
                   </th>
                   <th className="text-left py-3 px-4 font-semibold text-zinc-900 dark:text-white">
                     Deny
@@ -305,7 +306,8 @@ export default function DocsRiskAssessment() {
                 risk = 0.252
               </div>
               <div className="text-sm font-medium text-amber-900 dark:text-amber-400">
-                Result: REVIEW (risk 0.252 &gt; 0.22, ≤ 0.40 threshold)
+                Result: REVIEW — risk 0.252 falls in the Read-Only band (0.22–0.40), but the
+                criticality floor requires at least Review whenever criticality ≥ 0.80
               </div>
             </div>
 
@@ -359,18 +361,18 @@ export default function DocsRiskAssessment() {
               <pre>
                 <code>{`# High criticality band (≥0.80)
 RISK_ALLOW_THRESHOLD_HIGH=0.08
-RISK_REVIEW_THRESHOLD_HIGH=0.22
-RISK_READONLY_THRESHOLD_HIGH=0.40
+RISK_READONLY_THRESHOLD_HIGH=0.22
+RISK_REVIEW_THRESHOLD_HIGH=0.40
 
 # Medium criticality band (0.50-0.79)
 RISK_ALLOW_THRESHOLD_MID=0.15
-RISK_REVIEW_THRESHOLD_MID=0.35
-RISK_READONLY_THRESHOLD_MID=0.55
+RISK_READONLY_THRESHOLD_MID=0.35
+RISK_REVIEW_THRESHOLD_MID=0.55
 
 # Low criticality band (<0.50)
 RISK_ALLOW_THRESHOLD_LOW=0.30
-RISK_REVIEW_THRESHOLD_LOW=0.55
-RISK_READONLY_THRESHOLD_LOW=0.75
+RISK_READONLY_THRESHOLD_LOW=0.55
+RISK_REVIEW_THRESHOLD_LOW=0.75
 
 # Criticality boundaries
 RISK_CRITICALITY_HIGH_MIN=0.80

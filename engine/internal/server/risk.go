@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/lelu-ai/lelu/engine/internal/confidence"
 )
@@ -51,10 +52,17 @@ type riskDecision struct {
 	AnomalyFactor float64
 }
 
+// riskBandThresholds are score ceilings in ascending restrictiveness order:
+// Allow <= ReadOnly <= Review. ReadOnly is the softer outcome (the agent
+// keeps running, scope reduced) and Review is the harder one (the agent
+// stops for a human) — see decisionOutcome.severity(). Loading and
+// normalization must preserve that order or the switch in evaluate() and
+// severity() disagree about which of ReadOnly/Review is more restrictive.
+// See https://github.com/Lelu-ai/lelu/pull/45.
 type riskBandThresholds struct {
 	Allow    float64
-	Review   float64
 	ReadOnly float64
+	Review   float64
 }
 
 type RiskConfig struct {
@@ -68,9 +76,9 @@ type RiskConfig struct {
 
 func DefaultRiskConfig() RiskConfig {
 	return RiskConfig{
-		LowBand:  riskBandThresholds{Allow: 0.30, Review: 0.55, ReadOnly: 0.75},
-		MidBand:  riskBandThresholds{Allow: 0.15, Review: 0.35, ReadOnly: 0.55},
-		HighBand: riskBandThresholds{Allow: 0.08, Review: 0.22, ReadOnly: 0.40},
+		LowBand:  riskBandThresholds{Allow: 0.30, ReadOnly: 0.55, Review: 0.75},
+		MidBand:  riskBandThresholds{Allow: 0.15, ReadOnly: 0.35, Review: 0.55},
+		HighBand: riskBandThresholds{Allow: 0.08, ReadOnly: 0.22, Review: 0.40},
 
 		HighCriticalityMin: 0.80,
 		MidCriticalityMin:  0.50,
@@ -101,11 +109,11 @@ func loadBandFromEnv(prefix string, fallback riskBandThresholds) riskBandThresho
 		ReadOnly: getEnvFloatInRange("RISK_READONLY_THRESHOLD_"+prefix, fallback.ReadOnly, 0, 1),
 	}
 
-	if b.Review < b.Allow {
-		b.Review = b.Allow
+	if b.ReadOnly < b.Allow {
+		b.ReadOnly = b.Allow
 	}
-	if b.ReadOnly < b.Review {
-		b.ReadOnly = b.Review
+	if b.Review < b.ReadOnly {
+		b.Review = b.ReadOnly
 	}
 	return b
 }
@@ -145,27 +153,30 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 	riskScore := riskScore(criticality, confidenceScore, reliability, anomalyFactor)
 
 	allowThreshold := m.cfg.LowBand.Allow
-	reviewThreshold := m.cfg.LowBand.Review
 	readOnlyThreshold := m.cfg.LowBand.ReadOnly
+	reviewThreshold := m.cfg.LowBand.Review
 
 	if criticality >= m.cfg.HighCriticalityMin {
 		allowThreshold = m.cfg.HighBand.Allow
-		reviewThreshold = m.cfg.HighBand.Review
 		readOnlyThreshold = m.cfg.HighBand.ReadOnly
+		reviewThreshold = m.cfg.HighBand.Review
 	} else if criticality >= m.cfg.MidCriticalityMin {
 		allowThreshold = m.cfg.MidBand.Allow
-		reviewThreshold = m.cfg.MidBand.Review
 		readOnlyThreshold = m.cfg.MidBand.ReadOnly
+		reviewThreshold = m.cfg.MidBand.Review
 	}
 
+	// Ascending restrictiveness order must match decisionOutcome.severity()
+	// (allow < readOnly < review < deny), not the reverse — see the
+	// riskBandThresholds doc comment. See https://github.com/Lelu-ai/lelu/pull/45.
 	var outcome decisionOutcome
 	switch {
 	case riskScore <= allowThreshold+riskScoreEpsilon:
 		outcome = outcomeAllow
-	case riskScore <= reviewThreshold+riskScoreEpsilon:
-		outcome = outcomeReview
 	case riskScore <= readOnlyThreshold+riskScoreEpsilon:
 		outcome = outcomeReadOnly
+	case riskScore <= reviewThreshold+riskScoreEpsilon:
+		outcome = outcomeReview
 	default:
 		outcome = outcomeDeny
 	}
@@ -198,6 +209,55 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 	}
 }
 
+const (
+	criticalityHigh    = 0.90
+	criticalityMedium  = 0.60
+	criticalityLow     = 0.25
+	criticalityDefault = 0.50
+)
+
+// actionCriticalityTiers enumerates every criticality value actionCriticality
+// can return, in ascending order, each paired with one representative action
+// that resolves to it. TestRiskModel_CriticalityMonotone iterates this slice
+// directly instead of a hand-maintained copy, so a tier added here is
+// automatically covered by the monotonicity property — the 0.60 mediumRisk
+// tier previously escaped that test simply because nobody remembered to add
+// it to a second, separate list. See https://github.com/Lelu-ai/lelu/pull/45.
+var actionCriticalityTiers = []struct {
+	Action      string
+	Criticality float64
+}{
+	{"read_public_doc", criticalityLow},
+	{"restart_service", criticalityDefault},
+	{"update_record", criticalityMedium},
+	{"delete_record", criticalityHigh},
+}
+
+// actionKeywordToken reports whether any of keywords appears as a whole
+// token in action, splitting on any non-alphanumeric rune. Whole-token
+// matching (rather than raw substring containment) avoids false positives
+// where a short keyword like "drop" or "exec" is embedded in an unrelated
+// word with no delimiter nearby — read_dropbox_file and list_execution_logs
+// are not high-criticality just because "dropbox" and "execution" happen to
+// contain those substrings. This does not help when the keyword genuinely
+// is its own delimited word with an unintended meaning — "root" in
+// view_root_cause_report still matches, since "root_cause" really is a
+// standalone "root" token; that's a keyword-taxonomy problem, not a
+// tokenization one. See https://github.com/Lelu-ai/lelu/pull/45.
+func actionKeywordToken(action string, keywords []string) bool {
+	tokens := strings.FieldsFunc(action, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	for _, tok := range tokens {
+		for _, k := range keywords {
+			if tok == k {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func actionCriticality(action string) float64 {
 	a := strings.ToLower(strings.TrimSpace(action))
 
@@ -213,23 +273,17 @@ func actionCriticality(action string) float64 {
 	mediumRisk := []string{"update", "write", "create", "modify", "issue", "change"}
 	lowRisk := []string{"read", "view", "list", "search", "get", "fetch"}
 
-	for _, k := range highRisk {
-		if strings.Contains(a, k) {
-			return 0.90
-		}
+	if actionKeywordToken(a, highRisk) {
+		return criticalityHigh
 	}
-	for _, k := range mediumRisk {
-		if strings.Contains(a, k) {
-			return 0.60
-		}
+	if actionKeywordToken(a, mediumRisk) {
+		return criticalityMedium
 	}
-	for _, k := range lowRisk {
-		if strings.Contains(a, k) {
-			return 0.25
-		}
+	if actionKeywordToken(a, lowRisk) {
+		return criticalityLow
 	}
 
-	return 0.50
+	return criticalityDefault
 }
 
 func riskScore(criticality float64, confidenceScore float64, reliability float64, anomalyFactor float64) float64 {

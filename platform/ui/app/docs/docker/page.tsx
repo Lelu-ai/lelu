@@ -376,7 +376,7 @@ TENANT_MINT_RATE_LIMIT=50
 
 # Optional: Risk thresholds
 RISK_ALLOW_THRESHOLD_LOW=0.30
-RISK_REVIEW_THRESHOLD_LOW=0.55`}
+RISK_REVIEW_THRESHOLD_LOW=0.75`}
             </pre>
           </div>
 

@@ -39,6 +39,7 @@ agent_scopes:
 
 func newDecisionHandler(t *testing.T, confCfg ConfidenceConfig) *Handler {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(internalSamplePolicy))
 	h, err := New(

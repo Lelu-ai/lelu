@@ -54,8 +54,26 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return newTestServerWithMode(t, server.EnforcementModeEnforce)
 }
 
+// clearRiskEnv resets every env var server.NewRiskConfigFromEnv reads, so
+// server.New() in these fixtures can't fail (or coincidentally succeed) on
+// an ambient RISK_* value left over in the developer's shell or CI
+// environment, now that a misordered or collapsed band is a hard startup
+// error rather than a silent clamp. Flagged by the Copilot review on PR #45.
+func clearRiskEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"RISK_ALLOW_THRESHOLD_LOW", "RISK_READONLY_THRESHOLD_LOW", "RISK_REVIEW_THRESHOLD_LOW",
+		"RISK_ALLOW_THRESHOLD_MID", "RISK_READONLY_THRESHOLD_MID", "RISK_REVIEW_THRESHOLD_MID",
+		"RISK_ALLOW_THRESHOLD_HIGH", "RISK_READONLY_THRESHOLD_HIGH", "RISK_REVIEW_THRESHOLD_HIGH",
+		"RISK_CRITICALITY_HIGH_MIN", "RISK_CRITICALITY_MID_MIN",
+	} {
+		t.Setenv(k, "")
+	}
+}
+
 func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.Server {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
@@ -83,6 +101,7 @@ func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.
 
 func newTestHTTPServerWithConfig(t *testing.T, policy []byte, apiKey string, q *queue.Queue) *httptest.Server {
 	t.Helper()
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(policy))
 
@@ -603,6 +622,7 @@ func TestQueueGet_NotFound(t *testing.T) {
 // ─── Rate limiting integration tests ─────────────────────────────────────────
 
 func TestRateLimit_AuthEndpoint(t *testing.T) {
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
@@ -666,6 +686,7 @@ func TestFallbackStatus_NilFallback(t *testing.T) {
 }
 
 func TestFallbackStatus_WithStrategy(t *testing.T) {
+	clearRiskEnv(t)
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 

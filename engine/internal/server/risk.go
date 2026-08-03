@@ -110,8 +110,19 @@ func NewRiskConfigFromEnv() (RiskConfig, error) {
 	cfg.HighCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_HIGH_MIN", cfg.HighCriticalityMin, 0, 1)
 	cfg.MidCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_MID_MIN", cfg.MidCriticalityMin, 0, 1)
 
-	if cfg.MidCriticalityMin > cfg.HighCriticalityMin {
-		cfg.MidCriticalityMin = cfg.HighCriticalityMin
+	// Same collapse shape as loadBandFromEnv, one level up: evaluate() picks
+	// the mid band via `else if criticality >= MidCriticalityMin`, which is
+	// only reachable when MidCriticalityMin < HighCriticalityMin. Clamping
+	// MidCriticalityMin down to HighCriticalityMin on a >= violation used to
+	// silently make that equal, deleting the mid band rather than shifting
+	// it — every action that should have used MidBand thresholds fell
+	// through to LowBand, the loosest of the three, with no error. See
+	// https://github.com/Lelu-ai/lelu/pull/45.
+	if cfg.MidCriticalityMin >= cfg.HighCriticalityMin {
+		return RiskConfig{}, fmt.Errorf(
+			"risk criticality boundaries misconfigured: no criticality value can resolve to the mid band, it is unreachable — RISK_CRITICALITY_MID_MIN (%.4f) must be strictly less than RISK_CRITICALITY_HIGH_MIN (%.4f)",
+			cfg.MidCriticalityMin, cfg.HighCriticalityMin,
+		)
 	}
 
 	return cfg, nil

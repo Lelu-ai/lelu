@@ -140,10 +140,31 @@ func TestRiskModel_FloatBoundaryEpsilon(t *testing.T) {
 	}
 }
 
+// riskEnvKeys are every environment variable NewRiskConfigFromEnv reads.
+// clearRiskEnv resets all of them via t.Setenv (auto-restored after the
+// test), so a test that only sets the two or three keys it cares about
+// can't pass — or fail — because of an unrelated RISK_* value left over
+// in the developer's shell or CI environment. Without this, a test
+// asserting an error can go green because an ambient LOW-band override
+// fails validation before the MID-band value under test is ever loaded,
+// without the code path under test running at all. Flagged by the
+// Copilot review and confirmed by reproduction on PR #45.
+var riskEnvKeys = []string{
+	"RISK_ALLOW_THRESHOLD_LOW", "RISK_READONLY_THRESHOLD_LOW", "RISK_REVIEW_THRESHOLD_LOW",
+	"RISK_ALLOW_THRESHOLD_MID", "RISK_READONLY_THRESHOLD_MID", "RISK_REVIEW_THRESHOLD_MID",
+	"RISK_ALLOW_THRESHOLD_HIGH", "RISK_READONLY_THRESHOLD_HIGH", "RISK_REVIEW_THRESHOLD_HIGH",
+	"RISK_CRITICALITY_HIGH_MIN", "RISK_CRITICALITY_MID_MIN",
+}
+
+func clearRiskEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range riskEnvKeys {
+		t.Setenv(k, "")
+	}
+}
+
 func TestNewRiskConfigFromEnv_Defaults(t *testing.T) {
-	t.Setenv("RISK_ALLOW_THRESHOLD_LOW", "")
-	t.Setenv("RISK_REVIEW_THRESHOLD_LOW", "")
-	t.Setenv("RISK_READONLY_THRESHOLD_LOW", "")
+	clearRiskEnv(t)
 
 	cfg, err := NewRiskConfigFromEnv()
 	if err != nil {
@@ -160,10 +181,11 @@ func TestNewRiskConfigFromEnv_Defaults(t *testing.T) {
 }
 
 func TestNewRiskConfigFromEnv_Overrides(t *testing.T) {
+	clearRiskEnv(t)
 	t.Setenv("RISK_ALLOW_THRESHOLD_HIGH", "0.03")
 	t.Setenv("RISK_READONLY_THRESHOLD_HIGH", "0.04")
 	t.Setenv("RISK_REVIEW_THRESHOLD_HIGH", "0.05")
-	t.Setenv("RISK_CRITICALITY_MID_MIN", "0.9")
+	t.Setenv("RISK_CRITICALITY_MID_MIN", "0.7")
 	t.Setenv("RISK_CRITICALITY_HIGH_MIN", "0.8")
 
 	cfg, err := NewRiskConfigFromEnv()
@@ -180,8 +202,29 @@ func TestNewRiskConfigFromEnv_Overrides(t *testing.T) {
 	if cfg.HighBand.Review != 0.05 {
 		t.Fatalf("expected high-band review override 0.05, got %.2f", cfg.HighBand.Review)
 	}
-	if cfg.MidCriticalityMin > cfg.HighCriticalityMin {
-		t.Fatalf("expected mid criticality <= high criticality, got mid=%.2f high=%.2f", cfg.MidCriticalityMin, cfg.HighCriticalityMin)
+	if cfg.MidCriticalityMin != 0.7 {
+		t.Fatalf("expected mid criticality override 0.7, got %.2f", cfg.MidCriticalityMin)
+	}
+	if cfg.HighCriticalityMin != 0.8 {
+		t.Fatalf("expected high criticality override 0.8, got %.2f", cfg.HighCriticalityMin)
+	}
+}
+
+// TestNewRiskConfigFromEnv_RejectsCollapsedCriticalityBoundary is the same
+// collapse shape as TestNewRiskConfigFromEnv_RejectsCollapsedBoundary, one
+// level up: MidCriticalityMin >= HighCriticalityMin makes evaluate()'s
+// `else if criticality >= MidCriticalityMin` branch unreachable, so every
+// action that should use MidBand thresholds silently falls through to
+// LowBand — the loosest of the three — instead. The old clamp
+// (MidCriticalityMin = HighCriticalityMin on violation) produced exactly
+// this state without erroring. See https://github.com/Lelu-ai/lelu/pull/45.
+func TestNewRiskConfigFromEnv_RejectsCollapsedCriticalityBoundary(t *testing.T) {
+	clearRiskEnv(t)
+	t.Setenv("RISK_CRITICALITY_MID_MIN", "0.85")
+	t.Setenv("RISK_CRITICALITY_HIGH_MIN", "0.80")
+
+	if _, err := NewRiskConfigFromEnv(); err == nil {
+		t.Fatal("expected an error when MidCriticalityMin >= HighCriticalityMin (mid band becomes unreachable), got nil")
 	}
 }
 
@@ -194,6 +237,7 @@ func TestNewRiskConfigFromEnv_Overrides(t *testing.T) {
 // unreachable for that band. Out-of-order thresholds must fail loudly
 // instead. See https://github.com/Lelu-ai/lelu/pull/45.
 func TestNewRiskConfigFromEnv_RejectsMisconfiguredBand(t *testing.T) {
+	clearRiskEnv(t)
 	t.Setenv("RISK_ALLOW_THRESHOLD_HIGH", "0.08")
 	t.Setenv("RISK_REVIEW_THRESHOLD_HIGH", "0.22")
 	t.Setenv("RISK_READONLY_THRESHOLD_HIGH", "0.40")
@@ -213,6 +257,7 @@ func TestNewRiskConfigFromEnv_RejectsMisconfiguredBand(t *testing.T) {
 // https://github.com/Lelu-ai/lelu/pull/45.
 func TestNewRiskConfigFromEnv_RejectsCollapsedBoundary(t *testing.T) {
 	t.Run("read_only equals review deletes review", func(t *testing.T) {
+		clearRiskEnv(t)
 		t.Setenv("RISK_ALLOW_THRESHOLD_MID", "0.15")
 		t.Setenv("RISK_READONLY_THRESHOLD_MID", "0.35")
 		t.Setenv("RISK_REVIEW_THRESHOLD_MID", "0.35")
@@ -223,6 +268,7 @@ func TestNewRiskConfigFromEnv_RejectsCollapsedBoundary(t *testing.T) {
 	})
 
 	t.Run("allow equals read_only deletes read_only", func(t *testing.T) {
+		clearRiskEnv(t)
 		t.Setenv("RISK_ALLOW_THRESHOLD_MID", "0.15")
 		t.Setenv("RISK_READONLY_THRESHOLD_MID", "0.15")
 		t.Setenv("RISK_REVIEW_THRESHOLD_MID", "0.35")

@@ -85,12 +85,27 @@ func DefaultRiskConfig() RiskConfig {
 	}
 }
 
-func NewRiskConfigFromEnv() RiskConfig {
+// NewRiskConfigFromEnv loads risk thresholds from the environment. It
+// returns an error rather than silently reordering a misconfigured band —
+// see loadBandFromEnv. A silent clamp would let a deployment carrying
+// pre-PR#45 RISK_REVIEW_THRESHOLD_*/RISK_READONLY_THRESHOLD_* overrides
+// start up with review collapsed into read_only for that band instead of
+// failing loudly, since the meaning of those two variables swapped, not
+// just their recommended values. See
+// https://github.com/Lelu-ai/lelu/pull/45.
+func NewRiskConfigFromEnv() (RiskConfig, error) {
 	cfg := DefaultRiskConfig()
 
-	cfg.LowBand = loadBandFromEnv("LOW", cfg.LowBand)
-	cfg.MidBand = loadBandFromEnv("MID", cfg.MidBand)
-	cfg.HighBand = loadBandFromEnv("HIGH", cfg.HighBand)
+	var err error
+	if cfg.LowBand, err = loadBandFromEnv("LOW", cfg.LowBand); err != nil {
+		return RiskConfig{}, err
+	}
+	if cfg.MidBand, err = loadBandFromEnv("MID", cfg.MidBand); err != nil {
+		return RiskConfig{}, err
+	}
+	if cfg.HighBand, err = loadBandFromEnv("HIGH", cfg.HighBand); err != nil {
+		return RiskConfig{}, err
+	}
 
 	cfg.HighCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_HIGH_MIN", cfg.HighCriticalityMin, 0, 1)
 	cfg.MidCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_MID_MIN", cfg.MidCriticalityMin, 0, 1)
@@ -99,23 +114,24 @@ func NewRiskConfigFromEnv() RiskConfig {
 		cfg.MidCriticalityMin = cfg.HighCriticalityMin
 	}
 
-	return cfg
+	return cfg, nil
 }
 
-func loadBandFromEnv(prefix string, fallback riskBandThresholds) riskBandThresholds {
+func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresholds, error) {
 	b := riskBandThresholds{
 		Allow:    getEnvFloatInRange("RISK_ALLOW_THRESHOLD_"+prefix, fallback.Allow, 0, 1),
-		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 		ReadOnly: getEnvFloatInRange("RISK_READONLY_THRESHOLD_"+prefix, fallback.ReadOnly, 0, 1),
+		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 	}
 
-	if b.ReadOnly < b.Allow {
-		b.ReadOnly = b.Allow
+	if b.ReadOnly < b.Allow || b.Review < b.ReadOnly {
+		return riskBandThresholds{}, fmt.Errorf(
+			"risk band %s misconfigured: need RISK_ALLOW_THRESHOLD_%s (%.4f) <= RISK_READONLY_THRESHOLD_%s (%.4f) <= RISK_REVIEW_THRESHOLD_%s (%.4f) — "+
+				"if these were set before PR #45, note RISK_REVIEW_THRESHOLD_%s and RISK_READONLY_THRESHOLD_%s swapped meaning, they didn't just get new recommended values",
+			prefix, prefix, b.Allow, prefix, b.ReadOnly, prefix, b.Review, prefix, prefix,
+		)
 	}
-	if b.Review < b.ReadOnly {
-		b.Review = b.ReadOnly
-	}
-	return b
+	return b, nil
 }
 
 func getEnvFloatInRange(key string, fallback float64, minVal float64, maxVal float64) float64 {

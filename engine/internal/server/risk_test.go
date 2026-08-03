@@ -145,7 +145,10 @@ func TestNewRiskConfigFromEnv_Defaults(t *testing.T) {
 	t.Setenv("RISK_REVIEW_THRESHOLD_LOW", "")
 	t.Setenv("RISK_READONLY_THRESHOLD_LOW", "")
 
-	cfg := NewRiskConfigFromEnv()
+	cfg, err := NewRiskConfigFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	def := DefaultRiskConfig()
 
 	if cfg.LowBand.Allow != def.LowBand.Allow {
@@ -156,25 +159,46 @@ func TestNewRiskConfigFromEnv_Defaults(t *testing.T) {
 	}
 }
 
-func TestNewRiskConfigFromEnv_OverridesAndNormalizes(t *testing.T) {
-	t.Setenv("RISK_ALLOW_THRESHOLD_HIGH", "0.05")
-	t.Setenv("RISK_REVIEW_THRESHOLD_HIGH", "0.04")
-	t.Setenv("RISK_READONLY_THRESHOLD_HIGH", "0.03")
+func TestNewRiskConfigFromEnv_Overrides(t *testing.T) {
+	t.Setenv("RISK_ALLOW_THRESHOLD_HIGH", "0.03")
+	t.Setenv("RISK_READONLY_THRESHOLD_HIGH", "0.04")
+	t.Setenv("RISK_REVIEW_THRESHOLD_HIGH", "0.05")
 	t.Setenv("RISK_CRITICALITY_MID_MIN", "0.9")
 	t.Setenv("RISK_CRITICALITY_HIGH_MIN", "0.8")
 
-	cfg := NewRiskConfigFromEnv()
+	cfg, err := NewRiskConfigFromEnv()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
-	if cfg.HighBand.Allow != 0.05 {
-		t.Fatalf("expected high-band allow override 0.05, got %.2f", cfg.HighBand.Allow)
+	if cfg.HighBand.Allow != 0.03 {
+		t.Fatalf("expected high-band allow override 0.03, got %.2f", cfg.HighBand.Allow)
 	}
-	if cfg.HighBand.Review < cfg.HighBand.Allow {
-		t.Fatalf("expected review >= allow, got review=%.2f allow=%.2f", cfg.HighBand.Review, cfg.HighBand.Allow)
+	if cfg.HighBand.ReadOnly != 0.04 {
+		t.Fatalf("expected high-band read_only override 0.04, got %.2f", cfg.HighBand.ReadOnly)
 	}
-	if cfg.HighBand.ReadOnly < cfg.HighBand.Review {
-		t.Fatalf("expected read_only >= review, got read_only=%.2f review=%.2f", cfg.HighBand.ReadOnly, cfg.HighBand.Review)
+	if cfg.HighBand.Review != 0.05 {
+		t.Fatalf("expected high-band review override 0.05, got %.2f", cfg.HighBand.Review)
 	}
 	if cfg.MidCriticalityMin > cfg.HighCriticalityMin {
 		t.Fatalf("expected mid criticality <= high criticality, got mid=%.2f high=%.2f", cfg.MidCriticalityMin, cfg.HighCriticalityMin)
+	}
+}
+
+// TestNewRiskConfigFromEnv_RejectsMisconfiguredBand locks in the fix for the
+// operational risk flagged in PR #45 review: a deployment carrying
+// pre-fix RISK_REVIEW_THRESHOLD_HIGH/RISK_READONLY_THRESHOLD_HIGH overrides
+// (0.22/0.40, matching the old, backwards ordering) must not start up with
+// those silently reordered — reordering would collapse ReadOnly and Review
+// to the same value (both clamped to 0.40), making outcomeReview completely
+// unreachable for that band. Out-of-order thresholds must fail loudly
+// instead. See https://github.com/Lelu-ai/lelu/pull/45.
+func TestNewRiskConfigFromEnv_RejectsMisconfiguredBand(t *testing.T) {
+	t.Setenv("RISK_ALLOW_THRESHOLD_HIGH", "0.08")
+	t.Setenv("RISK_REVIEW_THRESHOLD_HIGH", "0.22")
+	t.Setenv("RISK_READONLY_THRESHOLD_HIGH", "0.40")
+
+	if _, err := NewRiskConfigFromEnv(); err == nil {
+		t.Fatal("expected an error for out-of-order HIGH band thresholds (stale pre-PR#45 overrides), got nil")
 	}
 }

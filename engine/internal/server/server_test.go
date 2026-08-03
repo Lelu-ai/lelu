@@ -59,7 +59,7 @@ func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -74,6 +74,7 @@ func newTestServerWithMode(t *testing.T, mode server.EnforcementMode) *httptest.
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -85,7 +86,7 @@ func newTestHTTPServerWithConfig(t *testing.T, policy []byte, apiKey string, q *
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(policy))
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -100,6 +101,7 @@ func newTestHTTPServerWithConfig(t *testing.T, policy []byte, apiKey string, q *
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 
 	httpSrv := server.NewHTTPServer(":0", h)
 	return httptest.NewServer(httpSrv.Handler)
@@ -611,7 +613,7 @@ func TestRateLimit_AuthEndpoint(t *testing.T) {
 		},
 	})
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -626,6 +628,7 @@ func TestRateLimit_AuthEndpoint(t *testing.T) {
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)
@@ -671,7 +674,7 @@ func TestFallbackStatus_WithStrategy(t *testing.T) {
 		ControlPlaneMode: fallback.ModeClosed,
 	})
 
-	h := server.New(
+	h, err := server.New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -686,6 +689,7 @@ func TestFallbackStatus_WithStrategy(t *testing.T) {
 		nil, // telemetry
 		nil, // database — not needed in unit tests
 	)
+	require.NoError(t, err)
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	srv := httptest.NewServer(mux)

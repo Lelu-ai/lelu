@@ -41,7 +41,7 @@ func newDecisionHandler(t *testing.T, confCfg ConfidenceConfig) *Handler {
 	t.Helper()
 	eval := evaluator.New()
 	require.NoError(t, eval.LoadPolicyBytes(internalSamplePolicy))
-	return New(
+	h, err := New(
 		eval,
 		tokens.New(tokens.Config{SigningKey: "test-key"}),
 		confidence.New(),
@@ -56,6 +56,8 @@ func newDecisionHandler(t *testing.T, confCfg ConfidenceConfig) *Handler {
 		nil, // telemetry
 		nil, // db
 	)
+	require.NoError(t, err)
+	return h
 }
 
 func f64(v float64) *float64 { return &v }

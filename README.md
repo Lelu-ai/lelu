@@ -61,22 +61,13 @@ It's one HTTP call from any language or framework, every decision is written to 
 
 Okta tells you **who can do what**. Lelu tells you **when they're doing it wrong**. Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access — they can't detect when a *legitimately authorized* agent is being manipulated by prompt injection, acting on low confidence, or behaving anomalously. Lelu closes that gap.
 
-|  | OPA / Casbin / AWS AVP | **Lelu** |
-|---|:---:|:---:|
-| Role & permission checks | ✅ | ✅ YAML + Rego |
-| Prompt-injection detection | ❌ | ✅ 5-layer filter |
-| LLM confidence gating (verified log-probs) | ❌ | ✅ |
-| Human-in-the-loop pause → approve → resume | ❌ | ✅ Slack / Teams / PagerDuty |
-| Behavioral anomaly & reputation scoring | ❌ | ✅ |
-| Audit log of every decision | partial | ✅ |
+OPA, Casbin, and AWS AVP handle role & permission checks, but stop there. Lelu does that too, and adds:
 
-<p align="center">
-  <a href="https://lelu-ai.com/sandbox">
-    <img src="docs/assets/sandbox-deny.png" alt="Lelu blocking a destructive agent action (delete_all_records) in the live sandbox" width="760" />
-  </a>
-  <br/>
-  <em>A destructive agent action blocked by the default policy — <a href="https://lelu-ai.com/sandbox">try it live, no signup</a>.</em>
-</p>
+- Prompt-injection detection (5-layer filter)
+- LLM confidence gating on verified log-probs
+- Human-in-the-loop pause → approve → resume (Slack / Teams / PagerDuty)
+- Behavioral anomaly & reputation scoring
+- A full audit log of every decision
 
 ---
 
@@ -149,14 +140,12 @@ if (decision.decision === "allow") {
 
 Every action flows through a layered pipeline — the strictest outcome wins:
 
-| Layer | What it does |
-|------|--------------|
-| Prompt-injection filter | 5 layers: exact → homoglyph → fuzzy → structural → entropy |
-| Confidence gate | Verified LLM token log-probs¹ — low confidence → deny or downgrade |
-| Policy evaluator | YAML roles + OPA/Rego, deny-first, wildcard patterns |
-| Risk model | `criticality × (1 − confidence) × reliability × anomaly_factor` |
-| Human-review queue | Uncertain decisions pause for approval (Slack / Teams / PagerDuty) |
-| Behavioral analytics | Shadow-agent detection, reputation scoring, baseline drift alerts |
+- **Prompt-injection filter** — 5 layers: exact → homoglyph → fuzzy → structural → entropy
+- **Confidence gate** — verified LLM token log-probs¹ — low confidence → deny or downgrade
+- **Policy evaluator** — YAML roles + OPA/Rego, deny-first, wildcard patterns
+- **Risk model** — `criticality × (1 − confidence) × reliability × anomaly_factor`
+- **Human-review queue** — uncertain decisions pause for approval (Slack / Teams / PagerDuty)
+- **Behavioral analytics** — shadow-agent detection, reputation scoring, baseline drift alerts
 
 ¹ Read from the provider (OpenAI, some Bedrock families) — never self-reported by the agent. No signal available (e.g. Anthropic Claude)? The engine applies its `MissingSignalMode` policy instead of trusting a fabricated score.
 
@@ -168,13 +157,11 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 
 ## Examples
 
-| Example | What it shows |
-|---|---|
-| [quickstart](examples/quickstart) | The real engine on SQLite — one request per outcome, live prompt-injection catch |
-| [langchain](examples/langchain) | Gate a plain LangChain `StructuredTool` before execution |
-| [crewai](examples/crewai) | Gate CrewAI tool calls — a prompt-injected refund agent gets stopped |
-| [bedrock](examples/bedrock) | Gate Amazon Bedrock agents on the model's *own verified* confidence |
-| [agentgateway](examples/agentgateway) | Lelu as the decision brain behind agentgateway (ext-authz PEP) |
+- [quickstart](examples/quickstart) — the real engine on SQLite: one request per outcome, live prompt-injection catch
+- [langchain](examples/langchain) — gate a plain LangChain `StructuredTool` before execution
+- [crewai](examples/crewai) — gate CrewAI tool calls; a prompt-injected refund agent gets stopped
+- [bedrock](examples/bedrock) — gate Amazon Bedrock agents on the model's *own verified* confidence
+- [agentgateway](examples/agentgateway) — Lelu as the decision brain behind agentgateway (ext-authz PEP)
 
 SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp)
 
@@ -217,30 +204,6 @@ Contributions of every size are welcome — from a typo fix to a new framework i
 Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20first%20issue), grab a [`help wanted`](https://github.com/lelu-ai/lelu/labels/help%20wanted) task, or start a thread in [Discussions](https://github.com/lelu-ai/lelu/discussions). Setup and guidelines → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 **If Lelu is useful to you, [a ⭐ star](https://github.com/lelu-ai/lelu/stargazers) helps more people find it — and tells us to keep going.**
-
-## Contributors
-
-Thanks to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)) — contributions of any kind are welcome:
-
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Abenezer0923"><img src="https://avatars.githubusercontent.com/Abenezer0923?s=100" width="100px;" alt="Abenezer Getachew"/><br /><sub><b>Abenezer Getachew</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Abenezer0923" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=Abenezer0923" title="Documentation">📖</a> <a href="#infra-Abenezer0923" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-Abenezer0923" title="Maintenance">🚧</a></td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- markdownlint-restore -->
-<!-- prettier-ignore-end -->
-
-<!-- ALL-CONTRIBUTORS-LIST:END -->
-
-<a href="https://github.com/lelu-ai/lelu/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=lelu-ai/lelu" alt="Contributor avatars" />
-</a>
 
 ---
 

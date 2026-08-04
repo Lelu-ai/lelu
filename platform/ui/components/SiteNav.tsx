@@ -139,10 +139,8 @@ export function SiteNav() {
           </Link>
 
           {/* Desktop nav links */}
-          <nav className="hidden md:flex items-center gap-6">
-            {NAV_LINKS.filter((item) =>
-              ["Docs", "Pricing", "Sandbox", "About", "GitHub"].includes(item.name)
-            ).map((item) => {
+          <nav className="hidden md:flex items-center gap-5">
+            {NAV_LINKS.map((item) => {
               if (item.external) {
                 return (
                   <a
@@ -163,7 +161,7 @@ export function SiteNav() {
                   href={item.href}
                   className={`text-[13px] font-medium transition-colors ${
                     active
-                      ? "text-[#0A0A0A] dark:text-white"
+                      ? "text-[#0A0A0A] dark:text-white font-semibold"
                       : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white"
                   }`}
                 >
@@ -274,13 +272,14 @@ export function SiteNav() {
               </div>
             )}
 
-            {/* Mobile hamburger trigger (hidden on desktop md:hidden) */}
+            {/* Sidenav trigger button (accessible on desktop & mobile) */}
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden flex items-center justify-center w-9 h-9 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0D0E13] text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors"
-              aria-label="Open mobile Sidenav"
+              className="flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0D0E13] text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#12141A] transition-colors text-[13px] font-medium"
+              aria-label="Open Sidenav"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4 text-[#737373] dark:text-[#8B8D98]" />
+              <span className="hidden sm:inline font-mono text-[12px]">Menu</span>
             </button>
           </div>
         </div>
@@ -290,23 +289,23 @@ export function SiteNav() {
       <AnimatePresence>
         {mobileOpen && (
           <>
-            {/* Backdrop overlay (md:hidden) */}
+            {/* Backdrop overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-sm md:hidden"
+              className="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-sm"
             />
 
-            {/* Sidenav Drawer Panel (md:hidden) */}
+            {/* Sidenav Drawer Panel */}
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 350, damping: 32 }}
-              className="fixed top-0 left-0 bottom-0 z-[6001] w-[300px] max-w-[85vw] bg-white dark:bg-[#0A0B10] border-r border-[#E7E5E4] dark:border-[#20222B] shadow-2xl flex flex-col md:hidden overflow-hidden"
+              className="fixed top-0 left-0 bottom-0 z-[6001] w-[300px] max-w-[85vw] bg-white dark:bg-[#0A0B10] border-r border-[#E7E5E4] dark:border-[#20222B] shadow-2xl flex flex-col overflow-hidden"
             >
               {/* Sidenav Drawer Header */}
               <div className="h-16 px-5 flex items-center justify-between border-b border-[#E7E5E4] dark:border-[#20222B] shrink-0 bg-white/50 dark:bg-[#0A0B10]/50 backdrop-blur-md">

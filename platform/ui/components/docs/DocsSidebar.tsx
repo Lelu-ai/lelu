@@ -174,6 +174,7 @@ export function DocsSidebar() {
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
     sections.forEach((s) => {
@@ -197,221 +198,362 @@ export function DocsSidebar() {
     active?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [pathname]);
 
+  // Close mobile sidebar on pathname change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
   const toggleSection = (title: string) => {
     setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
   const isDark = resolvedTheme === "dark";
+  const activeItem = sections.flatMap((s) => s.items).find((i) => i.href === pathname);
+
+  const renderNavContent = () => (
+    <>
+      {/* Version selector */}
+      <button className="w-full mb-3 flex items-center gap-2 px-3 py-2 text-xs border border-[#E7E5E4] dark:border-[#20222B] rounded-md bg-white dark:bg-[#0A0B10] hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors text-left">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-[#737373] shrink-0"
+        >
+          <line x1="6" y1="3" x2="6" y2="15" />
+          <circle cx="18" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <path d="M18 9a9 9 0 0 1-9 9" />
+        </svg>
+        <span className="flex-1 font-medium text-[#0A0A0A] dark:text-white">v1.0</span>
+        <span className="text-[10px] text-[#737373] border border-[#E7E5E4] dark:border-[#20222B] px-1.5 py-0.5 rounded">
+          Latest
+        </span>
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className="text-[#737373]"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {/* Search */}
+      <button className="w-full mb-5 flex items-center gap-2 px-3 py-2 text-xs text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-md transition-colors">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
+        </svg>
+        <span className="flex-1 text-left">Search...</span>
+        <kbd className="flex items-center px-1.5 py-0.5 text-[10px] font-medium text-[#737373] bg-white dark:bg-[#0A0B10] border border-[#E7E5E4] dark:border-[#20222B] rounded">
+          ⌘K
+        </kbd>
+      </button>
+
+      {/* Navigation sections */}
+      <nav className="space-y-0.5">
+        {sections.map((section) => {
+          const isOpen = openSections[section.title];
+          const hasActive = section.items.some((item) => pathname === item.href);
+
+          return (
+            <div key={section.title}>
+              <button
+                onClick={() => toggleSection(section.title)}
+                className={[
+                  "w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold tracking-[0.05em] uppercase rounded-md transition-colors group",
+                  hasActive || isOpen
+                    ? "text-[#0A0A0A] dark:text-white"
+                    : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white",
+                ].join(" ")}
+              >
+                <span className="text-[#737373] group-hover:text-[#0A0A0A] dark:group-hover:text-white transition-colors shrink-0">
+                  {section.icon}
+                </span>
+                <span className="flex-1 text-left">{section.title}</span>
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`text-[#737373] transition-transform duration-200 shrink-0 ${
+                    isOpen ? "rotate-90" : ""
+                  }`}
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.ul
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.18, ease: "easeInOut" }}
+                    className="overflow-hidden mt-0.5 mb-1"
+                  >
+                    {section.items.map((item) => {
+                      const active = pathname === item.href;
+                      return (
+                        <li key={item.href + item.label}>
+                          <a
+                            href={item.href}
+                            onClick={() => setMobileOpen(false)}
+                            className={[
+                              "flex items-center py-1.5 pl-8 pr-3 -mx-3 text-[13px] transition-colors",
+                              active
+                                ? "is-active bg-[#F5F5F4] dark:bg-[#0D0E13] text-[#0A0A0A] dark:text-white font-medium"
+                                : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13]",
+                            ].join(" ")}
+                          >
+                            {item.label}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
+      </nav>
+    </>
+  );
 
   return (
-    <aside className="hidden md:flex flex-col w-[240px] shrink-0 sticky top-14 h-[calc(100vh-56px)] border-r border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0A0B10]">
-      {/* Scrollable nav area */}
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto overscroll-contain no-scrollbar py-5 px-3"
-      >
-        {/* Version selector */}
-        <button className="w-full mb-3 flex items-center gap-2 px-3 py-2 text-xs border border-[#E7E5E4] dark:border-[#20222B] rounded-md bg-white dark:bg-[#0A0B10] hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors text-left">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-[#737373] shrink-0"
-          >
-            <line x1="6" y1="3" x2="6" y2="15" />
-            <circle cx="18" cy="6" r="3" />
-            <circle cx="6" cy="18" r="3" />
-            <path d="M18 9a9 9 0 0 1-9 9" />
+    <>
+      {/* Mobile Bar on Docs pages */}
+      <div className="md:hidden sticky top-14 z-30 w-full bg-white/95 dark:bg-[#0A0B10]/95 backdrop-blur-md border-b border-[#E7E5E4] dark:border-[#20222B] px-4 py-2 flex items-center justify-between">
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] dark:text-white bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] px-3 py-1.5 rounded-lg hover:bg-[#E7E5E4] dark:hover:bg-[#1A1C24] transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
-          <span className="flex-1 font-medium text-[#0A0A0A] dark:text-white">v1.0</span>
-          <span className="text-[10px] text-[#737373] border border-[#E7E5E4] dark:border-[#20222B] px-1.5 py-0.5 rounded">
-            Latest
-          </span>
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            className="text-[#737373]"
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+          <span>Docs Menu</span>
+          {activeItem && (
+            <span className="text-[#737373] font-normal truncate max-w-[120px]">
+              - {activeItem.label}
+            </span>
+          )}
         </button>
+        <span className="text-[11px] font-mono font-medium text-[#737373] bg-[#F5F5F4] dark:bg-[#0D0E13] px-2 py-0.5 rounded border border-[#E7E5E4] dark:border-[#20222B]">
+          v1.0
+        </span>
+      </div>
 
-        {/* Search */}
-        <button className="w-full mb-5 flex items-center gap-2 px-3 py-2 text-xs text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-md transition-colors">
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
-          </svg>
-          <span className="flex-1 text-left">Search...</span>
-          <kbd className="flex items-center px-1.5 py-0.5 text-[10px] font-medium text-[#737373] bg-white dark:bg-[#0A0B10] border border-[#E7E5E4] dark:border-[#20222B] rounded">
-            ⌘K
-          </kbd>
-        </button>
-
-        {/* Navigation sections */}
-        <nav className="space-y-0.5">
-          {sections.map((section) => {
-            const isOpen = openSections[section.title];
-            const hasActive = section.items.some((item) => pathname === item.href);
-
-            return (
-              <div key={section.title}>
+      {/* Mobile Off-Canvas Docs Sidenav Drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileOpen(false)}
+              className="fixed inset-0 z-[6000] bg-black/60 backdrop-blur-sm md:hidden"
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 350, damping: 32 }}
+              className="fixed top-0 left-0 bottom-0 z-[6001] w-[280px] max-w-[85vw] bg-white dark:bg-[#0A0B10] border-r border-[#E7E5E4] dark:border-[#20222B] shadow-2xl flex flex-col md:hidden overflow-hidden"
+            >
+              <div className="h-14 px-4 flex items-center justify-between border-b border-[#E7E5E4] dark:border-[#20222B] shrink-0">
+                <span className="text-xs font-bold tracking-wider uppercase text-[#0A0A0A] dark:text-white">
+                  Documentation Nav
+                </span>
                 <button
-                  onClick={() => toggleSection(section.title)}
-                  className={[
-                    "w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-semibold tracking-[0.05em] uppercase rounded-md transition-colors group",
-                    hasActive || isOpen
-                      ? "text-[#0A0A0A] dark:text-white"
-                      : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white",
-                  ].join(" ")}
+                  onClick={() => setMobileOpen(false)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
                 >
-                  <span className="text-[#737373] group-hover:text-[#0A0A0A] dark:group-hover:text-white transition-colors shrink-0">
-                    {section.icon}
-                  </span>
-                  <span className="flex-1 text-left">{section.title}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 px-3">
+                {renderNavContent()}
+              </div>
+
+              <div className="px-4 py-3 border-t border-[#E7E5E4] dark:border-[#20222B] flex items-center gap-3 shrink-0">
+                <a
+                  href="https://github.com/lelu-ai/lelu"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+                  aria-label="GitHub"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                  </svg>
+                </a>
+                <button
+                  onClick={() => setTheme(isDark ? "light" : "dark")}
+                  className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+                  aria-label="Toggle theme"
+                >
                   <svg
-                    width="11"
-                    height="11"
+                    width="16"
+                    height="16"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2.5"
+                    strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={`text-[#737373] transition-transform duration-200 shrink-0 ${isOpen ? "rotate-90" : ""}`}
+                    className="dark:hidden"
                   >
-                    <path d="M9 18l6-6-6-6" />
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="hidden dark:block"
+                  >
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                   </svg>
                 </button>
-
-                <AnimatePresence initial={false}>
-                  {isOpen && (
-                    <motion.ul
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.18, ease: "easeInOut" }}
-                      className="overflow-hidden mt-0.5 mb-1"
-                    >
-                      {section.items.map((item) => {
-                        const active = pathname === item.href;
-                        return (
-                          <li key={item.href + item.label}>
-                            <a
-                              href={item.href}
-                              className={[
-                                "flex items-center py-1.5 pl-8 pr-3 -mx-3 text-[13px] transition-colors",
-                                active
-                                  ? "is-active bg-[#F5F5F4] dark:bg-[#0D0E13] text-[#0A0A0A] dark:text-white font-medium"
-                                  : "text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13]",
-                              ].join(" ")}
-                            >
-                              {item.label}
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </motion.ul>
-                  )}
-                </AnimatePresence>
               </div>
-            );
-          })}
-        </nav>
-      </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
-      {/* GitHub star CTA */}
-      <div className="px-4 pt-3 pb-1">
-        <a
-          href="https://github.com/lelu-ai/lelu"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] text-[12px] font-semibold text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex flex-col w-[240px] shrink-0 sticky top-14 h-[calc(100vh-56px)] border-r border-[#E7E5E4] dark:border-[#20222B] bg-white dark:bg-[#0A0B10]">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto overscroll-contain no-scrollbar py-5 px-3"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-          </svg>
-          Star on GitHub
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-yellow-500">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-          </svg>
-        </a>
-      </div>
+          {renderNavContent()}
+        </div>
 
-      {/* Bottom bar: GitHub + theme toggle */}
-      <div className="px-4 py-3 border-t border-[#E7E5E4] dark:border-[#20222B] flex items-center gap-3">
-        <a
-          href="https://github.com/lelu-ai/lelu"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
-          aria-label="GitHub"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-          </svg>
-        </a>
-        <button
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-          className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
-          aria-label="Toggle theme"
-        >
-          {/* Sun — shown in light mode */}
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="dark:hidden"
+        {/* GitHub star CTA */}
+        <div className="px-4 pt-3 pb-1">
+          <a
+            href="https://github.com/lelu-ai/lelu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-lg border border-[#E7E5E4] dark:border-[#20222B] text-[12px] font-semibold text-[#0A0A0A] dark:text-white hover:bg-[#F5F5F4] dark:hover:bg-[#0D0E13] transition-colors"
           >
-            <circle cx="12" cy="12" r="5" />
-            <line x1="12" y1="1" x2="12" y2="3" />
-            <line x1="12" y1="21" x2="12" y2="23" />
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-            <line x1="1" y1="12" x2="3" y2="12" />
-            <line x1="21" y1="12" x2="23" y2="12" />
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-          </svg>
-          {/* Moon — shown in dark mode */}
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="hidden dark:block"
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+            Star on GitHub
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="text-yellow-500"
+            >
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </a>
+        </div>
+
+        {/* Bottom bar: GitHub + theme toggle */}
+        <div className="px-4 py-3 border-t border-[#E7E5E4] dark:border-[#20222B] flex items-center gap-3">
+          <a
+            href="https://github.com/lelu-ai/lelu"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+            aria-label="GitHub"
           >
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </svg>
-        </button>
-      </div>
-    </aside>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
+          </a>
+          <button
+            onClick={() => setTheme(isDark ? "light" : "dark")}
+            className="text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+            aria-label="Toggle theme"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="dark:hidden"
+            >
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="hidden dark:block"
+            >
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

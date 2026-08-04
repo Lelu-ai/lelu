@@ -166,6 +166,38 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10] text-[#18181B] dark:text-[#EDEEF0] antialiased">
 
+      {/* ── NAV ─────────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-50 border-b border-[#E7E5E4] dark:border-white/[0.06] bg-[#FAFAFA]/85 dark:bg-[#0A0B10]/80 backdrop-blur-md">
+        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2.5">
+            <LeluMark size={18} />
+            <span className="text-[#0A0A0A] dark:text-white font-bold text-[14px] tracking-[0.08em] uppercase">Lelu</span>
+          </Link>
+          <div className="hidden sm:flex items-center gap-6 text-[13px] text-[#737373] dark:text-[#8B8D98]">
+            <Link href="/docs" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Docs</Link>
+            <Link href="/pricing" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Pricing</Link>
+            <Link href="/sandbox" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Sandbox</Link>
+            <Link href="/about" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">About</Link>
+            <a href="https://github.com/lelu-ai/lelu" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">GitHub</a>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link
+              href="/login"
+              className="hidden sm:block text-[13px] font-medium text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/docs/quickstart"
+              className="rounded-md bg-gradient-to-r from-[#8B5CF6] to-[#3B82F6] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:opacity-90 transition-opacity"
+            >
+              Get started
+            </Link>
+          </div>
+        </nav>
+      </header>
+
       {/* ── HERO ────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden px-4 pt-16 sm:pt-24 pb-12" aria-label="Hero">
         {/* backdrop glow */}

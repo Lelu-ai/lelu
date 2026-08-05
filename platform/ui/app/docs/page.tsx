@@ -234,14 +234,14 @@ export default function DocsPage() {
         <span className="inline-block mb-2 text-[12px] font-medium uppercase tracking-[0.08em] text-[#737373] dark:text-[#8B8D98] font-mono">
           Documentation
         </span>
-        <div className="flex items-start justify-between gap-4 mb-3">
+        <div className="flex flex-col items-start gap-2 mb-3 sm:flex-row sm:justify-between sm:gap-4">
           <h1
             id="introduction"
-            className="text-[34px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white leading-tight"
+            className="text-[28px] sm:text-[34px] font-bold tracking-[-0.02em] text-[#0A0A0A] dark:text-white leading-tight"
           >
             Introduction
           </h1>
-          <div className="flex items-center gap-4 shrink-0 pt-2">
+          <div className="flex items-center gap-4 shrink-0 sm:pt-2">
             <button
               onClick={copyMarkdown}
               className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.06em] uppercase text-[#737373] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"

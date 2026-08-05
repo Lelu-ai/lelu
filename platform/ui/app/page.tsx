@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { LeluMark } from "@/components/ui/LeluMark";
@@ -128,6 +128,14 @@ const STEPS = [
   },
 ];
 
+/* ── Mobile nav links (homepage header) ────────────────────────────── */
+const MOBILE_NAV = [
+  { name: "Docs", href: "/docs" },
+  { name: "Pricing", href: "/pricing" },
+  { name: "Sandbox", href: "/sandbox" },
+  { name: "About", href: "/about" },
+];
+
 const DECISIONS = [
   { label: "allow", color: "#30A46C", desc: "the action runs" },
   { label: "deny", color: "#E5484D", desc: "blocked, with a reason" },
@@ -141,6 +149,15 @@ export default function HomePage() {
   const [copied, setCopied] = useState(false);
   const [npxCopied, setNpxCopied] = useState(false);
   const [npmCopied, setNpmCopied] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close the mobile menu when the viewport grows past the sm breakpoint
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const handler = (e: MediaQueryListEvent) => { if (e.matches) setMobileOpen(false); };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   function copy() {
     navigator.clipboard.writeText(CODE[codeTab]).then(() => {
@@ -168,7 +185,7 @@ export default function HomePage() {
 
       {/* ── NAV ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 border-b border-[#E7E5E4] dark:border-white/[0.06] bg-[#FAFAFA]/85 dark:bg-[#0A0B10]/80 backdrop-blur-md">
-        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+        <nav className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2.5">
             <LeluMark size={18} />
             <span className="text-[#0A0A0A] dark:text-white font-bold text-[14px] tracking-[0.08em] uppercase">Lelu</span>
@@ -194,7 +211,64 @@ export default function HomePage() {
             >
               Get started
             </Link>
+
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              className="sm:hidden -mr-1 flex h-8 w-8 items-center justify-center text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white transition-colors"
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileOpen}
+              aria-controls="home-mobile-menu"
+            >
+              {mobileOpen ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+              )}
+            </button>
           </div>
+
+          {/* Mobile dropdown menu */}
+          {mobileOpen && (
+            <div
+              id="home-mobile-menu"
+              className="absolute inset-x-0 top-full sm:hidden border-b border-[#E7E5E4] dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-[#0A0B10] shadow-lg"
+            >
+              <div className="flex flex-col px-4 py-3 gap-0.5">
+                {MOBILE_NAV.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-md px-3 py-2.5 text-[14px] font-medium text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors"
+                  >
+                    {item.name}
+                  </Link>
+                ))}
+                <a
+                  href="https://github.com/lelu-ai/lelu"
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-md px-3 py-2.5 text-[14px] font-medium text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors"
+                >
+                  GitHub
+                </a>
+                <div className="my-2 h-px bg-[#E7E5E4] dark:bg-white/[0.06]" />
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-md px-3 py-2.5 text-[14px] font-medium text-[#737373] dark:text-[#8B8D98] hover:text-[#0A0A0A] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors"
+                >
+                  Sign in
+                </Link>
+              </div>
+            </div>
+          )}
         </nav>
       </header>
 

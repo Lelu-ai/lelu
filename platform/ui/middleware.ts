@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+
 const PROTECTED = ["/dashboard", "/audit", "/policies", "/traces", "/api-key", "/api/policies", "/admin", "/agents", "/nhi"];
 const SESSION_COOKIE = "lelu_session";
 

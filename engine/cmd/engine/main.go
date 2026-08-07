@@ -127,8 +127,9 @@ func main() {
 	// ── Database (Phase 2: Behavioral Analytics) ─────────────────────────────
 	var db *sql.DB
 	if behavioralAnalyticsEnabled {
-		// Ensure database directory exists
-		if err := os.MkdirAll("/var/lib/lelu", 0755); err != nil {
+		// Ensure the configured database's directory exists (respects a
+		// custom DATABASE_PATH rather than assuming the production default).
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 			log.Printf("warning: could not create database directory: %v", err)
 		}
 

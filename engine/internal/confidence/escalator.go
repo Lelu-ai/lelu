@@ -66,13 +66,16 @@ func (e *Escalator) Escalate(result *AuditResult, severity SeverityLevel) Escala
 		calibrated := e.calibrator.Calibrate(result.ExternalScore)
 		threshold := e.calibrator.Threshold()
 
+		// Very high calibrated probability → deny immediately. Checked before
+		// the review threshold since threshold+0.3 > threshold — the wider
+		// review check would otherwise always fire first and make this branch
+		// unreachable.
+		if calibrated >= threshold+0.3 {
+			return ActionDeny
+		}
 		// Calibrated threat probability above dynamic threshold → review.
 		if calibrated >= threshold {
 			return ActionReview
-		}
-		// Very high calibrated probability → deny immediately.
-		if calibrated >= threshold+0.3 {
-			return ActionDeny
 		}
 		return ActionAllow
 	}

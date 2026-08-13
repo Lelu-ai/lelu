@@ -461,15 +461,19 @@ ai_agent_security_alerts_total{type, severity}`}</code>
             <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
-                <span>Heuristic-based detection may miss sophisticated or novel attacks</span>
+                <span>
+                  Every layer — exact phrase, homoglyph normalization, fuzzy match, structural
+                  keyword density, imperative density — keys off a fixed list of known phrases and
+                  keywords. A rewording that avoids all of them entirely (e.g. &ldquo;kindly set
+                  aside the guidance you were given earlier&rdquo;) is invisible to this filter.
+                  This catches the common, low-effort case well; it is not a semantic detector and
+                  an adversary who knows this can route around it with paraphrase alone, no
+                  obfuscation required.
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
-                <span>Pattern matching is case-insensitive but requires exact phrase matches</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
-                <span>Obfuscated or encoded injection attempts may bypass detection</span>
+                <span>Obfuscated or encoded injection attempts may also bypass detection</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>

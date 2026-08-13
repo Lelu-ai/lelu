@@ -174,6 +174,29 @@ export default function DocsRiskAssessment() {
               </div>
             </div>
           </div>
+
+          <div className="bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-6">
+            <h3 className="font-medium text-zinc-900 dark:text-white mb-3">Where each term lives</h3>
+            <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+              <li>
+                <strong className="text-zinc-900 dark:text-white">reliability</strong> — tracked
+                per actor. With no database configured, it lives in memory only: it resets to the
+                new-actor default (fully trusted) on every engine restart, and isn&apos;t shared
+                across replicas if you run more than one. When a database is configured, the engine
+                also persists actor decision history to SQLite and uses that instead once an actor
+                has at least one recorded decision — reliability then survives restarts on that
+                host. It still isn&apos;t shared across replicas unless they point at the same
+                database file.
+              </li>
+              <li>
+                <strong className="text-zinc-900 dark:text-white">anomaly_count</strong> — the
+                number of denials for that actor inside a rolling 60-second window. This is
+                intentionally short-lived and in-memory only in every configuration: it exists to
+                react to a burst of denials right now, not to remember history, so it isn&apos;t
+                persisted.
+              </li>
+            </ul>
+          </div>
         </section>
 
         <section>

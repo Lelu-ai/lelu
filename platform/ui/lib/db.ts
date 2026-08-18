@@ -48,6 +48,15 @@ export async function ensureSchema(): Promise<void> {
     ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS plan_updated_at TIMESTAMPTZ
   `;
 
+  // Backfill for databases created before Stripe billing existed.
+  await sql`
+    ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT
+  `;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_lelu_users_stripe_customer
+      ON lelu_users (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL
+  `;
+
   // Backfill for databases created before OAuth-only (no password) users existed.
   await sql`
     ALTER TABLE lelu_users ALTER COLUMN password_hash DROP NOT NULL

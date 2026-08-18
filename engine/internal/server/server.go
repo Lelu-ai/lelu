@@ -907,7 +907,22 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 
 	// 3. Risk model with timing
 	riskStart := time.Now()
+	// actorStat is the always-on, in-memory fallback: correct with zero setup,
+	// but reliability resets to the new-actor default on every restart and
+	// isn't shared across replicas. When persistence is configured (db != nil,
+	// see New()), prefer the SQLite-backed reputation history instead — it
+	// survives restarts on this host. Still fall back to actorStat for actors
+	// reputationMgr hasn't seen yet (DecisionCount == 0) so a brand-new actor
+	// keeps the same "trusted until proven otherwise" default either way;
+	// reputationMgr's own zero-history default (0.5) is calibrated for its
+	// separate calibration-score use, not for this risk formula's reliability
+	// term, so it must not leak in here.
 	reliability := h.actorStat.reliability(req.Actor)
+	if h.reputationMgr != nil {
+		if rep, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil && rep.DecisionCount > 0 {
+			reliability = rep.AccuracyRate
+		}
+	}
 	anomalyCount := h.anomaly.currentCount(req.Actor)
 	// anomalyFactorDivisor: number of denials in the sliding window that maps to a
 	// 50% increase in risk score. anomalyFactorCap: maximum fractional increase.

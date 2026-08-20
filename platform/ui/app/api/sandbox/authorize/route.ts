@@ -68,6 +68,16 @@ const RULES: PolicyRule[] = [
     safeArgs: { environment: "staging", sandboxed: true },
   },
   {
+    // Bulk data movement is sensitive regardless of what else it's named —
+    // checked before the read-ops rule below so e.g. "export_customer_data"
+    // (which also matches nothing in the deny/review rules above) doesn't
+    // fall all the way through to DEFAULT_RULE's allow.
+    pattern: /export|download|dump|extract_all|bulk_(read|export|fetch)/i,
+    decision: "human_review",
+    reason: "Bulk data export requires human approval.",
+    rule: "review:bulk-data-export",
+  },
+  {
     pattern: /read|get|fetch|list|search|query|find|view|show|describe|inspect/i,
     decision: "allow",
     reason: "Read-only operations are permitted by the default policy.",

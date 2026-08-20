@@ -7,6 +7,27 @@ version: "1.0"
 # point POLICY_PATH to its location.
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Cross-cutting rules (checked before any role/scope logic) ────────────────
+# Bulk data movement is sensitive regardless of which agent scope requests
+# it — a scope's own allow list (e.g. cloud_customer's inherited "*") has no
+# way to know a given action is exfiltration-shaped, so it falls through to
+# allow. Route these to human_review here instead of trusting every scope to
+# independently cover the same verbs. Not an exhaustive taxonomy — a stopgap
+# for the obvious cases until scopes define real allowlists.
+rules:
+  - id: bulk-export-review
+    match: "*export*"
+    decision: human_review
+    reason: "Bulk data export requires human approval"
+  - id: bulk-download-review
+    match: "*download*"
+    decision: human_review
+    reason: "Bulk data download requires human approval"
+  - id: bulk-dump-review
+    match: "*dump*"
+    decision: human_review
+    reason: "Bulk data dump requires human approval"
+
 # ── Standard RBAC roles (humans) ─────────────────────────────────────────────
 roles:
   finance_manager:

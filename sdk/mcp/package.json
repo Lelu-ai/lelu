@@ -1,9 +1,10 @@
 {
   "name": "lelu-mcp",
-  "version": "0.0.32",
+  "version": "0.0.34",
   "description": "Model Context Protocol (MCP) server for Lelu — gives AI agents secure, policy-gated access to your infrastructure",
   "author": "Abenezer",
   "license": "MIT",
+  "mcpName": "io.github.Lelu-ai/lelu-mcp",
   "type": "module",
   "bin": {
     "lelu-mcp": "./dist/cli.js"
@@ -17,7 +18,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "start": "node dist/cli.js start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:server-json": "node scripts/check-server-json.mjs",
+    "prepublishOnly": "npm run build && npm run check:server-json"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",

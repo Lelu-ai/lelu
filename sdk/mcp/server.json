@@ -1,0 +1,35 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Lelu-ai/lelu-mcp",
+  "description": "Policy-gated authorization for AI agents — confidence-aware gating, human review, zero-config.",
+  "title": "Lelu",
+  "version": "0.0.34",
+  "repository": {
+    "url": "https://github.com/Lelu-ai/lelu",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "lelu-mcp",
+      "version": "0.0.34",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "LELU_ENGINE_URL",
+          "description": "Lelu Engine base URL. Omit to run a local engine automatically (zero-config mode).",
+          "isRequired": false
+        },
+        {
+          "name": "LELU_API_KEY",
+          "description": "Lelu Engine API key. Omit in zero-config local mode — a per-install key is generated automatically.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

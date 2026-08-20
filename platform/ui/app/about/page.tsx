@@ -36,21 +36,11 @@ const TEAM = [
   },
 ];
 
-const ADVISOR = {
-  initials: "TD",
-  name: "Tadese Destaw",
-  role: "Advisor",
-  title: "PhD Candidate · AI Researcher",
-  bio: "PhD candidate and active AI researcher advising Lelu on the frontier of autonomous agent behavior, model safety, and AI decision-making. Brings academic depth to Lelu's approach to confidence scoring, behavioral anomaly detection, and agent trust frameworks.",
-  avatarBg: "bg-gradient-to-br from-violet-600 to-indigo-600",
-  badge: "bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400",
-};
-
 const OVERVIEW = [
   { label: "Company", value: "Lelu AI" },
   { label: "Founded", value: "2026" },
   { label: "Founder", value: "Abenezer Getachew" },
-  { label: "Team", value: "3 members + 1 advisor" },
+  { label: "Team", value: "3 members" },
   { label: "Product", value: "Authorization Engine for AI Agents" },
   { label: "Status", value: "Live — 2,000+ SDK downloads" },
   { label: "SDKs", value: "TypeScript, Python" },
@@ -255,26 +245,6 @@ export default function AboutPage() {
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Advisor */}
-          <div className="mt-4">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-[#A3A3A3] mb-3 px-1">Advisor</p>
-            <div className="bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5">
-              <div className={`w-14 h-14 rounded-xl ${ADVISOR.avatarBg} flex items-center justify-center text-white text-lg font-bold shrink-0`}>
-                {ADVISOR.initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[15px] font-bold text-[#0A0A0A] dark:text-white">{ADVISOR.name}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${ADVISOR.badge}`}>
-                    {ADVISOR.role}
-                  </span>
-                </div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-[#A3A3A3] mb-3">{ADVISOR.title}</p>
-                <p className="text-[13px] text-[#737373] leading-relaxed">{ADVISOR.bio}</p>
-              </div>
-            </div>
           </div>
         </section>
 

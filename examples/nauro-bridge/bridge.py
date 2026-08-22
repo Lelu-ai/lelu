@@ -1,74 +1,58 @@
-"""Rough draft: push a resolved Lelu human_review decision into Nauro.
+"""Resolve a Lelu human_review and hand off a source packet — not a Nauro record.
 
 Flow:
   1. Ask Lelu to authorize an action that policy routes to human_review.
   2. Resolve the review (stands in for your real approval webhook/UI).
-  3. Translate the resolved ReviewItem into a Nauro propose_decision call,
-     made over MCP stdio against a `nauro serve` subprocess.
+  3. Build a minimal source packet identifying the resolved review.
+
+This script stops there. It does not call Nauro's propose_decision — see
+README.md for why: a Lelu approval resolves one runtime action, it is not
+Nauro judgment. Whether any of the reasoning behind it should become a
+durable project decision is a separate, human-gated call that belongs to
+the agent session working the Nauro side (check_decision against related
+judgment, draft the exact proposal, get it approved, then propose_decision)
+— not something this script should decide unattended.
+
+The packet deliberately carries only review_id plus non-sensitive metadata,
+not the resolution note itself: an agent session that needs the actual
+reasoning can call get_review(review_id) fresh when it's ready to draft a
+proposal, rather than this script copying sensitive review content into an
+intermediate structure that outlives its reason for existing.
 
 Requires:
   - A running Lelu engine (`npx -y lelu-mcp start`, or set LELU_BASE_URL).
-  - A Nauro project: `pip install nauro && nauro init` in NAURO_PROJECT_DIR.
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
-from pathlib import Path
-
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+import json
 
 from auth_pe import AuthorizeRequest, LeluClient
 from auth_pe.models import AgentContext, ReviewItem
 
-NAURO_PROJECT_DIR = Path(os.environ.get("NAURO_PROJECT_DIR", "."))
 
-
-def confidence_tier(score: float) -> str:
-    """Map Lelu's 0.0-1.0 confidence_score to Nauro's low/medium/high tiers."""
-    if score >= 0.8:
-        return "high"
-    if score >= 0.5:
-        return "medium"
-    return "low"
-
-
-def to_nauro_decision(review: ReviewItem) -> dict:
-    """Shape a resolved Lelu ReviewItem as a Nauro propose_decision call.
-
-    decision_type/reversibility are placeholders — need Nauro's canonical
-    enum values from nauro_core.constants before this is more than a draft.
-    """
-    resource = ", ".join(f"{k}={v}" for k, v in (review.resource or {}).items())
-    title = f"{review.action}" + (f" ({resource})" if resource else "")
-    rationale = review.resolution_note or review.reason or "No reasoning recorded."
-
+def to_source_packet(review: ReviewItem) -> dict:
+    """The smallest packet that identifies a resolved review without copying
+    its reasoning. review_id (not request_id/trace_id — those identify the
+    authorization trace, not the queue item, and can't be used to look the
+    review back up) is the load-bearing field; an agent session fetches full
+    detail via get_review(review_id) only if it decides there's something
+    here worth carrying forward."""
     return {
-        "title": title[:120],
-        "rationale": f"[via Lelu review {review.id}, resolved by {review.resolved_by or 'unknown'}] {rationale}",
-        "operation": "add",
-        "confidence": confidence_tier(review.confidence_score),
-        "decision_type": "policy",  # placeholder — confirm against nauro_core.constants
-        "reversibility": "reversible",  # placeholder — same
+        "review_id": review.id,
+        "action": review.action,
+        "status": review.status,
+        "resolved_by": review.resolved_by,
+        "resolved_at": review.resolved_at.isoformat() if review.resolved_at else None,
     }
-
-
-async def push_to_nauro(decision: dict) -> dict:
-    server = StdioServerParameters(command="nauro", args=["serve"], cwd=str(NAURO_PROJECT_DIR))
-    async with stdio_client(server) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool("propose_decision", decision)
-            return result
 
 
 async def main() -> None:
     async with LeluClient() as lelu:
         decision = await lelu.authorize(
             AuthorizeRequest(
-                tool="issue_refund",
+                tool="process_refund_payment",
                 actor="refund_bot",
                 context=AgentContext(confidence=0.62, acting_for="user_42"),
                 args={"invoice_id": "INV-1001", "amount": 750},
@@ -79,23 +63,22 @@ async def main() -> None:
             print(f"Expected human_review for this demo, got: {decision.decision}")
             return
 
-        print(f"Paused for review: {decision.request_id} — {decision.reason}")
+        print(f"Paused for review: {decision.review_id} — {decision.reason}")
 
         # Stand-in for your real approval flow: a human decides and attaches
         # a note explaining why. In production this comes from your own
         # webhook/UI, not an immediate auto-approve.
         await lelu.approve_review(
-            decision.request_id,
+            decision.review_id,
             resolved_by="finance-oncall@example.com",
             note="Confirmed duplicate charge against Stripe records — approved.",
         )
 
-        review = await lelu.get_review(decision.request_id)
-        nauro_call = to_nauro_decision(review)
-        print(f"Pushing to Nauro: {nauro_call['title']!r}")
+        review = await lelu.get_review(decision.review_id)
+        packet = to_source_packet(review)
 
-        result = await push_to_nauro(nauro_call)
-        print(f"Nauro decision recorded: {result}")
+        print("Source packet (hand this to the agent session — nothing further runs here):")
+        print(json.dumps(packet, indent=2))
 
 
 if __name__ == "__main__":

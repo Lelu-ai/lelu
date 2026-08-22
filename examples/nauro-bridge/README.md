@@ -45,7 +45,7 @@ Requires a running Lelu engine (`npx -y lelu-mcp start`, or point `LELU_BASE_URL
 at one).
 
 ```bash
-pip install "../../sdk/python[all]"
+pip install "../../sdk/python"
 python bridge.py
 ```
 

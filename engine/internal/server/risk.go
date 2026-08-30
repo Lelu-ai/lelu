@@ -128,15 +128,18 @@ func NewRiskConfigFromEnv() (RiskConfig, error) {
 	return cfg, nil
 }
 
-// loadBandFromEnv requires strict ordering — Allow < ReadOnly < Review, not
-// merely non-decreasing. The switch in evaluate() uses <= at each boundary,
-// so an equal pair (e.g. ReadOnly == Review) isn't a no-op: whichever
-// outcome is checked first in the switch consumes the entire shared
-// boundary, and the other outcome becomes unreachable for that band with no
-// error and no visible sign anything is wrong. A non-strict Allow<=ReadOnly
-// <=Review check can't distinguish that collapse from a valid ordering,
-// since the collapsed state satisfies it too. See
-// https://github.com/Lelu-ai/lelu/pull/45.
+// loadBandFromEnv requires each adjacent threshold to be separated by more
+// than riskScoreEpsilon, not merely strictly ordered. evaluate() applies
+// riskScoreEpsilon to each score boundary, so a positive-but-too-small gap
+// can still be completely consumed by the preceding outcome and make the
+// next outcome unreachable.
+//
+// In other words, valid bands must satisfy:
+//
+//	Allow + riskScoreEpsilon < ReadOnly
+//	ReadOnly + riskScoreEpsilon < Review
+//
+// See https://github.com/Lelu-ai/lelu/issues/49.
 func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresholds, error) {
 	b := riskBandThresholds{
 		Allow:    getEnvFloatInRange("RISK_ALLOW_THRESHOLD_"+prefix, fallback.Allow, 0, 1),
@@ -144,22 +147,23 @@ func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresh
 		Review:   getEnvFloatInRange("RISK_REVIEW_THRESHOLD_"+prefix, fallback.Review, 0, 1),
 	}
 
-	if b.ReadOnly <= b.Allow {
+	if b.ReadOnly <= b.Allow+riskScoreEpsilon {
 		return riskBandThresholds{}, fmt.Errorf(
-			"risk band %s misconfigured: no risk score can resolve to read_only in this band — RISK_ALLOW_THRESHOLD_%s (%.4f) must be strictly less than RISK_READONLY_THRESHOLD_%s (%.4f)",
-			prefix, prefix, b.Allow, prefix, b.ReadOnly,
+			"risk band %s misconfigured: no risk score can resolve to read_only in this band — RISK_READONLY_THRESHOLD_%s (%.10f) must exceed RISK_ALLOW_THRESHOLD_%s (%.10f) by more than riskScoreEpsilon (%g)",
+			prefix, prefix, b.ReadOnly, prefix, b.Allow, riskScoreEpsilon,
 		)
 	}
-	if b.Review <= b.ReadOnly {
+
+	if b.Review <= b.ReadOnly+riskScoreEpsilon {
 		return riskBandThresholds{}, fmt.Errorf(
-			"risk band %s misconfigured: no risk score in this band can resolve to review, human review is unreachable — RISK_READONLY_THRESHOLD_%s (%.4f) must be strictly less than RISK_REVIEW_THRESHOLD_%s (%.4f). "+
+			"risk band %s misconfigured: no risk score in this band can resolve to review, human review is unreachable — RISK_REVIEW_THRESHOLD_%s (%.10f) must exceed RISK_READONLY_THRESHOLD_%s (%.10f) by more than riskScoreEpsilon (%g). "+
 				"If these were set before PR #45, note RISK_REVIEW_THRESHOLD_%s and RISK_READONLY_THRESHOLD_%s swapped meaning, they didn't just get new recommended values",
-			prefix, prefix, b.ReadOnly, prefix, b.Review, prefix, prefix,
+			prefix, prefix, b.Review, prefix, b.ReadOnly, riskScoreEpsilon, prefix, prefix,
 		)
 	}
+
 	return b, nil
 }
-
 func getEnvFloatInRange(key string, fallback float64, minVal float64, maxVal float64) float64 {
 	v, ok := os.LookupEnv(key)
 	if !ok || strings.TrimSpace(v) == "" {

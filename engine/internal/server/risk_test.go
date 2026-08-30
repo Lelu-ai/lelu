@@ -1,6 +1,9 @@
 package server
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // ─── https://github.com/Lelu-ai/lelu/issues/44 ────────────────────────────────
 
@@ -277,4 +280,156 @@ func TestNewRiskConfigFromEnv_RejectsCollapsedBoundary(t *testing.T) {
 			t.Fatal("expected an error when Allow == ReadOnly (read_only becomes unreachable), got nil")
 		}
 	})
+}
+
+func TestNewRiskConfigFromEnv_RejectsGapAtOrBelowEpsilon(t *testing.T) {
+	tests := []struct {
+		name     string
+		allow    string
+		readOnly string
+		review   string
+	}{
+		{
+			name:     "allow to read_only gap below epsilon",
+			allow:    "0.15",
+			readOnly: "0.1500000001",
+			review:   "0.35",
+		},
+		{
+			name:     "allow to read_only gap equals epsilon",
+			allow:    "0.15",
+			readOnly: "0.150000001",
+			review:   "0.35",
+		},
+		{
+			name:     "read_only to review gap below epsilon",
+			allow:    "0.15",
+			readOnly: "0.35",
+			review:   "0.3500000001",
+		},
+		{
+			name:     "read_only to review gap equals epsilon",
+			allow:    "0.15",
+			readOnly: "0.35",
+			review:   "0.350000001",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearRiskEnv(t)
+
+			t.Setenv("RISK_ALLOW_THRESHOLD_MID", tt.allow)
+			t.Setenv("RISK_READONLY_THRESHOLD_MID", tt.readOnly)
+			t.Setenv("RISK_REVIEW_THRESHOLD_MID", tt.review)
+
+			_, err := NewRiskConfigFromEnv()
+			if err == nil {
+				t.Fatal("expected an error when adjacent risk thresholds are separated by no more than riskScoreEpsilon, got nil")
+			}
+
+			if !strings.Contains(err.Error(), "riskScoreEpsilon") {
+				t.Fatalf("expected error to mention riskScoreEpsilon, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestNewRiskConfigFromEnv_AcceptsGapAboveEpsilon(t *testing.T) {
+	tests := []struct {
+		name     string
+		allow    string
+		readOnly string
+		review   string
+	}{
+		{
+			name:     "allow to read_only gap just above epsilon",
+			allow:    "0.15",
+			readOnly: "0.1500000011",
+			review:   "0.35",
+		},
+		{
+			name:     "read_only to review gap just above epsilon",
+			allow:    "0.15",
+			readOnly: "0.35",
+			review:   "0.3500000011",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearRiskEnv(t)
+
+			t.Setenv("RISK_ALLOW_THRESHOLD_MID", tt.allow)
+			t.Setenv("RISK_READONLY_THRESHOLD_MID", tt.readOnly)
+			t.Setenv("RISK_REVIEW_THRESHOLD_MID", tt.review)
+
+			if _, err := NewRiskConfigFromEnv(); err != nil {
+				t.Fatalf("expected thresholds separated by more than riskScoreEpsilon to be accepted, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestRiskModel_AboveEpsilonGapKeepsReadOnlyReachable(t *testing.T) {
+	clearRiskEnv(t)
+
+	// The Allow -> ReadOnly gap is only slightly larger than
+	// riskScoreEpsilon, but it is large enough that a real risk score can
+	// still land in the ReadOnly region at runtime.
+	t.Setenv("RISK_ALLOW_THRESHOLD_MID", "0.15")
+	t.Setenv("RISK_READONLY_THRESHOLD_MID", "0.1500000011")
+	t.Setenv("RISK_REVIEW_THRESHOLD_MID", "0.35")
+
+	cfg, err := NewRiskConfigFromEnv()
+	if err != nil {
+		t.Fatalf("expected just-above-epsilon band gap to be valid, got: %v", err)
+	}
+
+	m := newRiskModel(cfg)
+
+	if got := actionCriticality("restart_service"); got != 0.50 {
+		t.Fatalf("actionCriticality(\"restart_service\") = %.2f, want 0.50 (fixture assumption broken)", got)
+	}
+
+	tests := []struct {
+		name       string
+		confidence float64
+		want       decisionOutcome
+	}{
+		{
+			name:       "allow",
+			confidence: 0.70,
+			want:       outcomeAllow,
+		},
+		{
+			// criticality=0.5 and confidence=0.699999997 produce a risk
+			// score of roughly 0.1500000015. That is above
+			// Allow+riskScoreEpsilon (0.150000001) but below
+			// ReadOnly+riskScoreEpsilon (0.1500000021).
+			name:       "read_only remains reachable",
+			confidence: 0.699999997,
+			want:       outcomeReadOnly,
+		},
+		{
+			name:       "review",
+			confidence: 0.60,
+			want:       outcomeReview,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dec := m.evaluate("restart_service", tt.confidence, 1.0, 1.0)
+			if dec.Outcome != tt.want {
+				t.Fatalf(
+					"confidence %.9f produced risk score %.12f and outcome %v, want %v",
+					tt.confidence,
+					dec.Score,
+					dec.Outcome,
+					tt.want,
+				)
+			}
+		})
+	}
 }

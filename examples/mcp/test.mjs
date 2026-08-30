@@ -46,6 +46,23 @@ console.log("Running Lelu MCP Authorization tests...");
     assert.equal(denyRes.allowed, false);
     assert.equal(denyRes.decision, "deny");
     console.log("✔ Lelu DENY scenario passed");
+
+    // 2d. Compute redirect scenario — allowed:true on the wire, same as a
+    // clean allow, but must NOT be treated as one: it carries its own
+    // safe_tool/safe_args that the caller must run instead of the original.
+    mockDecision = {
+      allowed: true,
+      compute: true,
+      safe_tool: "read_customer_data",
+      safe_args: { customer_id: "c_123" },
+      reason: "Refund redirected to a read-only lookup pending review",
+    };
+    const computeRes = await authorizeToolCall("issue_refund", { customer_id: "c_123", amount_usd: 1000 });
+    assert.equal(computeRes.allowed, false, "compute redirect must not be treated as a plain allow");
+    assert.equal(computeRes.decision, "compute");
+    assert.equal(computeRes.safe_tool, "read_customer_data");
+    assert.deepEqual(computeRes.safe_args, { customer_id: "c_123" });
+    console.log("✔ Lelu COMPUTE redirect scenario passed");
   } finally {
     mockServer.close();
   }

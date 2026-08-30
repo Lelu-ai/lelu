@@ -10,5 +10,5 @@
   },
   "keywords": ["mcp", "lelu", "authorization", "agent-security", "human-in-the-loop"],
   "author": "Lelu Maintainers",
-  "license": "Apache-2.0"
+  "license": "MIT"
 }

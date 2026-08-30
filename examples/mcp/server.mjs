@@ -16,7 +16,7 @@
 import readline from "node:readline";
 
 function getLeluUrl() {
-  return process.env.LELU_URL ?? "http://localhost:8088";
+  return process.env.LELU_URL ?? "http://localhost:8080";
 }
 
 function getLeluApiKey() {
@@ -99,15 +99,26 @@ export async function authorizeToolCall(toolName, args, actor = getActorId()) {
       ? "human_review"
       : data.downgraded_scope
       ? "downgraded"
+      : data.compute
+      ? "compute"
       : data.allowed
       ? "allow"
       : "deny";
 
     return {
-      allowed: Boolean(data.allowed && !data.requires_human_review && !data.downgraded_scope),
+      // `allowed: true` alone isn't enough — Lelu represents a downgraded-scope
+      // and a compute redirect the same way on the wire as a clean allow (see
+      // engine/CHANGELOG.md). Executing the original tool/args on either would
+      // run it at full, unrestricted scope. compute in particular carries its
+      // own replacement tool/args (safe_tool/safe_args) that must be used
+      // instead of the ones the caller asked for.
+      allowed: Boolean(data.allowed && !data.requires_human_review && !data.downgraded_scope && !data.compute),
       decision,
       requires_human_review: Boolean(data.requires_human_review),
       downgraded_scope: data.downgraded_scope,
+      compute: Boolean(data.compute),
+      safe_tool: data.safe_tool,
+      safe_args: data.safe_args,
       reason: data.reason ?? "Policy evaluated by Lelu",
       trace_id: data.trace_id,
     };
@@ -201,6 +212,37 @@ async function handleMessage(msg) {
             ],
           },
         };
+      }
+
+      if (authResult.compute) {
+        // Lelu redirected this call to a safer tool/args instead of the ones
+        // requested — run those, not the original. Never fall back to
+        // toolName/args here: that would execute the exact call Lelu decided
+        // was unsafe as originally requested.
+        try {
+          const output = executeTool(authResult.safe_tool, authResult.safe_args ?? {});
+          return {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              content: [
+                {
+                  type: "text",
+                  text: `🧪 [LELU COMPUTE REDIRECT] '${toolName}' was redirected to '${authResult.safe_tool}' by policy.\nReason: ${authResult.reason}\n\n${JSON.stringify(output, null, 2)}`,
+                },
+              ],
+            },
+          };
+        } catch (err) {
+          return {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              isError: true,
+              content: [{ type: "text", text: `🧪 [LELU COMPUTE REDIRECT] '${toolName}' was redirected to '${authResult.safe_tool}', but it failed: ${err.message}` }],
+            },
+          };
+        }
       }
 
       return {

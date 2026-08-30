@@ -1,0 +1,14 @@
+﻿{
+  "name": "lelu-mcp-example",
+  "version": "0.1.0",
+  "description": "Authorize MCP (Model Context Protocol) tool calls in real time using Lelu",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test.mjs"
+  },
+  "keywords": ["mcp", "lelu", "authorization", "agent-security", "human-in-the-loop"],
+  "author": "Lelu Maintainers",
+  "license": "Apache-2.0"
+}

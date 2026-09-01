@@ -224,6 +224,16 @@ func main() {
 		log.Fatalf("RSA signing key: %v", rsaErr)
 	}
 
+	// Sign audit receipts (AARM R5/R6) with the same key, independent of
+	// whether DATABASE_PATH/db is configured below — the identity registry
+	// needs a DB, receipt signing doesn't.
+	if kid, err := audit.DeriveKeyID(&rsaKey.PublicKey); err != nil {
+		log.Printf("warning: audit receipt signing disabled: %v", err)
+	} else {
+		auditWriter.SetSigner(rsaKey, kid)
+		log.Printf("audit receipts: signing enabled (kid: %s)", kid)
+	}
+
 	var identityReg *identity.Registry
 	var mcpAuthSvc *mcpauth.Server
 	if db != nil {

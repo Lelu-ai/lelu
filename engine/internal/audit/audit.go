@@ -28,7 +28,11 @@ type Event struct {
 	ConfidenceScore float64           `json:"confidence_score,omitempty"`
 	// ConfidenceVerified is true only when ConfidenceScore came from a verified
 	// provider signal rather than a self-reported/unverified fallback.
-	ConfidenceVerified bool    `json:"confidence_verified,omitempty"`
+	ConfidenceVerified bool `json:"confidence_verified,omitempty"`
+	// ActorVerified is true only when Actor came from a signed WorkloadToken
+	// validated against the identity registry, not the self-reported "actor"
+	// field.
+	ActorVerified bool    `json:"actor_verified,omitempty"`
 	Decision           string  `json:"decision"` // "allowed" | "denied" | "human_review" | "compute" | "shadow_detected"
 	Reason             string  `json:"reason,omitempty"`
 	DowngradedScope    string  `json:"downgraded_scope,omitempty"`

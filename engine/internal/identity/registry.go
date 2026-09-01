@@ -298,6 +298,54 @@ func (r *Registry) IssueToken(ctx context.Context, agentID string) (*WorkloadTok
 	}, nil
 }
 
+// VerifiedAgent is the output of VerifyToken() — the caller-independent facts
+// about who made the request, derived entirely from a signature this package
+// controls rather than from anything the caller merely claimed.
+type VerifiedAgent struct {
+	AgentID  string
+	TenantID string
+	Scopes   []string
+}
+
+// VerifyToken checks a WorkloadToken's signature, expiry, and issuer/audience
+// against this registry's own key, then confirms the agent it names is still
+// active. The active-status check is what makes SetStatus(..., Revoked)
+// actually revoke access before expiry — signature and exp alone can't do
+// that, since a revoked agent's already-issued JWT still verifies fine right
+// up to the moment it expires.
+func (r *Registry) VerifyToken(ctx context.Context, raw string) (*VerifiedAgent, error) {
+	var claims jwt.MapClaims
+	_, err := jwt.ParseWithClaims(raw, &claims, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return &r.signingKey.PublicKey, nil
+	}, jwt.WithIssuer(r.issuer), jwt.WithAudience("lelu"))
+	if err != nil {
+		return nil, fmt.Errorf("identity: verify token: %w", err)
+	}
+
+	agentID, _ := claims["lelu_agent_id"].(string)
+	if agentID == "" {
+		return nil, fmt.Errorf("identity: token missing lelu_agent_id claim")
+	}
+
+	agent, err := r.Get(ctx, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("identity: verify token: %w", err)
+	}
+	if agent.Status != AgentStatusActive {
+		return nil, fmt.Errorf("identity: agent %q is %s", agentID, agent.Status)
+	}
+
+	var scopes []string
+	if s, _ := claims["scope"].(string); s != "" {
+		scopes = strings.Split(s, " ")
+	}
+
+	return &VerifiedAgent{AgentID: agentID, TenantID: agent.TenantID, Scopes: scopes}, nil
+}
+
 // ── OIDC / JWKS ───────────────────────────────────────────────────────────────
 
 // JWKSResponse returns the JSON Web Key Set (RFC 7517) for this registry's

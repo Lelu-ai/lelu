@@ -573,6 +573,12 @@ type agentAuthorizeResponse struct {
 	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
 	EffectiveScope      string  `json:"effective_scope,omitempty"`
 	RequiresHumanReview bool    `json:"requires_human_review"`
+	// ActorVerified is true only when Actor came from a signed WorkloadToken
+	// (X-Lelu-Agent-Token) validated against the identity registry, not from
+	// the self-reported "actor" field in the request body. Mirrors
+	// ConfidenceVerified — lets callers/auditors tell a proven identity apart
+	// from a claimed one.
+	ActorVerified bool `json:"actor_verified"`
 	// ReviewID is the queue item ID when RequiresHumanReview is true — the
 	// caller needs this to poll GET /v1/queue/{id}, long-poll
 	// /v1/queue/{id}/wait, or resolve it via approve/deny. Without it, a
@@ -823,6 +829,23 @@ type agentDecisionResult struct {
 // stop. When handled=false the result carries the response plus the inputs the
 // async analytics needs.
 func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWriter, r *http.Request, req agentAuthorizeRequest, span trace.Span, start time.Time, inputHash string) (agentDecisionResult, bool) {
+	// Optional verified identity: if the caller presents a signed WorkloadToken,
+	// override the self-reported Actor with the identity the token actually
+	// proves rather than trusting the request body's claim. A token that's
+	// present but invalid fails closed rather than silently falling back to
+	// the unverified claim — falling back would let an attacker probe for a
+	// working token for free, with a wrong guess costing nothing.
+	actorVerified := false
+	if tok := r.Header.Get("X-Lelu-Agent-Token"); tok != "" && h.identityReg != nil {
+		va, err := h.identityReg.VerifyToken(ctx, tok)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, fmt.Sprintf("agent token: %v", err))
+			return agentDecisionResult{}, true
+		}
+		req.Actor = va.AgentID
+		actorVerified = true
+	}
+
 	confidenceScore, missingSignal, confidenceVerified, err := h.resolveConfidence(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
@@ -1046,6 +1069,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		ReviewID:            reviewID,
 		ConfidenceUsed:      confidenceScore,
 		ConfidenceVerified:  confidenceVerified,
+		ActorVerified:       actorVerified,
 		RiskScore:           riskDec.Score,
 		RiskCriticality:     riskDec.Criticality,
 		RiskReliability:     riskDec.Reliability,
@@ -1071,6 +1095,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		Resource:           req.Resource,
 		ConfidenceScore:    confidenceScore,
 		ConfidenceVerified: confidenceVerified,
+		ActorVerified:      actorVerified,
 		Decision:           decisionStringFull(allowed, requiresReview, isCompute),
 		Reason:             finalReason,
 		DowngradedScope:    downgradedScope,

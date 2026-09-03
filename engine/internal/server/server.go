@@ -494,7 +494,7 @@ func (h *Handler) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.rateLimit != nil && !h.rateLimit.AllowAuth(req.TenantID) {
+	if h.rateLimit != nil && !h.rateLimit.AllowAuth(rateLimitKey(r.Context(), req.TenantID)) {
 		writeError(w, http.StatusTooManyRequests, "rate limit exceeded for tenant")
 		return
 	}
@@ -1192,7 +1192,7 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if h.rateLimit != nil && !h.rateLimit.AllowAuth(req.TenantID) {
+	if h.rateLimit != nil && !h.rateLimit.AllowAuth(rateLimitKey(r.Context(), req.TenantID)) {
 		writeError(w, http.StatusTooManyRequests, "rate limit exceeded for tenant")
 		return
 	}
@@ -1799,7 +1799,7 @@ func (h *Handler) handleMintToken(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	if h.rateLimit != nil && !h.rateLimit.AllowMint(req.TenantID) {
+	if h.rateLimit != nil && !h.rateLimit.AllowMint(rateLimitKey(r.Context(), req.TenantID)) {
 		writeError(w, http.StatusTooManyRequests, "rate limit exceeded for tenant")
 		return
 	}
@@ -1894,6 +1894,15 @@ func (h *Handler) handleVaultGetToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "agent_id, user_id, and provider are required")
 		return
 	}
+	// user_id is caller-supplied — without this check, any valid account-bound
+	// key could read any other account's decrypted provider access token by
+	// naming their user_id. Only the static admin credential (self-hosted,
+	// single operator) may act outside its own identity. See Nate Howard's
+	// review.
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, userID) {
+		writeError(w, http.StatusForbidden, "cannot access vault credentials for a different user_id")
+		return
+	}
 
 	entry, err := h.vaultSvc.Get(r.Context(), agentID, userID, provider)
 	if err != nil {
@@ -1921,6 +1930,10 @@ func (h *Handler) handleVaultRevoke(w http.ResponseWriter, r *http.Request) {
 	provider := r.URL.Query().Get("provider")
 	if agentID == "" || userID == "" || provider == "" {
 		writeError(w, http.StatusBadRequest, "agent_id, user_id, and provider are required")
+		return
+	}
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, userID) {
+		writeError(w, http.StatusForbidden, "cannot revoke vault credentials for a different user_id")
 		return
 	}
 	if err := h.vaultSvc.Revoke(r.Context(), agentID, userID, provider); err != nil {
@@ -2148,13 +2161,17 @@ func (h *Handler) handlePolicyValidate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handlePolicyPut(w http.ResponseWriter, r *http.Request) {
-	// Auth — require the configured API key; reject on mismatch.
-	if h.apiKey != "" {
-		auth := r.Header.Get("Authorization")
-		if auth != "Bearer "+h.apiKey {
-			writeError(w, http.StatusForbidden, "policy mutation requires the admin API key")
-			return
-		}
+	// Policy is one shared Rego file for the whole engine process — there is
+	// no per-tenant policy to scope this to, so only the operator's static
+	// admin credential may touch it, in every auth mode. The previous check
+	// only ran `if h.apiKey != ""`, which meant it silently did nothing in
+	// PLATFORM_URL mode: any account-bound lelu_sk_ key, from any customer,
+	// could overwrite the global policy for every tenant on the engine. See
+	// Nate Howard's review.
+	principal, ok := principalFromContext(r.Context())
+	if !ok || !principal.IsStaticAdminKey {
+		writeError(w, http.StatusForbidden, "policy mutation requires the admin API key")
+		return
 	}
 
 	// Optimistic concurrency — If-Match must equal active digest when provided.
@@ -2378,6 +2395,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		// leave the engine open.
 		if h.apiKey == "" && h.keyVerify == nil {
 			if strings.EqualFold(strings.TrimSpace(os.Getenv("LELU_DEV_INSECURE")), "true") {
+				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true}))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -2393,6 +2411,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			expected := "Bearer " + h.apiKey
 			// Constant-time comparison to avoid leaking the key via response timing.
 			if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expected)) == 1 {
+				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true}))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -2401,7 +2420,8 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		// Account-bound keys (lelu_sk_…) resolved against the platform key store.
 		if h.keyVerify != nil {
 			if token, ok := strings.CutPrefix(authHeader, "Bearer "); ok && strings.HasPrefix(token, "lelu_sk_") {
-				if _, valid := h.keyVerify.verify(r.Context(), token); valid {
+				if userID, valid := h.keyVerify.verify(r.Context(), token); valid {
+					r = r.WithContext(withPrincipal(r.Context(), Principal{UserID: userID}))
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -2835,7 +2855,14 @@ func (h *Handler) handleRegisterAgent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	// TenantID was never set here before — every agent registered through
+	// this handler got the zero value, so tenant scoping on list/get/
+	// suspend/revoke had nothing real to check against. Scope it to the
+	// registering principal's UserID (empty for the static admin credential,
+	// which bypasses ownership checks anyway — see principalMayActAs).
+	principal, _ := principalFromContext(r.Context())
 	agent, err := h.identityReg.Register(r.Context(), identity.RegisterRequest{
+		TenantID:    principal.UserID,
 		Name:        req.Name,
 		Description: req.Description,
 		AgentType:   identity.AgentType(req.AgentType),
@@ -2855,7 +2882,20 @@ func (h *Handler) handleListAgents(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "agent identity registry not configured")
 		return
 	}
+	// tenant_id was previously taken straight from the query string — an
+	// empty value lists every tenant's agents (see Registry.List), so any
+	// authenticated caller could enumerate every account's agent inventory
+	// just by omitting it. A non-admin principal's own UserID always wins
+	// over whatever the query param claims; only the static admin credential
+	// may pass an arbitrary (or empty, meaning "all") value. See Nate
+	// Howard's review.
 	tenantID := r.URL.Query().Get("tenant_id")
+	if principal, ok := principalFromContext(r.Context()); !ok {
+		writeError(w, http.StatusForbidden, "unauthorized")
+		return
+	} else if !principal.IsStaticAdminKey {
+		tenantID = principal.UserID
+	}
 	agents, err := h.identityReg.List(r.Context(), tenantID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("list agents: %v", err))
@@ -2882,6 +2922,15 @@ func (h *Handler) handleGetAgent(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	// Fetch before checking, not the other way round: the agent's own
+	// TenantID is what ownership is checked against, and there's no way to
+	// know it without reading the record first. Returning 404 rather than
+	// 403 for an out-of-tenant agent avoids confirming the ID exists at all
+	// to a caller with no right to it. See Nate Howard's review.
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+		return
+	}
 	writeJSON(w, http.StatusOK, agent)
 }
 
@@ -2891,6 +2940,22 @@ func (h *Handler) handleRevokeAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentID := r.PathValue("agentID")
+	// Fetch first — SetStatus mutates by ID alone with no ownership check,
+	// so without reading the record first any authenticated caller could
+	// revoke any tenant's agent. See Nate Howard's review.
+	agent, err := h.identityReg.Get(r.Context(), agentID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+		return
+	}
 	if err := h.identityReg.SetStatus(r.Context(), agentID, identity.AgentStatusRevoked); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
@@ -2908,6 +2973,19 @@ func (h *Handler) handleSuspendAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentID := r.PathValue("agentID")
+	agent, err := h.identityReg.Get(r.Context(), agentID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+		} else {
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+		return
+	}
 	if err := h.identityReg.SetStatus(r.Context(), agentID, identity.AgentStatusSuspended); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))

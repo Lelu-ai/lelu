@@ -2074,6 +2074,24 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 	if item, gerr := h.queue.Get(r.Context(), id); gerr == nil {
 		rawConfidence = item.ConfidenceScore
 		haveConfidence = true
+
+		// An agent flagged for human_review holds the exact same credential
+		// it used to make the original request — nothing about
+		// authentication here distinguishes "the flagged agent" from "a
+		// human reviewer", so the pause-approve-resume guarantee only holds
+		// if the resolver is provably not the actor under review. There's
+		// no separate reviewer credential (a bigger change, not done here —
+		// see the finding), so resolved_by is the only "who is resolving
+		// this" signal available. It's caller-supplied and not
+		// cryptographically verified, so this doesn't stop an actor willing
+		// to put a different name in resolved_by while using the same key —
+		// it closes the literal, named case (an actor resolving under its
+		// own name), not the deeper one. See Nate Howard's review, finding
+		// #3.
+		if req.ResolvedBy != "" && req.ResolvedBy == item.Actor {
+			writeError(w, http.StatusForbidden, "an actor cannot resolve its own human_review item")
+			return
+		}
 	}
 
 	var err error
@@ -2425,10 +2443,26 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for health check, metrics, and public OIDC/MCP OAuth endpoints.
+		// Skip auth for health check, metrics, OIDC/MCP discovery, and the
+		// OAuth token endpoint — the last one is protected by the OAuth
+		// client's own PKCE verifier, client_secret, or refresh_token, which
+		// is a separate, legitimate credential from a Lelu API key, and
+		// requiring both would break the standard flow for a client that's
+		// already been through /oauth/authorize.
+		//
+		// /oauth/clients and /oauth/authorize deliberately do NOT skip auth:
+		// with no gate here, anyone with network access could register a
+		// client and get a code issued with no credential at all, then
+		// exchange it for an RS256 JWT signed by Lelu's identity key — Lelu
+		// itself would reject that token, but any external MCP resource
+		// server that trusts Lelu as an issuer via /.well-known/jwks.json
+		// would not. Both endpoints now require the same Bearer credential
+		// as everything else — only someone who already has Lelu access can
+		// mint a new OAuth client or get a code issued at all. See Nate
+		// Howard's review, finding #1 — the only unauthenticated one.
 		if r.URL.Path == "/healthz" || r.URL.Path == "/metrics" ||
 			strings.HasPrefix(r.URL.Path, "/.well-known/") ||
-			strings.HasPrefix(r.URL.Path, "/oauth/") {
+			r.URL.Path == "/oauth/token" {
 			next.ServeHTTP(w, r)
 			return
 		}

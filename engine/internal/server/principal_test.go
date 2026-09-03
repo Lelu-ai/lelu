@@ -303,3 +303,57 @@ func TestHandleAgentAuthorize_AuditUsesVerifiedTenantNotClaimed(t *testing.T) {
 			got.TenantID, "real-account-1")
 	}
 }
+
+// ── OAuth endpoint gating ────────────────────────────────────────────────────
+// Finding #1, the only unauthenticated one: /oauth/clients and
+// /oauth/authorize let anyone with network access register a client and get
+// a code issued with no credential at all. Tested directly against
+// authMiddleware — its exemption check is pure path matching, so this
+// doesn't need a real mcpauth.Server (which needs a DB) behind it.
+
+func TestAuthMiddleware_GatesOAuthRegisterAndAuthorize(t *testing.T) {
+	h := &Handler{apiKey: "static-key"}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := h.authMiddleware(next)
+
+	for _, path := range []string{"/oauth/clients", "/oauth/authorize"} {
+		t.Run(path+"_without_credential", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			rec := httptest.NewRecorder()
+			mw.ServeHTTP(rec, req)
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("%s with no credential = %d, want 401 — this endpoint must not be reachable with no Lelu credential at all", path, rec.Code)
+			}
+		})
+		t.Run(path+"_with_credential", func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			req.Header.Set("Authorization", "Bearer static-key")
+			rec := httptest.NewRecorder()
+			mw.ServeHTTP(rec, req)
+			if rec.Code == http.StatusUnauthorized {
+				t.Fatalf("%s with a valid credential = 401, want it to pass through to the handler", path)
+			}
+		})
+	}
+}
+
+func TestAuthMiddleware_OAuthTokenEndpointStaysExempt(t *testing.T) {
+	// /oauth/token is protected by the OAuth client's own PKCE verifier,
+	// client_secret, or refresh_token — a separate, legitimate credential
+	// from a Lelu API key. Requiring both would break the standard flow for
+	// a client that's already been through /oauth/authorize.
+	h := &Handler{apiKey: "static-key"}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mw := h.authMiddleware(next)
+
+	req := httptest.NewRequest(http.MethodPost, "/oauth/token", nil)
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("/oauth/token with no Lelu credential = %d, want it to pass through (it has its own OAuth-level credential check)", rec.Code)
+	}
+}

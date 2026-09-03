@@ -499,6 +499,40 @@ func TestQueueApproveDenyFlows(t *testing.T) {
 	assert.Equal(t, http.StatusOK, denyResp.StatusCode)
 }
 
+func TestQueueApprove_RejectsActorResolvingItsOwnItem(t *testing.T) {
+	q := queue.NewInMemory()
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
+	defer srv.Close()
+
+	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u")
+	require.NoError(t, err)
+
+	// invoice_bot holds whatever credential got it flagged for review in the
+	// first place — resolving under its own name is exactly the case Nate
+	// Howard's review named: "an agent that gets human_review can approve
+	// its own item with the key it already holds."
+	resp := postJSON(t, srv, "/v1/queue/"+id+"/approve", map[string]any{
+		"resolved_by": "invoice_bot",
+		"note":        "self-approved",
+	})
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
+func TestQueueApprove_AllowsADifferentResolver(t *testing.T) {
+	q := queue.NewInMemory()
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
+	defer srv.Close()
+
+	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u")
+	require.NoError(t, err)
+
+	resp := postJSON(t, srv, "/v1/queue/"+id+"/approve", map[string]any{
+		"resolved_by": "human_reviewer_1",
+		"note":        "checked, looks fine",
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 func TestQueueResolve_BadBody(t *testing.T) {
 	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", queue.NewInMemory())
 	defer srv.Close()

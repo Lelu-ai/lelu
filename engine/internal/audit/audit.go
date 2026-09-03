@@ -32,9 +32,13 @@ type Event struct {
 	Action          string            `json:"action"`
 	Resource        map[string]string `json:"resource,omitempty"`
 	ConfidenceScore float64           `json:"confidence_score,omitempty"`
-	// ConfidenceVerified is true only when ConfidenceScore came from a verified
-	// provider signal rather than a self-reported/unverified fallback.
-	ConfidenceVerified bool `json:"confidence_verified,omitempty"`
+	// ProviderSignalPresent is true only when ConfidenceScore came from a
+	// caller-submitted provider signal rather than the self-reported
+	// fallback — not a claim that the signal was confirmed against the
+	// provider itself. See agentAuthorizeResponse.ProviderSignalPresent in
+	// the server package for the full explanation; renamed from
+	// ConfidenceVerified for the same reason.
+	ProviderSignalPresent bool `json:"provider_signal_present,omitempty"`
 	// ActorVerified is true only when Actor came from a signed WorkloadToken
 	// validated against the identity registry, not the self-reported "actor"
 	// field.
@@ -205,7 +209,7 @@ type receiptCore struct {
 	Action             string            `json:"action"`
 	Resource           map[string]string `json:"resource"`
 	ConfidenceScore    float64           `json:"confidence_score"`
-	ConfidenceVerified bool              `json:"confidence_verified"`
+	ProviderSignalPresent bool           `json:"provider_signal_present"`
 	ActorVerified      bool              `json:"actor_verified"`
 	Decision           string            `json:"decision"`
 	Reason             string            `json:"reason"`
@@ -226,7 +230,7 @@ func canonicalizeReceipt(e Event, prevHash string) ([]byte, error) {
 		Action:             e.Action,
 		Resource:           e.Resource,
 		ConfidenceScore:    e.ConfidenceScore,
-		ConfidenceVerified: e.ConfidenceVerified,
+		ProviderSignalPresent: e.ProviderSignalPresent,
 		ActorVerified:      e.ActorVerified,
 		Decision:           e.Decision,
 		Reason:             e.Reason,

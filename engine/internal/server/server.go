@@ -575,9 +575,10 @@ type agentAuthorizeResponse struct {
 	RequiresHumanReview bool    `json:"requires_human_review"`
 	// ActorVerified is true only when Actor came from a signed WorkloadToken
 	// (X-Lelu-Agent-Token) validated against the identity registry, not from
-	// the self-reported "actor" field in the request body. Mirrors
-	// ConfidenceVerified — lets callers/auditors tell a proven identity apart
-	// from a claimed one.
+	// the self-reported "actor" field in the request body. Unlike
+	// ProviderSignalPresent below, this one is a real cryptographic check,
+	// not just "a well-formed value was present" — named to reflect that
+	// difference, not to match it.
 	ActorVerified bool `json:"actor_verified"`
 	// ReviewID is the queue item ID when RequiresHumanReview is true — the
 	// caller needs this to poll GET /v1/queue/{id}, long-poll
@@ -585,12 +586,18 @@ type agentAuthorizeResponse struct {
 	// human_review decision is unaddressable: nothing to poll or resolve.
 	ReviewID string `json:"review_id,omitempty"`
 	ConfidenceUsed      float64 `json:"confidence_used"`
-	// ConfidenceVerified is true only when ConfidenceUsed came from a verified
-	// provider signal (confidence.ExtractScore); false when it came from the
-	// AllowUnverifiedConfidence self-reported fallback, or when no signal was
-	// available at all. Lets callers tell a real signal apart from a number the
-	// agent claimed about itself.
-	ConfidenceVerified           bool    `json:"confidence_verified"`
+	// ProviderSignalPresent is true only when ConfidenceUsed came from a
+	// caller-submitted confidence_signal (confidence.ExtractScore) rather
+	// than the AllowUnverifiedConfidence self-reported fallback or a missing
+	// signal. Deliberately not called "verified": Lelu never calls the
+	// provider itself to confirm token_logprobs/token_probabilities actually
+	// came from a real API response — it only checks the shape is
+	// well-formed for providers that can expose it (rejects it outright for
+	// Anthropic, which never exposes it at all). A caller can still submit
+	// fabricated numbers shaped like a real signal for OpenAI/Bedrock and
+	// this will be true. Was named ConfidenceVerified until Nate Howard's
+	// review pointed out that name claimed more than the check establishes.
+	ProviderSignalPresent bool `json:"provider_signal_present"`
 	RiskScore                    float64 `json:"risk_score,omitempty"`
 	RiskCriticality              float64 `json:"risk_criticality,omitempty"`
 	RiskReliability              float64 `json:"risk_reliability,omitempty"`
@@ -659,7 +666,7 @@ func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req a
 			Reason:              "shadow detection check failed — request escalated for safety",
 			TraceID:             traceID,
 			ConfidenceUsed:      0,
-			ConfidenceVerified:  false,
+			ProviderSignalPresent: false,
 		})
 		return true
 	}
@@ -846,7 +853,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		actorVerified = true
 	}
 
-	confidenceScore, missingSignal, confidenceVerified, err := h.resolveConfidence(req)
+	confidenceScore, missingSignal, providerSignalPresent, err := h.resolveConfidence(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
 		return agentDecisionResult{}, true
@@ -1067,9 +1074,9 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		EffectiveScope:      effectiveScope,
 		RequiresHumanReview: requiresReview,
 		ReviewID:            reviewID,
-		ConfidenceUsed:      confidenceScore,
-		ConfidenceVerified:  confidenceVerified,
-		ActorVerified:       actorVerified,
+		ConfidenceUsed:        confidenceScore,
+		ProviderSignalPresent: providerSignalPresent,
+		ActorVerified:         actorVerified,
 		RiskScore:           riskDec.Score,
 		RiskCriticality:     riskDec.Criticality,
 		RiskReliability:     riskDec.Reliability,
@@ -1093,9 +1100,9 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		Actor:              req.Actor,
 		Action:             req.Action,
 		Resource:           req.Resource,
-		ConfidenceScore:    confidenceScore,
-		ConfidenceVerified: confidenceVerified,
-		ActorVerified:      actorVerified,
+		ConfidenceScore:       confidenceScore,
+		ProviderSignalPresent: providerSignalPresent,
+		ActorVerified:         actorVerified,
 		Decision:           decisionStringFull(allowed, requiresReview, isCompute),
 		Reason:             finalReason,
 		DowngradedScope:    downgradedScope,
@@ -1355,10 +1362,13 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 }
 
 // resolveConfidence returns the confidence score to use, whether the request
-// has no usable signal at all, and whether the score is a verified provider
-// signal (true) or a self-reported number accepted only because
-// AllowUnverifiedConfidence is set (false).
-func (h *Handler) resolveConfidence(req agentAuthorizeRequest) (score float64, missingSignal bool, verified bool, err error) {
+// has no usable signal at all, and whether the score came from a
+// caller-submitted provider signal (true) or a self-reported number accepted
+// only because AllowUnverifiedConfidence is set (false). "true" here means
+// confidence.ExtractScore accepted the signal's shape for that provider —
+// not that Lelu confirmed it against the provider itself. See
+// ProviderSignalPresent's doc comment on agentAuthorizeResponse.
+func (h *Handler) resolveConfidence(req agentAuthorizeRequest) (score float64, missingSignal bool, providerSignalPresent bool, err error) {
 	if req.Signal != nil {
 		score, err = confidence.ExtractScore(req.Signal)
 		return score, false, true, err
@@ -1410,7 +1420,7 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 		RequiresHumanReview: requiresReview,
 		ReviewID:            reviewID,
 		ConfidenceUsed:      0,
-		ConfidenceVerified:  false,
+		ProviderSignalPresent: false,
 	}
 }
 

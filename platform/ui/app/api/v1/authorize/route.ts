@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
 
   let result: { decision: Decision; reason: string; rule: string; safeTool?: string; safeArgs?: Record<string, unknown> };
   let confidenceUsed = 0;
-  let confidenceVerified: boolean | undefined;
+  let providerSignalPresent: boolean | undefined;
   let riskScore: number | undefined;
   let quotaInfo: { plan: string; used: number; limit: number } | undefined;
 
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
       safe_tool?: string;
       safe_args?: Record<string, unknown>;
       confidence_used?: number;
-      confidence_verified?: boolean;
+      provider_signal_present?: boolean;
       risk_score?: number;
     } | null;
 
@@ -271,7 +271,7 @@ export async function POST(req: NextRequest) {
       safeArgs: engineData.safe_args,
     };
     confidenceUsed = engineData.confidence_used ?? 0;
-    confidenceVerified = engineData.confidence_verified;
+    providerSignalPresent = engineData.provider_signal_present;
     riskScore = engineData.risk_score;
   }
 
@@ -314,7 +314,7 @@ export async function POST(req: NextRequest) {
     rule: result.rule,
     ...(result.safeTool ? { safeTool: result.safeTool } : {}),
     ...(result.safeArgs ? { safeArgs: result.safeArgs } : {}),
-    ...(confidenceVerified !== undefined ? { confidenceVerified } : {}),
+    ...(providerSignalPresent !== undefined ? { providerSignalPresent } : {}),
     ...(riskScore !== undefined ? { riskScore } : {}),
     ...(quotaInfo ? { quota: quotaInfo } : {}),
     latencyMs,

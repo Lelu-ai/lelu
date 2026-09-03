@@ -185,12 +185,16 @@ func TestEvaluateAgentDecision_MissingSignalFailsClosed(t *testing.T) {
 	assert.Contains(t, resp.Reason, "no confidence signal")
 }
 
-// ── ConfidenceVerified ────────────────────────────────────────────────────────
+// ── ProviderSignalPresent ────────────────────────────────────────────────────
 //
-// A caller must be able to tell a real provider signal apart from a
-// self-reported (or absent) confidence number — see resolveConfidence.
+// A caller must be able to tell a submitted provider signal apart from a
+// self-reported (or absent) confidence number — see resolveConfidence. Named
+// ProviderSignalPresent, not ConfidenceVerified: as the WithSignal case below
+// shows, these TokenLogProbs are just hardcoded numbers shaped like a real
+// response, not an actual provider call Lelu confirmed — that's exactly what
+// the old name overclaimed.
 
-func TestEvaluateAgentDecision_ConfidenceVerified_WithSignal(t *testing.T) {
+func TestEvaluateAgentDecision_ProviderSignalPresent_WithSignal(t *testing.T) {
 	h := newDecisionHandler(t, ConfidenceConfig{})
 	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
 		Actor:  "invoice_bot",
@@ -202,20 +206,20 @@ func TestEvaluateAgentDecision_ConfidenceVerified_WithSignal(t *testing.T) {
 	})
 
 	assert.False(t, handled)
-	assert.True(t, res.resp.ConfidenceVerified, "a real provider signal must be marked verified")
+	assert.True(t, res.resp.ProviderSignalPresent, "a submitted provider signal must be marked present")
 }
 
-func TestEvaluateAgentDecision_ConfidenceVerified_SelfReportedIsUnverified(t *testing.T) {
+func TestEvaluateAgentDecision_ProviderSignalPresent_SelfReportedIsAbsent(t *testing.T) {
 	h := newDecisionHandler(t, ConfidenceConfig{AllowUnverifiedConfidence: true})
 	res, handled, _ := evaluate(t, h, agentAuthorizeRequest{
 		Actor: "invoice_bot", Action: "approve_refunds", Confidence: f64(0.95),
 	})
 
 	assert.False(t, handled)
-	assert.False(t, res.resp.ConfidenceVerified, "a self-reported confidence must never be marked verified")
+	assert.False(t, res.resp.ProviderSignalPresent, "a self-reported confidence must never be marked as a provider signal")
 }
 
-func TestEvaluateAgentDecision_ConfidenceVerified_MissingSignalIsUnverified(t *testing.T) {
+func TestEvaluateAgentDecision_ProviderSignalPresent_MissingSignalIsAbsent(t *testing.T) {
 	h := newDecisionHandler(t, ConfidenceConfig{MissingSignalMode: MissingConfidenceReview})
 	_, handled, rec := evaluate(t, h, agentAuthorizeRequest{
 		Actor: "invoice_bot", Action: "approve_refunds",
@@ -223,5 +227,5 @@ func TestEvaluateAgentDecision_ConfidenceVerified_MissingSignalIsUnverified(t *t
 
 	assert.True(t, handled)
 	resp := decodeResp(t, rec)
-	assert.False(t, resp.ConfidenceVerified)
+	assert.False(t, resp.ProviderSignalPresent)
 }

@@ -76,7 +76,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
     "lelu_agent_authorize",
     "Ask the Lelu Engine whether an AI agent is allowed to perform an action. " +
     "Lelu evaluates the action against your policy using behavioral signals. " +
-    "In production, confidence comes from verified provider signals (logprobs/entropy), never agent self-reports. " +
+    "In production, confidence comes from a submitted provider signal (logprobs/entropy), never agent self-reports. " +
     "Returns allowed/denied/requires_human_review along with a request ID for HITL polling.",
     {
       actor:     z.string().describe("The agent or bot performing the action, e.g. 'invoice_bot'"),
@@ -87,7 +87,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
       confidence: z.number().min(0).max(1).optional().describe(
         "Self-reported confidence (0–1) that this action is correct. Dev-mode only: honored when " +
         "the engine runs with CONFIDENCE_ALLOW_UNVERIFIED=true (the zero-config local default). " +
-        "Production engines require a verified provider signal instead; when omitted, the engine's " +
+        "Production engines require a submitted provider signal instead; when omitted, the engine's " +
         "CONFIDENCE_MISSING_MODE decides (local default: route to human review)."
       ),
     },
@@ -98,7 +98,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
         trace_id: string;
         requires_human_review: boolean;
         confidence_used: number;
-        confidence_verified: boolean;
+        provider_signal_present: boolean;
         downgraded_scope?: string;
       }>("/v1/agent/authorize", {
         actor,
@@ -129,9 +129,11 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
                 trace_id:             data.trace_id,
                 confidence_used:      data.confidence_used,
                 // false whenever this decision relied on a self-reported
-                // confidence number (or none at all) rather than a real
+                // confidence number (or none at all) rather than a submitted
                 // provider signal — see the `confidence` param description.
-                confidence_verified:  data.confidence_verified,
+                // Not a claim the signal was confirmed against the provider
+                // itself, only that one was submitted and well-formed.
+                provider_signal_present: data.provider_signal_present,
                 ...(data.downgraded_scope ? { downgraded_scope: data.downgraded_scope } : {}),
               },
               null,

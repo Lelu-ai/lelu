@@ -21,7 +21,12 @@ services:
     environment:
       LISTEN_ADDR:       ":8080"
       POLICY_PATH:       "/etc/lelu/auth.yaml"
-      REDIS_ADDR:        "redis:6379"
+      # redis:// URL form (not bare host:port) so the password is actually
+      # sent — ParseRedisAddr hands this straight to go-redis's ParseURL,
+      # which parses out the password into redis.Options. Shared by both
+      # the JIT token store and the human-review queue. See Nate Howard's
+      # review: Redis previously had no auth at all.
+      REDIS_ADDR:        "redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD to a real secret before running in production}@redis:6379"
       # APP_ENV must be set for the engine's own fail-closed production guard
       # to fire at all (see isProductionEnv() in main.go) — without it, a
       # missing/default JWT_SIGNING_KEY or API_KEY starts up silently instead
@@ -76,17 +81,22 @@ services:
     image: redis:7-alpine
     container_name: lelu-redis
     restart: unless-stopped
-    ports:
-      - "6380:6379"
+    # No host port published — engine and platform reach this over the
+    # internal `lelu` network by service name, and that's the only access
+    # this needs. Publishing 6380:6379 made Redis reachable from outside the
+    # host, on top of having no auth at all. If you need local debug access,
+    # use `docker compose exec redis redis-cli` or a docker-compose.override.yml
+    # you don't commit, not a port published by default.
     command: >
       redis-server
+      --requirepass "${REDIS_PASSWORD:?set REDIS_PASSWORD to a real secret before running in production}"
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -98,8 +108,8 @@ services:
     image: postgres:15
     container_name: lelu-postgres
     restart: unless-stopped
-    ports:
-      - "5434:5432"
+    # No host port published — same reasoning as redis above. Only the
+    # platform service needs to reach this, over the internal network.
     environment:
       POSTGRES_DB:       lelu
       POSTGRES_USER:     lelu

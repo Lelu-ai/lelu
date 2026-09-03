@@ -494,6 +494,13 @@ func (h *Handler) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// See the identical override in handleAgentAuthorize — a platform-
+	// verified key's UserID is the trust boundary, not the self-reported
+	// TenantID in the body. See Nate Howard's review, finding #2.
+	if principal, ok := principalFromContext(r.Context()); ok && !principal.IsStaticAdminKey && principal.UserID != "" {
+		req.TenantID = principal.UserID
+	}
+
 	if h.rateLimit != nil && !h.rateLimit.AllowAuth(rateLimitKey(r.Context(), req.TenantID)) {
 		writeError(w, http.StatusTooManyRequests, "rate limit exceeded for tenant")
 		return
@@ -853,6 +860,14 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		actorVerified = true
 	}
 
+	// Same tenant override as handleAgentAuthorize — repeated here (not just
+	// there) so this function stays correct on its own for callers that
+	// invoke it directly, such as the internal tests. A no-op on the normal
+	// request path, where handleAgentAuthorize already applied it.
+	if principal, ok := principalFromContext(r.Context()); ok && !principal.IsStaticAdminKey && principal.UserID != "" {
+		req.TenantID = principal.UserID
+	}
+
 	confidenceScore, missingSignal, providerSignalPresent, err := h.resolveConfidence(req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("confidence: %v", err))
@@ -1167,8 +1182,21 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Compute input hash immediately after decode — tamper-proof record of the request.
+	// Compute input hash immediately after decode — tamper-proof record of the
+	// request exactly as claimed, before any correction below.
 	inputHash := payloadHash(req)
+
+	// A platform-verified key's UserID is the trust boundary already
+	// enforced elsewhere (handlePolicyPut, vault ownership, agent registry
+	// scoping, rate limiting) — checkShadowAgent and checkPromptInjection
+	// run before evaluateAgentDecision and build their own audit/incident
+	// records, so the override has to happen here too, not only inside
+	// evaluateAgentDecision, or those two paths keep attributing to
+	// whatever TenantID the caller claimed. See Nate Howard's review,
+	// finding #2.
+	if principal, ok := principalFromContext(r.Context()); ok && !principal.IsStaticAdminKey && principal.UserID != "" {
+		req.TenantID = principal.UserID
+	}
 
 	// Start enhanced OpenTelemetry span with AI agent semantic conventions
 	var span trace.Span
@@ -1257,6 +1285,12 @@ func (h *Handler) handleAgentDelegate(w http.ResponseWriter, r *http.Request) {
 	if req.Delegator == "" || req.Delegatee == "" {
 		writeError(w, http.StatusBadRequest, "delegator and delegatee are required")
 		return
+	}
+
+	// See the identical override in handleAgentAuthorize. See Nate Howard's
+	// review, finding #2.
+	if principal, ok := principalFromContext(r.Context()); ok && !principal.IsStaticAdminKey && principal.UserID != "" {
+		req.TenantID = principal.UserID
 	}
 
 	// Start enhanced delegation span with correlation tracking

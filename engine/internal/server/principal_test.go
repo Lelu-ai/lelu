@@ -1,11 +1,21 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/lelu-ai/lelu/engine/internal/audit"
+	"github.com/lelu-ai/lelu/engine/internal/confidence"
+	"github.com/lelu-ai/lelu/engine/internal/evaluator"
+	"github.com/lelu-ai/lelu/engine/internal/tokens"
 )
 
 // ── principalMayActAs ────────────────────────────────────────────────────────
@@ -203,5 +213,93 @@ func TestHandlePolicyPut_AllowsStaticAdminPastTheGate(t *testing.T) {
 
 	if rec.Code == http.StatusForbidden {
 		t.Fatalf("static admin principal should clear the auth gate, got 403: %s", rec.Body.String())
+	}
+}
+
+// ── Audit attribution uses the verified tenant, not the claimed one ─────────
+// The sub-point of Nate Howard's finding #2 that survived the first pass:
+// "audit attribution records whatever was claimed." These confirm the fix by
+// reading the actual audit record back, not just checking a status code.
+
+// newDecisionHandlerWithSink is newDecisionHandler but exposes the audit
+// sink so a test can decode what actually got logged.
+func newDecisionHandlerWithSink(t *testing.T) (*Handler, *bytes.Buffer) {
+	t.Helper()
+	clearRiskEnv(t)
+	buf := &bytes.Buffer{}
+	eval := evaluator.New()
+	require.NoError(t, eval.LoadPolicyBytes(internalSamplePolicy))
+	h, err := New(
+		eval,
+		tokens.New(tokens.Config{SigningKey: "test-key"}),
+		confidence.New(),
+		audit.New(audit.Config{Sink: buf}),
+		nil, // queue
+		"",  // apiKey
+		ConfidenceConfig{AllowUnverifiedConfidence: true},
+		EnforcementModeEnforce,
+		nil, // incident notifier
+		nil, // rateLimit
+		nil, // fallback
+		nil, // telemetry
+		nil, // db
+	)
+	require.NoError(t, err)
+	return h, buf
+}
+
+func lastAuditEvent(t *testing.T, buf *bytes.Buffer) audit.Event {
+	t.Helper()
+	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n"))
+	require.NotEmpty(t, lines, "expected at least one audit event to have been written")
+	var e audit.Event
+	require.NoError(t, json.Unmarshal(lines[len(lines)-1], &e))
+	return e
+}
+
+func TestEvaluateAgentDecision_AuditUsesVerifiedTenantNotClaimed(t *testing.T) {
+	h, buf := newDecisionHandlerWithSink(t)
+
+	r := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", nil)
+	r = r.WithContext(withPrincipal(context.Background(), Principal{UserID: "real-account-1"}))
+	rec := httptest.NewRecorder()
+
+	_, handled := h.evaluateAgentDecision(r.Context(), rec, r, agentAuthorizeRequest{
+		TenantID: "attacker-claimed-tenant",
+		Actor:    "invoice_bot",
+		Action:   "view_invoices",
+		Confidence: f64(0.95),
+	}, nil, time.Now(), "test-input-hash")
+
+	require.False(t, handled)
+	h.audit.Close()
+
+	got := lastAuditEvent(t, buf)
+	if got.TenantID != "real-account-1" {
+		t.Fatalf("audit event TenantID = %q, want the verified principal's UserID (%q), not the claimed tenant_id in the request body",
+			got.TenantID, "real-account-1")
+	}
+}
+
+func TestHandleAgentAuthorize_AuditUsesVerifiedTenantNotClaimed(t *testing.T) {
+	// Unlike the test above, this goes through the real HTTP entry point —
+	// confirms checkShadowAgent/checkPromptInjection (which run before
+	// evaluateAgentDecision and build their own audit records) also see the
+	// corrected tenant, not just evaluateAgentDecision's own internal copy.
+	h, buf := newDecisionHandlerWithSink(t)
+
+	body := `{"tenant_id":"attacker-claimed-tenant","actor":"invoice_bot","action":"view_invoices","confidence":0.95}`
+	r := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", bytes.NewBufferString(body))
+	r = r.WithContext(withPrincipal(context.Background(), Principal{UserID: "real-account-1"}))
+	rec := httptest.NewRecorder()
+
+	h.handleAgentAuthorize(rec, r)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	h.audit.Close()
+
+	got := lastAuditEvent(t, buf)
+	if got.TenantID != "real-account-1" {
+		t.Fatalf("audit event TenantID = %q, want the verified principal's UserID (%q), not the claimed tenant_id in the request body",
+			got.TenantID, "real-account-1")
 	}
 }

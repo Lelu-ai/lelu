@@ -22,7 +22,15 @@ services:
       LISTEN_ADDR:       ":8080"
       POLICY_PATH:       "/etc/lelu/auth.yaml"
       REDIS_ADDR:        "redis:6379"
-      JWT_SIGNING_KEY:   "${JWT_SIGNING_KEY:-change-me-in-production}"
+      # APP_ENV must be set for the engine's own fail-closed production guard
+      # to fire at all (see isProductionEnv() in main.go) — without it, a
+      # missing/default JWT_SIGNING_KEY or API_KEY starts up silently instead
+      # of refusing to boot. ${VAR:?...} is the second, independent layer:
+      # docker compose itself refuses to start if the operator hasn't set a
+      # real key, rather than silently substituting the well-known,
+      # public-in-source default. See Nate Howard's review.
+      APP_ENV:           "production"
+      JWT_SIGNING_KEY:   "${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY to a real secret before running in production}"
       CONTROL_PLANE_URL: "${CONTROL_PLANE_URL:-}"
       CP_HMAC_SECRET:    "${CP_HMAC_SECRET:-}"
       API_KEY:           "${API_KEY}"

@@ -313,3 +313,121 @@ def test_delegate_scope_validates_confidence_range() -> None:
             delegatee="bot",
             confidence=1.5,
         )
+
+
+# ─── Approval redemption (POST /v1/queue/{id}/redeem) ─────────────────────────
+#
+# Waiting for "approved" only tells you a reviewer said yes to something.
+# Redemption is what binds that yes to the request you then execute.
+
+
+@pytest.mark.asyncio
+async def test_redeem_review_allowed(client: LeluClient, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-1/redeem",
+        json={"allowed": True, "reason": "payload matches the approved request",
+              "review_id": "rev-1", "trace_id": "tr-1"},
+    )
+    res = await client.redeem_review("rev-1", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is True
+    assert res.review_id == "rev-1"
+
+
+@pytest.mark.asyncio
+async def test_redeem_review_refusal_is_a_result_not_an_exception(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    # The engine answers a mismatched payload with 403 and a reason. That's an
+    # answer, not a transport failure — the caller shouldn't have to catch an
+    # exception to learn their payload changed.
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-1/redeem",
+        status_code=403,
+        json={"allowed": False, "reason": "payload does not match what was approved",
+              "review_id": "rev-1", "trace_id": "tr-2"},
+    )
+    res = await client.redeem_review("rev-1", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is False
+    assert "does not match" in res.reason
+
+
+@pytest.mark.asyncio
+async def test_redeem_sends_the_same_body_as_authorize(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    # The engine fingerprints this body to bind the approval. If authorize and
+    # redeem serialised it differently, an untouched request would fail
+    # redemption for reasons invisible to the caller — so they must match.
+    req = AuthorizeRequest(
+        tool="approve_refunds",
+        actor="invoice_bot",
+        args={"amount_usd": 100},
+        resource={"invoice": "INV-1"},
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/agent/authorize",
+        json=_authorize_response(decision="human_review", req_id="rev-9"),
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-9/redeem",
+        json={"allowed": True, "reason": "ok", "review_id": "rev-9", "trace_id": "t"},
+    )
+
+    await client.authorize(req)
+    await client.redeem_review("rev-9", req)
+
+    requests = httpx_mock.get_requests()
+    authorize_body = requests[0].read()
+    redeem_body = requests[1].read()
+    assert authorize_body == redeem_body
+
+
+@pytest.mark.asyncio
+async def test_wait_and_redeem_approved(client: LeluClient, httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="http://localhost:8080/v1/queue/rev-2/wait?timeout_ms=30000",
+        json={"id": "rev-2", "status": "approved", "actor": "invoice_bot"},
+    )
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-2/redeem",
+        json={"allowed": True, "reason": "ok", "review_id": "rev-2", "trace_id": "t"},
+    )
+    res = await client.wait_and_redeem("rev-2", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is True
+
+
+@pytest.mark.asyncio
+async def test_wait_and_redeem_still_pending_does_not_redeem(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    # Only the wait is mocked. If wait_and_redeem tried to redeem an
+    # unresolved review, the missing mock would surface it.
+    httpx_mock.add_response(
+        method="GET",
+        url="http://localhost:8080/v1/queue/rev-3/wait?timeout_ms=30000",
+        status_code=408,
+        json={"id": "rev-3", "status": "pending", "actor": "invoice_bot"},
+    )
+    res = await client.wait_and_redeem("rev-3", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is False
+    assert "pending" in res.reason
+
+
+@pytest.mark.asyncio
+async def test_wait_and_redeem_denied_does_not_redeem(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    httpx_mock.add_response(
+        method="GET",
+        url="http://localhost:8080/v1/queue/rev-4/wait?timeout_ms=30000",
+        json={"id": "rev-4", "status": "denied", "actor": "invoice_bot"},
+    )
+    res = await client.wait_and_redeem("rev-4", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is False
+    assert "denied" in res.reason

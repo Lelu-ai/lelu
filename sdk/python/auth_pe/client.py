@@ -53,6 +53,7 @@ from .models import (
     OAuthClient,
     ReviewItem,
     ListReviewsResult,
+    RedeemResult,
     ScanOutputResult,
     EnginePolicyInfo,
     PolicyValidationResult,
@@ -200,25 +201,20 @@ class LeluClient:
 
     # ── Authorization ─────────────────────────────────────────────────────────
 
-    async def authorize(self, req: AuthorizeRequest) -> AuthDecision:
+    @staticmethod
+    def _authorize_body(req: AuthorizeRequest) -> dict[str, Any]:
         """
-        Check whether an AI agent is permitted to call a tool.
+        Build the engine's agent-authorize body. `tool` maps to `action`;
+        confidence is sent only when present so the engine's
+        MissingSignalMode decides on absence rather than a fabricated
+        perfect score.
 
-        Example::
-
-            result = await lelu.authorize(AuthorizeRequest(tool="send_email"))
-            if result.decision == "allow":
-                pass  # proceed
-            elif result.decision == "compute":
-                call_tool(result.safe_tool, result.safe_args)  # use safe alternative
-            elif result.decision == "human_review":
-                return f"Awaiting approval (id: {result.request_id})"
-            else:
-                return f"Blocked: {result.reason}"
+        Shared by authorize() and redeem_review() on purpose. The engine
+        fingerprints the effect-determining fields of this body to bind an
+        approval to a payload; if the two call sites built the body even
+        slightly differently, an unmodified request would fail redemption
+        for no reason the caller could see.
         """
-        # Build the engine's agent-authorize body. `tool` maps to `action`;
-        # confidence is sent only when present so the engine's MissingSignalMode
-        # decides on absence rather than a fabricated perfect score.
         body: dict[str, Any] = {"action": req.tool}
         if req.actor:
             body["actor"] = req.actor
@@ -236,8 +232,31 @@ class LeluClient:
             body["resource"] = req.resource
         if req.tenant_id:
             body["tenant_id"] = req.tenant_id
+        return body
 
-        data = await self._post("/v1/agent/authorize", body)
+    async def authorize(self, req: AuthorizeRequest) -> AuthDecision:
+        """
+        Check whether an AI agent is permitted to call a tool.
+
+        Example::
+
+            req = AuthorizeRequest(tool="send_email")
+            result = await lelu.authorize(req)
+            if result.decision == "allow":
+                pass  # proceed
+            elif result.decision == "compute":
+                call_tool(result.safe_tool, result.safe_args)  # use safe alternative
+            elif result.decision == "human_review":
+                # Don't just wait for "approved" and then act — an approval
+                # is bound to the payload it approved. wait_and_redeem()
+                # waits, then re-checks this exact request against it.
+                outcome = await lelu.wait_and_redeem(result.review_id, req)
+                if not outcome.allowed:
+                    return f"Not approved for this action: {outcome.reason}"
+            else:
+                return f"Blocked: {result.reason}"
+        """
+        data = await self._post("/v1/agent/authorize", self._authorize_body(req))
 
         # Derive the decision from the engine's boolean flags.
         if data.get("compute"):
@@ -368,6 +387,64 @@ class LeluClient:
             f"/v1/queue/{review_id}/deny", {"resolved_by": resolved_by, "note": note}
         )
         return bool(data.get("success"))
+
+    async def redeem_review(self, review_id: str, req: AuthorizeRequest) -> RedeemResult:
+        """
+        Check an approval against the request you are about to execute.
+
+        Pass the same :class:`AuthorizeRequest` you passed to
+        :meth:`authorize`. The engine fingerprinted that request's
+        effect-determining fields — action, resource, args, acting_for,
+        scope — when it paused for review, and compares them again here.
+        A request altered in between is refused rather than executing under
+        an approval that was granted for something else.
+
+        Confidence is deliberately outside that comparison: a reviewer
+        approves an effect, not the model's confidence in it, so an agent
+        that recomputed confidence in the meantime still redeems fine.
+
+        Returns a :class:`RedeemResult` rather than raising on refusal —
+        "not allowed" is an answer, not an error.
+        """
+        resp = await self._client.post(
+            f"/v1/queue/{review_id}/redeem", json=self._authorize_body(req)
+        )
+        # 403 is the engine's refusal, and carries the reason in its body.
+        # Anything else unexpected is a genuine transport/server fault.
+        if resp.status_code not in (200, 403):
+            await self._raise_for_status(resp)
+        return RedeemResult(**resp.json())
+
+    async def wait_and_redeem(
+        self, review_id: str, req: AuthorizeRequest, timeout_ms: int = 30_000
+    ) -> RedeemResult:
+        """
+        Wait for a human decision, then redeem the approval against `req`.
+
+        This is the path you want after a ``human_review`` decision.
+        Waiting alone only tells you a reviewer said yes to *something*;
+        it doesn't bind that yes to what you then execute. This waits, and
+        on approval re-checks this exact request against what was approved.
+
+        Returns ``allowed=False`` with a reason when the wait times out
+        while still pending, when the review was denied, or when the
+        payload no longer matches — the caller has one thing to check
+        rather than three.
+        """
+        item = await self.wait_review(review_id, timeout_ms=timeout_ms)
+        if item.pending:
+            return RedeemResult(
+                allowed=False,
+                reason=f"still pending after {timeout_ms}ms",
+                review_id=review_id,
+            )
+        if not item.approved:
+            return RedeemResult(
+                allowed=False,
+                reason=f"review was {item.status}",
+                review_id=review_id,
+            )
+        return await self.redeem_review(review_id, req)
 
     # ── Output scanning (indirect injection defense) ──────────────────────────
 

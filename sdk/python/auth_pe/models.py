@@ -226,6 +226,28 @@ class ListReviewsResult(BaseModel):
     count: int = 0
 
 
+class RedeemResult(BaseModel):
+    """
+    The engine's answer to "may I execute *this* payload against that
+    approval, right now?"
+
+    An approval on its own only says a reviewer said yes to something. It
+    doesn't say yes to whatever the agent happens to run next. Redeeming
+    re-checks the payload against the one that was actually approved, so a
+    request mutated in between fails instead of riding a valid approval.
+
+    ``allowed`` is false for every failure — mismatched payload, still
+    pending, denied, expired, or an approval that was never bound to a
+    payload at all. ``reason`` says which, without echoing the approved
+    payload back (it would otherwise be an oracle for discovering it).
+    """
+
+    allowed: bool = False
+    reason: str = ""
+    review_id: str = ""
+    trace_id: str = ""
+
+
 # ─── Output scanning (engine /v1/scan/output) ─────────────────────────────────
 
 

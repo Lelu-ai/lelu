@@ -36,7 +36,13 @@ async def main():
     if result.decision == "allow":
         ...  # proceed
     elif result.decision == "human_review":
-        ...  # queued — agent pauses, awaiting approval
+        # Queued for a human. Don't just wait for "approved" and then act —
+        # an approval is bound to the request it approved, so pass the same
+        # request back and let the engine confirm nothing changed.
+        outcome = await auth.wait_and_redeem(result.review_id, tool="invoice:create")
+        if not outcome.allowed:
+            raise PermissionError(outcome.reason)
+        ...  # proceed
     else:
         raise PermissionError(result.reason)
 

@@ -64,6 +64,7 @@ from .models import (
     # Human review queue
     ReviewItem,
     ListReviewsResult,
+    RedeemResult,
     # Output scanning
     ScanOutputResult,
     # Engine policy
@@ -144,6 +145,7 @@ __all__ = [
     # Human review queue
     "ReviewItem",
     "ListReviewsResult",
+    "RedeemResult",
     # Output scanning
     "ScanOutputResult",
     # Engine policy

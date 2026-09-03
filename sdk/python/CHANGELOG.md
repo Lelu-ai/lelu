@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0] (2026-09-03)
+## [0.4.4] (2026-09-03)
 
 **Requires engine ≥ 0.2.0.** The redemption endpoint this release calls does not exist in earlier engines — `wait_and_redeem()` against an older engine will 404. (If you were waiting on engine `0.1.1` for the `review_id` fix in 0.4.3: that was never tagged, and everything it covered shipped in `0.2.0` instead.)
 

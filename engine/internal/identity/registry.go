@@ -23,6 +23,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+
+	"github.com/lelu-ai/lelu/engine/internal/mcpauth"
 )
 
 // AgentType classifies the operational model of an agent.
@@ -381,7 +383,7 @@ func (r *Registry) OIDCDiscovery() map[string]any {
 		"id_token_signing_alg_values_supported": []string{"RS256"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post", "none"},
 		"code_challenge_methods_supported":      []string{"S256"},
-		"scopes_supported":                      []string{"openid", "profile", "agent:read", "agent:write", "tools:call"},
+		"scopes_supported":                      mcpauth.SupportedScopes,
 	}
 }
 
@@ -394,7 +396,7 @@ func (r *Registry) MCPAuthServerMetadata() map[string]any {
 		"token_endpoint":                        r.issuer + "/oauth/token",
 		"registration_endpoint":                 r.issuer + "/oauth/clients",
 		"jwks_uri":                              r.issuer + "/.well-known/jwks.json",
-		"scopes_supported":                      []string{"openid", "profile", "agent:read", "agent:write", "tools:call"},
+		"scopes_supported":                      mcpauth.SupportedScopes,
 		"response_types_supported":              []string{"code"},
 		"grant_types_supported":                 []string{"authorization_code", "client_credentials", "refresh_token"},
 		"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post", "none"},
@@ -410,7 +412,7 @@ func (r *Registry) MCPProtectedResourceMetadata() map[string]any {
 		"resource":                 r.issuer,
 		"authorization_servers":    []string{r.issuer},
 		"jwks_uri":                 r.issuer + "/.well-known/jwks.json",
-		"scopes_supported":         []string{"openid", "profile", "agent:read", "agent:write", "tools:call"},
+		"scopes_supported":         mcpauth.SupportedScopes,
 		"bearer_methods_supported": []string{"header"},
 	}
 }

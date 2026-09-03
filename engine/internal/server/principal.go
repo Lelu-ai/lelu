@@ -1,6 +1,10 @@
 package server
 
-import "context"
+import (
+	"context"
+
+	"github.com/lelu-ai/lelu/engine/internal/mcpauth"
+)
 
 // Principal is the identity authMiddleware actually resolved for this
 // request, set once a credential has verified — so handlers derive
@@ -25,7 +29,17 @@ type Principal struct {
 type principalContextKey struct{}
 
 func withPrincipal(ctx context.Context, p Principal) context.Context {
-	return context.WithValue(ctx, principalContextKey{}, p)
+	ctx = context.WithValue(ctx, principalContextKey{}, p)
+	// The MCP OAuth server registers and revokes clients on behalf of
+	// whoever is calling, and cannot import this package to ask. Hand it the
+	// two facts it needs: an owner to attribute the client to, and whether
+	// this caller is the operator.
+	owner := p.UserID
+	if owner == "" && p.IsStaticAdminKey {
+		owner = "static-admin"
+	}
+	ctx = mcpauth.WithOwner(ctx, owner)
+	return mcpauth.WithAdmin(ctx, p.IsStaticAdminKey)
 }
 
 // principalFromContext returns the request's resolved Principal. ok is

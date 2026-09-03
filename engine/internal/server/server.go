@@ -5,14 +5,18 @@ package server
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -79,7 +84,47 @@ var (
 		Name: "lelu_anomaly_alerts_total",
 		Help: "Total number of anomaly spike alerts fired per actor",
 	}, []string{"actor"})
+
+	// Audit pipeline loss. Previously the only way to notice that decisions
+	// were going unrecorded was to compare lelu_auth_decisions_total against
+	// a hand count of log lines — which nobody does, so silent loss stayed
+	// silent. These are gauges rather than counters because they are read
+	// from the writer's own totals.
+	auditEventsDropped = promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "lelu_audit_events_dropped_total",
+		Help: "Audit events discarded because the writer queue was full. Non-zero means the audit log is incomplete and any chain verification over it attests only to what survived.",
+	}, func() float64 { return float64(globalAuditWriter.Load().dropped()) })
+
+	auditWriteErrors = promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "lelu_audit_write_errors_total",
+		Help: "Audit events that failed to reach the sink. The receipt chain does not advance past a failed write, so these are gaps too.",
+	}, func() float64 { return float64(globalAuditWriter.Load().writeErrors()) })
 )
+
+// globalAuditWriter lets the package-level metric collectors above read the
+// live writer's counters. promauto registers at package init, before any
+// Handler exists, so the collectors need a reference that can be filled in
+// later rather than one captured at registration time.
+var globalAuditWriter atomic.Pointer[auditCounters]
+
+// auditCounters is the small read-only view the metrics need.
+type auditCounters struct{ w *audit.Writer }
+
+func (a *auditCounters) dropped() uint64 {
+	if a == nil || a.w == nil {
+		return 0
+	}
+	return a.w.Dropped()
+}
+
+func (a *auditCounters) writeErrors() uint64 {
+	if a == nil || a.w == nil {
+		return 0
+	}
+	return a.w.WriteErrors()
+}
+
+func init() { globalAuditWriter.Store(&auditCounters{}) }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +139,23 @@ type Handler struct {
 	queue     *queue.Queue
 	apiKey    string
 	keyVerify *keyVerifier // account-bound lelu_sk_ keys; nil unless PLATFORM_URL is set
+	// reviewers is the separate credential class that identifies a human
+	// resolving a review. nil when LELU_REVIEWER_KEYS is unset, which leaves
+	// reviewer identity self-asserted — see handleQueueResolve.
+	reviewers *reviewerRegistry
+	// advertiseAS gates the /.well-known/ authorization-server documents.
+	// Off unless LELU_ADVERTISE_AUTH_SERVER=true.
+	advertiseAS bool
+	// metricsPublic exempts /metrics from authentication. Off by default.
+	metricsPublic bool
+	// receiptKey is the public half of the audit receipt signing key, held
+	// here so /.well-known/jwks.json does not depend on the database.
+	receiptKey   *rsa.PublicKey
+	receiptKeyID string
+	// policyWritable records whether policyPath can actually be written, so
+	// PUT /v1/policy can say "this deployment cannot do that" instead of
+	// failing at write time with a filesystem error.
+	policyWritable bool
 	confCfg   ConfidenceConfig
 	mode      EnforcementMode
 	shadow    *shadowStats
@@ -136,7 +198,28 @@ type Handler struct {
 
 // SetPolicyPath configures the file path used by PUT /v1/policy to persist
 // policy changes so they survive engine restarts.
-func (h *Handler) SetPolicyPath(path string) { h.policyPath = path }
+// SetPolicyPath records where policy is persisted and probes whether that
+// location is actually writable, so PUT /v1/policy can report a read-only
+// deployment as a deployment fact at startup rather than as a runtime error
+// on the first attempt.
+func (h *Handler) SetPolicyPath(path string) {
+	h.policyPath = path
+	if path == "" {
+		h.policyWritable = false
+		return
+	}
+	dir := filepath.Dir(path)
+	probe, err := os.CreateTemp(dir, ".policy-writable-*")
+	if err != nil {
+		h.policyWritable = false
+		log.Printf("policy updates disabled: %s is not writable (PUT /v1/policy will report 501)", dir)
+		return
+	}
+	name := probe.Name()
+	probe.Close()
+	os.Remove(name)
+	h.policyWritable = true
+}
 
 // ─── Anomaly Tracker ──────────────────────────────────────────────────────────
 
@@ -311,9 +394,31 @@ func New(
 
 	// Account-bound API key verification (optional — only active when
 	// PLATFORM_URL is configured)
+	advertiseAS := strings.EqualFold(strings.TrimSpace(os.Getenv("LELU_ADVERTISE_AUTH_SERVER")), "true")
+	if advertiseAS {
+		log.Printf("WARNING: advertising as an OAuth authorization server (/.well-known/oauth-authorization-server). Any resource server that trusts this issuer will accept tokens minted by any holder of a Lelu credential, bounded only by the client's registered scope. There is no resource-owner consent step.")
+	}
+
+	reviewers := newReviewerRegistryFromEnv()
+	if reviewers != nil {
+		log.Printf("human review: reviewer credentials configured for %s — resolver identity is taken from the credential", strings.Join(reviewers.names(), ", "))
+	} else {
+		log.Printf("WARNING: human review has no reviewer credentials (LELU_REVIEWER_KEYS unset) — an agent holding an API key can resolve the reviews it triggered. resolved_by is a self-asserted claim, not an authenticated identity.")
+	}
+
 	keyVerify := newKeyVerifierFromEnv()
 	if keyVerify != nil {
-		log.Printf("platform key verification enabled (lelu_sk_ keys accepted)")
+		log.Printf("auth mode: platform key verification enabled (account-bound lelu_sk_ keys accepted; per-principal authorization active)")
+	} else {
+		// The branch that actually matters. With no key verifier every caller
+		// authenticates as the one static admin credential, so every
+		// !principal.IsStaticAdminKey restriction in this file is
+		// unreachable and the deployment is single-tenant by construction —
+		// which is a legitimate way to run it, but not something an operator
+		// should have to infer from the absence of a log line. The database
+		// path a few lines up already logs its disabled case; this is the
+		// same courtesy for the one with security consequences.
+		log.Printf("auth mode: single static admin credential (PLATFORM_URL unset) — every authenticated caller has full admin authority and per-principal checks are inactive")
 	}
 
 	// External confidence auditor (optional — only active when API key configured)
@@ -331,7 +436,7 @@ func New(
 		return nil, fmt.Errorf("risk config: %w", err)
 	}
 
-	return &Handler{
+	h := &Handler{
 		eval:           eval,
 		tokenSvc:       tokenSvc,
 		confGate:       confGate,
@@ -342,6 +447,9 @@ func New(
 		queue:          q,
 		apiKey:         apiKey,
 		keyVerify:      keyVerify,
+		reviewers:      reviewers,
+		advertiseAS:    advertiseAS,
+		metricsPublic:  strings.EqualFold(strings.TrimSpace(os.Getenv("LELU_METRICS_PUBLIC")), "true"),
 		confCfg:        confCfg.withDefaults(),
 		mode:           mode,
 		shadow:         newShadowStats(),
@@ -365,7 +473,12 @@ func New(
 		extAuditor:     extAuditor,
 		confScorer:     confScorer,
 		confEscalator:  confEscalator,
-	}, nil
+	}
+
+	// Let the package-level audit metrics read this writer's counters.
+	globalAuditWriter.Store(&auditCounters{w: auditWriter})
+
+	return h, nil
 }
 
 // SetVault attaches an OAuth token vault to the handler after construction.
@@ -433,6 +546,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("GET /v1/fallback/status", h.handleFallbackStatus)
 	mux.HandleFunc("GET /healthz", h.handleHealth)
+	// /metrics names agents, actions and volumes, so it sits behind auth like
+	// everything else. It is also the only place an operator can currently
+	// see the audit pipeline's drop counters, which is a reason to keep it
+	// reachable — not a reason to keep it anonymous. Set
+	// LELU_METRICS_PUBLIC=true for a scrape path that cannot present a
+	// credential (in which case bind it somewhere only your scraper reaches).
 	mux.Handle("GET /metrics", promhttp.Handler())
 
 	// OAuth Token Vault
@@ -451,10 +570,27 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/agents/{agentID}/token", h.handleIssueAgentToken)
 
 	// Feature 2: OIDC discovery + JWKS (public — no API key)
-	mux.HandleFunc("GET /.well-known/openid-configuration", h.handleOIDCDiscovery)
+	// JWKS is always published: audit receipts are signed with this key and a
+	// receipt nobody can verify is not evidence. Publishing a public key is
+	// also the one thing here with no third-party consequence.
 	mux.HandleFunc("GET /.well-known/jwks.json", h.handleJWKS)
-	mux.HandleFunc("GET /.well-known/oauth-authorization-server", h.handleMCPAuthServerMeta)
-	mux.HandleFunc("GET /.well-known/oauth-protected-resource", h.handleMCPProtectedResourceMeta)
+
+	// The authorization-server documents are gated. Publishing them tells any
+	// MCP resource server that Lelu is an authorization server it may trust,
+	// and a resource server that takes that at face value will accept any
+	// token this engine signs. Until an authorization here represents a
+	// resource owner's decision — there is no consent step, only
+	// authentication — the blast radius of that advertisement lands on third
+	// parties rather than on this deployment, so it is opt-in rather than
+	// automatic. Scope binding (see mcpauth.grantableScope) reduces what such
+	// a token can claim; it does not make the advertisement consented.
+	//
+	// See Nate Howard's follow-up on finding #1.
+	if h.advertiseAS {
+		mux.HandleFunc("GET /.well-known/openid-configuration", h.handleOIDCDiscovery)
+		mux.HandleFunc("GET /.well-known/oauth-authorization-server", h.handleMCPAuthServerMeta)
+		mux.HandleFunc("GET /.well-known/oauth-protected-resource", h.handleMCPProtectedResourceMeta)
+	}
 
 	// Feature 2: MCP OAuth 2.1 endpoints (public — clients use their own auth)
 	if h.mcpAuth != nil {
@@ -638,9 +774,19 @@ func payloadHash(v interface{}) string {
 // actually *does* — deliberately narrower than the inputHash covering the
 // whole request.
 //
-// A human approving a review is approving an effect: this action, on this
-// target, with these arguments, on behalf of this user, at this scope. It is
-// not approving the confidence telemetry that happened to accompany the
+// A human approving a review is approving an effect: this actor, in this
+// tenant, taking this action, on this target, with these arguments, on behalf
+// of this user, at this scope.
+//
+// Actor and TenantID are part of the effect, not context around it. A
+// reviewer looking at "invoice_bot, in tenant t1, may refund $10 on
+// refund-88" is not agreeing that anyone in any tenant may refund $10 on
+// refund-88 — but that is exactly what the binding said while those two
+// fields were excluded, since redemption recomputes the fingerprint from a
+// caller-supplied payload and both fields could be swapped freely without
+// changing the hash.
+//
+// It is not approving the confidence telemetry that happened to accompany the
 // request. Including Confidence/Signal here would make redemption fail
 // whenever an agent recomputed its confidence between the request and the
 // execution — a false mismatch on a payload that is, in every way the
@@ -652,12 +798,16 @@ func payloadHash(v interface{}) string {
 // canonicalize to the same bytes.
 func effectFingerprint(req agentAuthorizeRequest) string {
 	return payloadHash(struct {
+		Actor     string                 `json:"actor"`
+		TenantID  string                 `json:"tenant_id"`
 		Action    string                 `json:"action"`
 		Resource  map[string]string      `json:"resource"`
 		Args      map[string]interface{} `json:"args"`
 		ActingFor string                 `json:"acting_for"`
 		Scope     string                 `json:"scope"`
 	}{
+		Actor:     req.Actor,
+		TenantID:  req.TenantID,
 		Action:    req.Action,
 		Resource:  req.Resource,
 		Args:      req.Args,
@@ -2053,12 +2203,35 @@ func (h *Handler) handleQueueList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "queue not configured")
 		return
 	}
-	items, err := h.queue.ListPending(r.Context(), 50)
+	// Pagination, and a real total. A fixed page of 50 with no cursor and no
+	// count meant a reviewer could not tell "these are all of them" from
+	// "these are the newest 50 of four thousand" — and an item pushed off the
+	// page was invisible rather than merely on page two.
+	limit := int64(50)
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+	var offset int64
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+
+	page, err := h.queue.ListPendingPage(r.Context(), limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items, "count": len(items)})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items":  page.Items,
+		"count":  len(page.Items),
+		"total":  page.Total,
+		"offset": page.Offset,
+		"limit":  page.Limit,
+	})
 }
 
 func (h *Handler) handleQueueGet(w http.ResponseWriter, r *http.Request) {
@@ -2088,6 +2261,20 @@ func (h *Handler) handleQueueDeny(w http.ResponseWriter, r *http.Request) {
 	h.handleQueueResolve(w, r, false)
 }
 
+// handleQueueResolve records a human decision on a flagged action.
+//
+// Reviewer identity comes from a reviewer credential when one is configured
+// (LELU_REVIEWER_KEYS), and the request body's resolved_by is ignored in that
+// mode. That is the only mode in which the pause-approve-resume guarantee
+// actually holds, because it is the only one where the resolver is provably
+// not the agent under review: the flagged agent holds an ordinary API key,
+// the same credential this endpoint otherwise accepts.
+//
+// Without reviewer credentials the endpoint stays usable but is not a
+// security control, and it now says so rather than implying otherwise:
+// resolved_by is mandatory and non-empty, so an item can never be resolved
+// with no attribution at all, and the response carries reviewer_authenticated
+// so a consumer can tell an authenticated decision from a claimed one.
 func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, approve bool) {
 	if h.queue == nil {
 		writeError(w, http.StatusServiceUnavailable, "queue not configured")
@@ -2099,48 +2286,87 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// Capture the flagged action's confidence before resolving so the calibrate
-	// stage can train on this real reviewer outcome (approved ⇒ the action was
-	// safe). This is the ground-truth feedback the calibration layer relies on.
-	var rawConfidence float64
-	haveConfidence := false
-	if item, gerr := h.queue.Get(r.Context(), id); gerr == nil {
-		rawConfidence = item.ConfidenceScore
-		haveConfidence = true
 
-		// An agent flagged for human_review holds the exact same credential
-		// it used to make the original request — nothing about
-		// authentication here distinguishes "the flagged agent" from "a
-		// human reviewer", so the pause-approve-resume guarantee only holds
-		// if the resolver is provably not the actor under review. There's
-		// no separate reviewer credential (a bigger change, not done here —
-		// see the finding), so resolved_by is the only "who is resolving
-		// this" signal available. It's caller-supplied and not
-		// cryptographically verified, so this doesn't stop an actor willing
-		// to put a different name in resolved_by while using the same key —
-		// it closes the literal, named case (an actor resolving under its
-		// own name), not the deeper one. See Nate Howard's review, finding
-		// #3.
-		if req.ResolvedBy != "" && req.ResolvedBy == item.Actor {
+	item, gerr := h.queue.Get(r.Context(), id)
+	if gerr != nil {
+		writeError(w, http.StatusNotFound, gerr.Error())
+		return
+	}
+
+	var resolvedBy string
+	reviewerAuthenticated := false
+
+	if h.reviewers != nil {
+		name, ok := h.reviewerFromRequest(r)
+		if !ok {
+			writeError(w, http.StatusForbidden,
+				"a valid reviewer credential ("+reviewerHeader+") is required to resolve a human_review item")
+			return
+		}
+		// Identity from the credential, never from the body. The body value
+		// is not merely untrusted here — accepting it at all would reopen the
+		// gap the credential exists to close.
+		resolvedBy = name
+		reviewerAuthenticated = true
+	} else {
+		resolvedBy = strings.TrimSpace(req.ResolvedBy)
+		// Required. The guard this replaces was `resolved_by != "" && ==
+		// actor`, so omitting the field skipped the check entirely: the
+		// easiest possible request body was the one that both defeated the
+		// self-approval check and left the item recorded as resolved by
+		// nobody.
+		if resolvedBy == "" {
+			writeError(w, http.StatusBadRequest,
+				"resolved_by is required and must name the human resolving this item")
+			return
+		}
+		// Closes the literal case only — an actor resolving under its own
+		// name. Any other string still passes, with the same key. That is
+		// inherent to self-asserted identity and is why the reviewer
+		// credential above exists.
+		if resolvedBy == item.Actor {
 			writeError(w, http.StatusForbidden, "an actor cannot resolve its own human_review item")
 			return
 		}
 	}
 
+	// Captured before resolving so the calibrate stage can train on this real
+	// reviewer outcome (approved ⇒ the action was safe).
+	rawConfidence := item.ConfidenceScore
+
 	var err error
 	if approve {
-		err = h.queue.Approve(r.Context(), id, req.ResolvedBy, req.Note)
+		err = h.queue.Approve(r.Context(), id, resolvedBy, req.Note)
 	} else {
-		err = h.queue.Deny(r.Context(), id, req.ResolvedBy, req.Note)
+		err = h.queue.Deny(r.Context(), id, resolvedBy, req.Note)
 	}
 	if err != nil {
+		// A resolution that lost the race must not report success. Reporting
+		// {"success":true} to a reviewer whose denial was overwritten by a
+		// concurrent approval is the specific failure this distinguishes.
+		if errors.Is(err, queue.ErrAlreadyResolved) {
+			current, cerr := h.queue.Get(r.Context(), id)
+			status := ""
+			if cerr == nil {
+				status = string(current.Status)
+			}
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"success":        false,
+				"error":          "this item was already resolved; your decision was not applied",
+				"current_status": status,
+			})
+			return
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if haveConfidence {
-		h.confCalibrator.RecordReview(rawConfidence, approve)
-	}
-	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+
+	h.confCalibrator.RecordReview(rawConfidence, approve)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"success":                true,
+		"resolved_by":            resolvedBy,
+		"reviewer_authenticated": reviewerAuthenticated,
+	})
 }
 
 // handleQueueRedeem re-checks an approval against the payload actually about
@@ -2360,8 +2586,20 @@ func (h *Handler) handlePolicyPut(w http.ResponseWriter, r *http.Request) {
 	// Persist first (atomic rename). If the write fails, the live policy is
 	// untouched and the new policy won't survive a restart if we were to swap it.
 	if h.policyPath != "" {
+		if !h.policyWritable {
+			// Reported up front rather than as a filesystem error after the
+			// fact. The stock compose mounts the policy directory read-only,
+			// so this endpoint could never succeed there — an operator
+			// deserves to be told that's a deployment choice, not a
+			// transient failure.
+			writeError(w, http.StatusNotImplemented,
+				"policy updates are disabled in this deployment: the policy directory is mounted read-only. Mount it writable, or manage policy through your deployment pipeline.")
+			return
+		}
 		if err := atomicWritePolicy(h.policyPath, body); err != nil {
-			writeError(w, http.StatusInsufficientStorage, "persist failed; policy unchanged: "+err.Error())
+			// Deliberately does not echo err: it names the internal temp path.
+			log.Printf("policy persist failed for %s: %v", h.policyPath, err)
+			writeError(w, http.StatusInsufficientStorage, "persist failed; policy unchanged")
 			return
 		}
 	}
@@ -2459,6 +2697,41 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 		deps["fallback"] = h.fallback.Status()
 	}
 
+	// The audit pipeline is a dependency like any other, and an engine that
+	// is answering authorization requests while losing the record of them is
+	// degraded — not "ok". A container that reports healthy in that state is
+	// the reason nobody noticed.
+	if h.audit != nil {
+		dropped, werrs := h.audit.Dropped(), h.audit.WriteErrors()
+		auditDep := map[string]any{
+			"status":         "ok",
+			"events_dropped": dropped,
+			"write_errors":   werrs,
+		}
+		if dropped > 0 || werrs > 0 {
+			auditDep["status"] = "degraded"
+			auditDep["detail"] = "decisions were returned to callers with no durable audit record; sequence gaps in the log identify them"
+			status = http.StatusServiceUnavailable
+		}
+		deps["audit"] = auditDep
+	}
+
+	// Subsystems that are configured-but-absent were previously visible only
+	// as warning lines at boot, which scroll away. An operator asking the
+	// health endpoint what is running should get an answer.
+	deps["identity_registry"] = map[string]any{"configured": h.identityReg != nil}
+	deps["mcp_oauth"] = map[string]any{"configured": h.mcpAuth != nil, "advertised": h.advertiseAS}
+	deps["human_review"] = map[string]any{
+		"configured":             h.queue != nil,
+		"reviewer_credentials":   h.reviewers != nil,
+		"authenticated_reviewer": h.reviewers != nil,
+	}
+	deps["auth_mode"] = map[string]any{
+		"platform_keys": h.keyVerify != nil,
+		"static_admin":  h.keyVerify == nil,
+	}
+	deps["rate_limiting"] = map[string]any{"enabled": h.rateLimit.Enabled()}
+
 	payload := map[string]any{
 		"status":  "ok",
 		"service": "lelu-engine",
@@ -2549,6 +2822,12 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		// requiring both would break the standard flow for a client that's
 		// already been through /oauth/authorize.
 		//
+		// /oauth/revoke and /oauth/introspect skip it for the same reason as
+		// /oauth/token: both carry their own credential (a token in hand for
+		// revocation, per RFC 7009; client_secret for introspection, per RFC
+		// 7662), and a resource server checking whether a token is still live
+		// is not a party that holds a Lelu API key.
+		//
 		// /oauth/clients and /oauth/authorize deliberately do NOT skip auth:
 		// with no gate here, anyone with network access could register a
 		// client and get a code issued with no credential at all, then
@@ -2559,9 +2838,17 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		// as everything else — only someone who already has Lelu access can
 		// mint a new OAuth client or get a code issued at all. See Nate
 		// Howard's review, finding #1 — the only unauthenticated one.
-		if r.URL.Path == "/healthz" || r.URL.Path == "/metrics" ||
+		if r.URL.Path == "/healthz" ||
 			strings.HasPrefix(r.URL.Path, "/.well-known/") ||
-			r.URL.Path == "/oauth/token" {
+			r.URL.Path == "/oauth/token" ||
+			r.URL.Path == "/oauth/revoke" ||
+			r.URL.Path == "/oauth/introspect" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// /metrics is authenticated unless explicitly published. It exposes
+		// agent identifiers, action names and request volumes.
+		if r.URL.Path == "/metrics" && h.metricsPublic {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -3206,14 +3493,57 @@ func (h *Handler) handleOIDCDiscovery(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(h.identityReg.OIDCDiscovery())
 }
 
+// handleJWKS publishes the public half of the receipt signing key.
+//
+// Deliberately not gated on the identity registry. The registry needs a
+// database; receipt signing does not — so tying JWKS to the registry meant a
+// deployment whose database failed to open would happily sign every audit
+// receipt with a key whose public half it then served as HTTP 503. Receipts
+// nobody can ever verify are not receipts, and the failure announced itself
+// only as a warning line at boot.
+//
+// The registry's key and the receipt key are the same key, so when the
+// registry is up its response is used verbatim; when it is not, the key is
+// published directly. Either way, if the engine is signing, the verifier is
+// reachable.
 func (h *Handler) handleJWKS(w http.ResponseWriter, r *http.Request) {
-	if h.identityReg == nil {
-		writeError(w, http.StatusServiceUnavailable, "identity registry not configured")
+	var body any
+	switch {
+	case h.identityReg != nil:
+		body = h.identityReg.JWKSResponse()
+	case h.receiptKey != nil:
+		body = jwksFromPublicKey(h.receiptKey, h.receiptKeyID)
+	default:
+		writeError(w, http.StatusServiceUnavailable, "no signing key is configured; this engine signs nothing")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	json.NewEncoder(w).Encode(h.identityReg.JWKSResponse())
+	json.NewEncoder(w).Encode(body)
+}
+
+// jwksFromPublicKey renders a single RSA public key as a JWKS document, in
+// the same shape identity.Registry produces.
+func jwksFromPublicKey(pub *rsa.PublicKey, keyID string) map[string]any {
+	eBytes := big.NewInt(int64(pub.E)).Bytes()
+	return map[string]any{
+		"keys": []map[string]any{{
+			"kty": "RSA",
+			"use": "sig",
+			"alg": "RS256",
+			"kid": keyID,
+			"n":   base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
+			"e":   base64.RawURLEncoding.EncodeToString(eBytes),
+		}},
+	}
+}
+
+// SetReceiptKey records the public half of the audit receipt signing key so
+// JWKS can be served without a database. Call it alongside
+// audit.Writer.SetSigner.
+func (h *Handler) SetReceiptKey(pub *rsa.PublicKey, keyID string) {
+	h.receiptKey = pub
+	h.receiptKeyID = keyID
 }
 
 func (h *Handler) handleMCPAuthServerMeta(w http.ResponseWriter, r *http.Request) {

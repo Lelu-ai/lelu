@@ -12,8 +12,10 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"net/url"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -59,7 +61,19 @@ func main() {
 	otelSampleRate := parseFloatOr(envOr("OTEL_SAMPLE_RATE", "1.0"), 1.0)
 
 	// Feature 2: Durable Agent Identity + MCP OAuth 2.1
-	leluIssuer := envOr("LELU_ISSUER", "https://lelu-ai.com")
+	//
+	// The issuer is published verbatim in /.well-known/* as the
+	// authorization_endpoint, registration_endpoint and jwks_uri. Defaulting
+	// it to the hosted domain means every self-hosted instance hands RFC 8414
+	// clients a document directing them to register clients and fetch signing
+	// keys from lelu-ai.com instead of from the engine they discovered. The
+	// default is now the engine's own public URL, and the hosted value is only
+	// used when an operator sets it deliberately.
+	leluIssuer := envOr("LELU_ISSUER", envOr("LELU_ENGINE_PUBLIC_URL", ""))
+	if leluIssuer == "" {
+		leluIssuer = "http://localhost" + addr
+		log.Printf("warning: neither LELU_ISSUER nor LELU_ENGINE_PUBLIC_URL is set — publishing discovery metadata as %s, which is almost certainly not reachable by your clients", leluIssuer)
+	}
 	rsaKeyPath := envOr("LELU_RSA_KEY_PATH", "/var/lib/lelu/signing.key.pem")
 
 	// Phase 2: Behavioral Analytics Database
@@ -150,9 +164,13 @@ func main() {
 	}
 
 	// ── Redis configuration validation ────────────────────────────────────────
+	// REDIS_ADDR is a redis:// URL and carries the password in userinfo, so
+	// neither it nor a parse error wrapping it may be logged: container
+	// stdout goes to docker logs and onward to any aggregator. Report the
+	// redacted form only.
 	redisOpts, err := tokens.ParseRedisAddr(redisAddr)
 	if err != nil {
-		log.Fatalf("invalid REDIS_ADDR %q: %v", redisAddr, err)
+		log.Fatalf("invalid REDIS_ADDR (%s): %v", redactRedisAddr(redisAddr), redactRedisErr(err, redisAddr))
 	}
 
 	tokenSvc := tokens.New(tokens.Config{
@@ -162,7 +180,27 @@ func main() {
 		FallbackService: fb,
 	})
 	confGate := confidence.New()
-	auditWriter := audit.New()
+
+	// ── Audit writer ─────────────────────────────────────────────────────────
+	// AuditStatePath keeps the receipt chain continuous across restarts. With
+	// it unset, every process start opens a fresh genesis, and an attacker who
+	// deletes one process lifetime's worth of events leaves a log that still
+	// verifies — indistinguishable from an honest restart.
+	auditStatePath := envOr("LELU_AUDIT_STATE_PATH", filepath.Join(filepath.Dir(dbPath), "audit-chain.json"))
+	// LELU_AUDIT_BLOCK_ON_FULL trades hot-path latency for the guarantee that a
+	// decision is never returned to a caller without its audit event being
+	// queued. Default off preserves existing latency behaviour; operators who
+	// treat the log as evidence rather than telemetry should turn it on.
+	auditBlockOnFull := strings.EqualFold(strings.TrimSpace(envOr("LELU_AUDIT_BLOCK_ON_FULL", "false")), "true")
+	auditWriter := audit.New(audit.Config{
+		StatePath:   auditStatePath,
+		BlockOnFull: auditBlockOnFull,
+	})
+	if auditBlockOnFull {
+		log.Printf("audit: backpressure enabled — decisions block rather than go unrecorded")
+	} else {
+		log.Printf("audit: drop-on-full (set LELU_AUDIT_BLOCK_ON_FULL=true to apply backpressure instead)")
+	}
 	incidentNotifier := incident.New(incident.Config{
 		WebhookURL: incidentWebhookURL,
 		Timeout:    time.Duration(incidentTimeoutMS) * time.Millisecond,
@@ -170,33 +208,57 @@ func main() {
 
 	// ── Human review queue (Phase 2) ──────────────────────────────────────────
 	var reviewQueue *queue.Queue
+	queueDurable := false
 	if redisOpts != nil {
 		rdb := redis.NewClient(redisOpts)
 		var qErr error
 		reviewQueue, qErr = queue.New(rdb)
 		if qErr != nil {
-			log.Printf("warning: could not init review queue: %v", qErr)
+			// redisOpts.Addr is host:port only — the password lives in
+			// redisOpts.Password, so this is safe to log; the wrapped error
+			// is not guaranteed to be, hence the redaction.
+			log.Printf("warning: could not init review queue (Redis %s): %v", redisOpts.Addr, redactRedisErr(qErr, redisAddr))
 			reviewQueue = queue.NewInMemory()
 		} else {
+			queueDurable = true
 			log.Printf("human review queue ready (Redis %s)", redisOpts.Addr)
 		}
 	} else {
 		reviewQueue = queue.NewInMemory()
 	}
-	if enforcementMode == server.EnforcementModeEnforce && (redisOpts == nil) {
-		log.Printf("WARNING: human review queue is in-memory — pending approvals WILL be lost on restart. Set REDIS_ADDR for durable storage when LELU_MODE=enforce")
+	// Gate on whether the queue actually ended up durable, not on whether the
+	// URL parsed. Parsing succeeds and connecting fails is the common case —
+	// a wrong host, a down Redis, an image that predates the URL format — and
+	// that was exactly the case the old redisOpts == nil condition could not
+	// see, so the one warning written to tell an operator their approvals are
+	// volatile stayed silent precisely when it mattered.
+	if !queueDurable {
+		if enforcementMode == server.EnforcementModeEnforce {
+			log.Printf("WARNING: human review queue is in-memory — pending approvals WILL be lost on restart. Set REDIS_ADDR to a reachable Redis for durable storage when LELU_MODE=enforce")
+		} else {
+			log.Printf("human review queue is in-memory (no reachable Redis) — pending approvals will be lost on restart")
+		}
 	}
 
 	// ── Tenant rate limiter (Phase 2) ────────────────────────────────────────
+	// Non-zero defaults. A limiter that is off unless an operator opts in is
+	// off in every deployment that follows the README, and an unbounded
+	// caller is what lets a single API key outrun the audit writer
+	// indefinitely. These ceilings are high enough not to interfere with
+	// ordinary use and low enough to keep one key from saturating the log;
+	// set either to 0 to disable deliberately.
+	authLimit := parseIntOr(envOr("TENANT_AUTH_RATE_LIMIT", "6000"), 6000)
+	mintLimit := parseIntOr(envOr("TENANT_MINT_RATE_LIMIT", "600"), 600)
 	rl := ratelimit.New(ratelimit.Config{
 		Defaults: ratelimit.TenantLimits{
-			AuthChecksPerMinute: parseIntOr(envOr("TENANT_AUTH_RATE_LIMIT", "0"), 0),
-			TokenMintsPerMinute: parseIntOr(envOr("TENANT_MINT_RATE_LIMIT", "0"), 0),
+			AuthChecksPerMinute: authLimit,
+			TokenMintsPerMinute: mintLimit,
 		},
 	})
 	if rl != nil {
-		log.Printf("tenant rate limiter enabled (auth=%s/min, mint=%s/min)",
-			envOr("TENANT_AUTH_RATE_LIMIT", "0"), envOr("TENANT_MINT_RATE_LIMIT", "0"))
+		log.Printf("tenant rate limiter enabled (auth=%d/min, mint=%d/min)", authLimit, mintLimit)
+	} else {
+		log.Printf("WARNING: tenant rate limiting is DISABLED (TENANT_AUTH_RATE_LIMIT and TENANT_MINT_RATE_LIMIT are both 0) — a single credential can saturate the audit writer")
 	}
 
 	// ── OAuth Token Vault ─────────────────────────────────────────────────────
@@ -227,10 +289,12 @@ func main() {
 	// Sign audit receipts (AARM R5/R6) with the same key, independent of
 	// whether DATABASE_PATH/db is configured below — the identity registry
 	// needs a DB, receipt signing doesn't.
+	var receiptKeyID string
 	if kid, err := audit.DeriveKeyID(&rsaKey.PublicKey); err != nil {
 		log.Printf("warning: audit receipt signing disabled: %v", err)
 	} else {
 		auditWriter.SetSigner(rsaKey, kid)
+		receiptKeyID = kid
 		log.Printf("audit receipts: signing enabled (kid: %s)", kid)
 	}
 
@@ -270,6 +334,13 @@ func main() {
 		log.Fatalf("server init: %v", err)
 	}
 	h.SetPolicyPath(policyPath)
+	// Publish the receipt verification key regardless of whether the identity
+	// registry came up. Signing receipts against a key nobody can fetch makes
+	// the receipts worthless, and the registry needs a database that the
+	// receipt signer does not.
+	if receiptKeyID != "" {
+		h.SetReceiptKey(&rsaKey.PublicKey, receiptKeyID)
+	}
 	if vaultSvc != nil {
 		h.SetVault(vaultSvc)
 	}
@@ -315,7 +386,11 @@ func main() {
 
 	// ── Graceful shutdown ─────────────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	// SIGHUP and SIGQUIT reach the graceful path too — every signal that can
+	// be caught should drain the audit buffer rather than lose it. SIGKILL
+	// cannot be caught, so the un-flushed window is bounded by FlushEvery and
+	// closed only by LELU_AUDIT_BLOCK_ON_FULL plus a durable sink.
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit
 
 	log.Println("shutting down…")
@@ -329,6 +404,9 @@ func main() {
 
 	h.Shutdown() // Shutdown handler components (e.g., ReputationManager)
 	auditWriter.Close()
+	if dropped, werrs := auditWriter.Dropped(), auditWriter.WriteErrors(); dropped > 0 || werrs > 0 {
+		log.Printf("WARNING: audit log is incomplete for this process lifetime: %d events dropped (queue full), %d failed to write. Sequence gaps in the log identify them.", dropped, werrs)
+	}
 	if db != nil {
 		db.Close()
 	}
@@ -466,6 +544,46 @@ func initDatabase(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// redactRedisAddr renders a redis:// URL with the password removed, for use
+// in operator-facing messages. REDIS_ADDR carries the password in userinfo,
+// so the raw value must never reach a log line.
+func redactRedisAddr(addr string) string {
+	u, err := url.Parse(addr)
+	if err != nil || u.Host == "" {
+		// Unparseable: say nothing about the contents rather than risk
+		// echoing a secret out of a malformed string.
+		return "<unparseable redis address>"
+	}
+	if u.User != nil {
+		u.User = url.User("<redacted>")
+	}
+	return u.String()
+}
+
+// redactRedisErr strips any literal occurrence of the Redis password out of
+// an error's text. Wrapped parse and dial errors quote the address they were
+// given, so redacting the address alone is not enough — the secret comes back
+// a second time inside the error.
+func redactRedisErr(err error, addr string) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if u, perr := url.Parse(addr); perr == nil && u.User != nil {
+		if pw, ok := u.User.Password(); ok && pw != "" {
+			msg = strings.ReplaceAll(msg, pw, "<redacted>")
+		}
+		if name := u.User.Username(); name != "" {
+			msg = strings.ReplaceAll(msg, name, "<redacted>")
+		}
+	}
+	// Belt and braces: if the whole address still appears, redact that too.
+	if addr != "" {
+		msg = strings.ReplaceAll(msg, addr, redactRedisAddr(addr))
+	}
+	return msg
 }
 
 func envOr(key, fallback string) string {

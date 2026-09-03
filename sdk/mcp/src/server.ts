@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import * as http from "http";
+import * as crypto from "crypto";
 import { z } from "zod";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -282,20 +283,92 @@ export async function runStdio(cfg?: LeluMcpConfig): Promise<void> {
 
 // ─── HTTP/SSE runner ──────────────────────────────────────────────────────────
 
+/**
+ * Constant-time string comparison, so a wrong token cannot be discovered a
+ * character at a time from response timing.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf8");
+  const bb = Buffer.from(b, "utf8");
+  // timingSafeEqual requires equal lengths; hash first so that length itself
+  // is not the thing being compared.
+  const ah = crypto.createHash("sha256").update(ab).digest();
+  const bh = crypto.createHash("sha256").update(bb).digest();
+  return crypto.timingSafeEqual(ah, bh);
+}
+
+/**
+ * Runs the MCP server over HTTP/SSE.
+ *
+ * This process holds LELU_API_KEY and authenticates to the engine on its
+ * caller's behalf, so every tool it exposes — including `lelu_mint_token`,
+ * which mints real signed agent tokens — is reachable by whoever can reach
+ * this port. Listening without checking a credential therefore made this an
+ * unauthenticated proxy onto the authenticated engine API: anyone who could
+ * reach the host could list the tools and mint tokens with no credential of
+ * their own.
+ *
+ * MCP_AUTH_TOKEN is required for that reason, and startup fails without it
+ * rather than falling back to open. The bind address also defaults to
+ * loopback: a deployment that wants this reachable from elsewhere should say
+ * so deliberately via MCP_BIND_ADDR.
+ *
+ * The stdio transport is unaffected — there the peer is the process that
+ * spawned this one, which is a different trust situation entirely.
+ */
 export async function runHttp(cfg?: LeluMcpConfig, port = 3001): Promise<void> {
   const transports: Record<string, SSEServerTransport> = {};
 
+  const authToken = (process.env["MCP_AUTH_TOKEN"] ?? "").trim();
+  if (!authToken) {
+    throw new Error(
+      "[lelu-mcp] MCP_AUTH_TOKEN is required for the HTTP/SSE transport. " +
+      "This server holds the engine's API key and mints agent tokens on behalf of its callers, " +
+      "so an unauthenticated listener hands those capabilities to anyone who can reach the port. " +
+      "Set MCP_AUTH_TOKEN to a strong secret, or use the stdio transport (--transport stdio)."
+    );
+  }
+  if (authToken.length < 16) {
+    throw new Error("[lelu-mcp] MCP_AUTH_TOKEN must be at least 16 characters.");
+  }
+
+  const bindAddr = process.env["MCP_BIND_ADDR"] ?? "127.0.0.1";
+
+  /** Extracts the presented bearer token from the request. */
+  const presentedToken = (req: http.IncomingMessage): string => {
+    const header = req.headers["authorization"];
+    if (typeof header === "string" && header.startsWith("Bearer ")) {
+      return header.slice("Bearer ".length).trim();
+    }
+    const alt = req.headers["x-lelu-mcp-token"];
+    return typeof alt === "string" ? alt.trim() : "";
+  };
+
   const httpServer = http.createServer(async (req, res) => {
-    // CORS
+    // CORS. Credentials are never reflected and the allowed origin stays
+    // wildcard only because no cookie or credentialed request is involved —
+    // authentication here is an explicit header the caller must supply.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Lelu-MCP-Token");
     if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
-    // Health probe (used by Docker healthcheck)
+    // Health probe (used by Docker healthcheck). Deliberately unauthenticated
+    // and deliberately says nothing beyond liveness.
     if (req.url === "/healthz" && req.method === "GET") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ status: "ok", service: "lelu-mcp" }));
+      return;
+    }
+
+    // Everything below this line reaches the engine under LELU_API_KEY.
+    const token = presentedToken(req);
+    if (!token || !safeEqual(token, authToken)) {
+      res.writeHead(401, {
+        "Content-Type": "application/json",
+        "WWW-Authenticate": 'Bearer realm="lelu-mcp"',
+      });
+      res.end(JSON.stringify({ error: "unauthorized" }));
       return;
     }
 
@@ -326,11 +399,14 @@ export async function runHttp(cfg?: LeluMcpConfig, port = 3001): Promise<void> {
     res.end();
   });
 
-  await new Promise<void>((resolve) => httpServer.listen(port, "0.0.0.0", resolve));
-  console.error(`[lelu-mcp] HTTP/SSE server listening on http://0.0.0.0:${port}`);
-  console.error(`[lelu-mcp]   SSE endpoint  : GET  /sse`);
-  console.error(`[lelu-mcp]   Post endpoint : POST /messages?sessionId=<id>`);
-  console.error(`[lelu-mcp]   Health check  : GET  /healthz`);
+  await new Promise<void>((resolve) => httpServer.listen(port, bindAddr, resolve));
+  console.error(`[lelu-mcp] HTTP/SSE server listening on http://${bindAddr}:${port}`);
+  console.error(`[lelu-mcp]   SSE endpoint  : GET  /sse            (requires Authorization: Bearer <MCP_AUTH_TOKEN>)`);
+  console.error(`[lelu-mcp]   Post endpoint : POST /messages?sessionId=<id>  (same)`);
+  console.error(`[lelu-mcp]   Health check  : GET  /healthz        (open)`);
+  if (bindAddr === "0.0.0.0") {
+    console.error(`[lelu-mcp] WARNING: bound to 0.0.0.0 — this port fronts the engine's API key. Ensure MCP_AUTH_TOKEN is strong and the port is firewalled.`);
+  }
 
   // Keep alive
   await new Promise<void>((_, reject) => httpServer.on("error", reject));

@@ -47,8 +47,28 @@ services:
       INCIDENT_WEBHOOK_PAGERDUTY_MODE: "${INCIDENT_WEBHOOK_PAGERDUTY_MODE:-}"
       PAGERDUTY_ROUTING_KEY: "${PAGERDUTY_ROUTING_KEY:-}"
       LELU_ENGINE_PUBLIC_URL: "${LELU_ENGINE_PUBLIC_URL:-}"
-      TENANT_AUTH_RATE_LIMIT: "${TENANT_AUTH_RATE_LIMIT:-0}"
-      TENANT_MINT_RATE_LIMIT: "${TENANT_MINT_RATE_LIMIT:-0}"
+      # Non-zero. At 0 the limiter is never constructed, and an unbounded
+      # caller can outrun the audit writer indefinitely — which is what made
+      # silent audit loss reachable by an ordinary API key.
+      TENANT_AUTH_RATE_LIMIT: "${TENANT_AUTH_RATE_LIMIT:-6000}"
+      TENANT_MINT_RATE_LIMIT: "${TENANT_MINT_RATE_LIMIT:-600}"
+      # Human review is only a control when the reviewer is provably not the
+      # agent under review. Without this, resolved_by is a self-asserted
+      # string and a flagged agent can resolve its own item.
+      LELU_REVIEWER_KEYS: "${LELU_REVIEWER_KEYS:-}"
+      # Chain continuity across restarts, and the sequence high-water mark.
+      LELU_AUDIT_STATE_PATH: "/var/lib/lelu/audit-chain.json"
+      # Set true to make the engine apply backpressure rather than drop audit
+      # events when the writer is saturated.
+      LELU_AUDIT_BLOCK_ON_FULL: "${LELU_AUDIT_BLOCK_ON_FULL:-false}"
+      # Publishing OAuth authorization-server metadata tells third-party MCP
+      # resource servers to trust tokens this engine signs. Off unless you
+      # mean it.
+      LELU_ADVERTISE_AUTH_SERVER: "${LELU_ADVERTISE_AUTH_SERVER:-false}"
+      # The issuer is published verbatim in the discovery documents. Left
+      # unset it used to default to the hosted domain, pointing every
+      # self-hosted instance's clients at lelu-ai.com for registration and keys.
+      LELU_ISSUER: "${LELU_ISSUER:-${LELU_ENGINE_PUBLIC_URL:-}}"
       FALLBACK_REDIS_MODE: "${FALLBACK_REDIS_MODE:-closed}"
       FALLBACK_CP_MODE: "${FALLBACK_CP_MODE:-closed}"
       RISK_ALLOW_THRESHOLD_LOW: "${RISK_ALLOW_THRESHOLD_LOW:-0.30}"
@@ -63,7 +83,15 @@ services:
       RISK_CRITICALITY_MID_MIN: "${RISK_CRITICALITY_MID_MIN:-0.50}"
       RISK_CRITICALITY_HIGH_MIN: "${RISK_CRITICALITY_HIGH_MIN:-0.80}"
     volumes:
+      # Policy stays read-only: PUT /v1/policy reports 501 rather than failing
+      # at write time. Mount it rw if you want the endpoint live.
       - ./config:/etc/lelu:ro
+      # Writable state. Without this the engine cannot persist its RSA signing
+      # key (so every restart signs receipts with a fresh, unpublished key that
+      # nobody can ever verify), cannot open its database (so the identity
+      # registry, JWKS endpoint, vault and analytics never start), and cannot
+      # persist the audit chain (so every restart opens a new genesis).
+      - engine-data:/var/lib/lelu
     depends_on:
       redis:
         condition: service_healthy
@@ -177,13 +205,31 @@ services:
     image: leluauth/lelu-mcp:latest
     container_name: lelu-mcp
     restart: unless-stopped
+    # Bound to loopback, not 0.0.0.0.
+    #
+    # This container holds the engine's API key and authenticates upstream on
+    # the caller's behalf, so anything that can reach this port can act as the
+    # engine's credential holder — list tools, authorize actions, and mint
+    # real signed agent tokens via lelu_mint_token, with no credential of its
+    # own. Published on 0.0.0.0 it was an unauthenticated proxy onto the
+    # authenticated engine API, reachable by anyone who could reach the host.
+    #
+    # MCP_AUTH_TOKEN below is the actual fix; this binding is the second layer
+    # so that a deployment which forgets to set it is not immediately exposed
+    # to the network. Reach it from other containers by service name over the
+    # internal `lelu` network, which does not go through this mapping.
     ports:
-      - "3003:3001"
+      - "127.0.0.1:3003:3001"
     environment:
       MCP_TRANSPORT:       "http"
       MCP_PORT:            "3001"
       LELU_ENGINE_URL:     "http://engine:8080"
       LELU_API_KEY:        "${API_KEY}"
+      # Required. The MCP server refuses to start an HTTP/SSE transport
+      # without it, because a network-listening MCP server that holds the
+      # engine's credential and checks nothing is a credential-free path to
+      # every tool it exposes.
+      MCP_AUTH_TOKEN:      "${MCP_AUTH_TOKEN:?set MCP_AUTH_TOKEN to a real secret — the MCP server holds the engine API key and must authenticate its own callers}"
     depends_on:
       engine:
         condition: service_healthy
@@ -203,6 +249,7 @@ services:
 volumes:
   redis-data:
   postgres-data:
+  engine-data:
 
 networks:
   lelu:

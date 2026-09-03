@@ -434,6 +434,9 @@ class LeluClient:
 
         Returns a :class:`RedeemResult` rather than raising on refusal —
         "not allowed" is an answer, not an error.
+
+        Requires engine ≥ 0.2.0 — earlier engines have no redeem endpoint
+        and will return 404.
         """
         review_id = self._review_id_of(review)
         resp = await self._client.post(
@@ -466,6 +469,9 @@ class LeluClient:
         while still pending, when the review was denied, or when the
         payload no longer matches — the caller has one thing to check
         rather than three.
+
+        Requires engine ≥ 0.2.0 — earlier engines have no redeem endpoint
+        and will return 404.
         """
         review_id = self._review_id_of(review)
         item = await self.wait_review(review_id, timeout_ms=timeout_ms)

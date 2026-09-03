@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] (2026-09-03)
+
+**Requires engine ≥ 0.2.0.** The redemption endpoint this release calls does not exist in earlier engines — `wait_and_redeem()` against an older engine will 404. (If you were waiting on engine `0.1.1` for the `review_id` fix in 0.4.3: that was never tagged, and everything it covered shipped in `0.2.0` instead.)
+
+### Features
+
+* **`wait_and_redeem()` — the path you want after a `human_review` decision.** Waiting for an approval only tells you a reviewer said yes to *something*; it doesn't bind that yes to what you execute next. This waits for the decision, then re-checks your request against the one that was actually approved, so a payload altered in between is refused instead of riding a valid approval. Returns `allowed=False` with a reason for timeout, denial, or mismatch, so there's one thing to check rather than three.
+* **`redeem_review()`** for callers driving the wait themselves, and a `RedeemResult` model. Refusal comes back as a result, not an exception — "not allowed" is an answer.
+* Both accept the `AuthDecision` you got from `authorize()` as well as a raw review ID. Prefer passing the decision: it carries both `request_id` (trace) and `review_id` (queue key), and reaching for "the request's ID" gets the wrong one with no symptom until redemption fails. Passing the decision removes the choice. An `AuthDecision` with no `review_id` now raises with an explanation rather than building a broken URL.
+* `LeluInstance.wait_and_redeem()` on the ergonomic `auth.*` API, with the default actor applied.
+
+### Fixed
+
+* `AuthDecision.request_id`'s description said "Unique request identifier", which is exactly what you reach for when you want your request's ID — and it's the trace ID, not the review handle. It now says what it is and points at `review_id`.
+
 ## [0.4.3] (2026-08-01)
 
 ### Security Fixes

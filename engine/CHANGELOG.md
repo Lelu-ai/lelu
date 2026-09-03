@@ -1,20 +1,43 @@
 # Changelog
 
-## [0.1.1] (2026-08-01)
+## [0.2.0] (2026-09-03)
 
 _Continues from the `engine-v0.1.0` tag (2026-07-04). The entries below (0.1.6 and earlier) predate the Lelu rename and the versioning restart that came with it — kept for history, but not a continuous sequence with this one._
 
+_A `0.1.1` was drafted but never tagged; everything it covered is included here. If you were waiting on `engine-v0.1.1` for `review_id`, this is that release._
+
+Minor bump rather than a patch because this carries breaking changes — see below. Pre-1.0, so breaking changes ride a minor bump.
+
+### Breaking
+
+* **`confidence_verified` is now `provider_signal_present` in the authorize response and audit events.** The old name claimed more than the check establishes: it was true whenever a well-formed `confidence_signal` was submitted for a provider that *can* expose log-probs, not when Lelu confirmed the numbers came from a real API response — which it never does. `token_logprobs: [0,0,0]` was reported as "verified". Renamed rather than repaired: actually verifying a provider signal means a trusted adapter per provider, which is separate work. Update any caller reading `confidence_verified`.
+* **`/oauth/clients` and `/oauth/authorize` now require a credential.** They were exempted from auth entirely, so anyone with network access could register an OAuth client, get an authorization code with no resource-owner consent, and exchange it for an RS256 JWT signed by the engine's identity key with arbitrary scope. Lelu never accepted those tokens itself, but any MCP resource server trusting Lelu as an issuer via `/.well-known/jwks.json` would. `/oauth/token` remains unauthenticated — it's protected by the client's own PKCE verifier, secret, or refresh token.
+* **`PUT /v1/policy` now enforces the admin credential in every auth mode.** The check only ran when a static `API_KEY` was configured, so in `PLATFORM_URL` mode it silently did nothing and any account-bound key could overwrite the global policy for every tenant.
+
 ### Security Fixes
+
+* **Authentication resolved an identity and then discarded it.** In `PLATFORM_URL` mode the key verifier resolved a `userID` and the middleware threw it away, after which every handler read `tenant_id`/`actor` from the request body. With any valid `lelu_sk_` key that meant: reading decrypted vault tokens for any agent/user/provider triple, listing and suspending/revoking agents across tenants, rate limits keyed on a caller-chosen string, and audit records attributing to whatever was claimed. A `Principal` is now bound to the request context after authentication, and the vault, agent-registry, rate-limit and audit paths all derive identity from it.
+* **An agent could approve its own `human_review` item.** `POST /v1/queue/{id}/approve` accepted the same API key the flagged agent already held, with `resolved_by` as free text. Resolving an item under the same actor name it was raised against is now refused. This closes the named case; a fully separate reviewer credential is still the right long-term answer.
+* **Unused `internal/apikeys` and `internal/middleware` deleted.** Unimported but compiled and tested, and carrying real bugs: raw-secret Redis storage, `Sprintf`/substring metadata parsing that let a crafted name inject fields, a `BindIPToKey` path that resurrected revoked keys on IP change, and `X-Forwarded-For` trusted from any source.
 
 * **Anthropic confidence signals could bypass verification.** `resolveConfidence` marked any `confidence_signal` as verified solely because the field was present, with no provider-capability check, and `ExtractScore` routed `provider: "anthropic"` through the same log-prob path as OpenAI — even though Anthropic exposes no token-level log-prob data on any model. A caller could attach a fabricated log-prob array tagged `"provider": "anthropic"` and have it accepted as a verified signal, bypassing `MissingSignalMode` entirely. Anthropic now always returns an explanatory error, the same pattern already used for Claude on Bedrock, so the signal is correctly treated as missing rather than trusted.
 * **Confidence calibrator could return a fully inverted score outside its fitted range.** The isotonic calibrator only ever trains on the review-queue band — scores that auto-allow or auto-deny never reach it — and previously clamped out-of-range inputs to the *terminal fitted value* instead of returning them unchanged. In an ordinary early-deployment state (the first several human reviews all approved), this could calibrate a raw confidence of 0.0 to roughly 1.0 — a full confidence-gate bypass. The calibrator now refuses to fit on a single-class buffer and returns the raw score unchanged for inputs outside its fitted support.
 * **`human_review` decisions didn't carry a review ID.** The queue item ID returned by `Enqueue` was discarded, so the response had no way to reference the pending review — `GET /v1/queue/{id}`, the long-poll `/wait` endpoint, and approve/deny could never be used to resolve it programmatically. The response now includes `review_id` whenever a decision requires human review.
 
-### Also fixed (client-side — requires SDK ≥ TS 0.0.35 / Python 0.4.3 to take effect)
+### Features
 
-* A scope downgrade (`read_only`) and a `compute` redirect were both represented as `allowed: true` on the wire, same as a clean allow. This was always correct at the engine/API level, but existing SDK wrappers that branched only on `allowed` would run the original action at full, unrestricted scope in both cases — see the TypeScript and Python SDK changelogs for the client-side fix.
+* **Approvals are bound to a payload, and revalidated before execution.** Previously an approval bound to a review ID and nothing else — an agent could get one payload approved and execute a different one under the same ID, with the approval and the ID both still valid. Enqueue now fingerprints the effect-determining fields (action, resource, args, acting_for, scope), and a new `POST /v1/queue/{id}/redeem` re-checks that fingerprint against the payload the caller is about to run. Approvals also expire (15 minutes) so they can't be banked and spent against circumstances the reviewer never saw. Confidence is deliberately outside the fingerprint: a reviewer approves an effect, not the model's confidence in it. Requires Python SDK ≥ 0.5.0 to use from the client (`wait_and_redeem`).
+* **Agent identity can now be cryptographically verified.** The identity registry (agent registration, RS256 workload tokens, JWKS) already existed but was never wired into authorization — `actor` was a free-text claim. `/v1/agent/authorize` now accepts an optional `X-Lelu-Agent-Token`; when present and valid it replaces the self-reported actor, and the response and audit event carry `actor_verified`. A token that's present but invalid fails closed rather than falling back to the claim.
+* **Audit events can be signed and hash-chained into tamper-evident receipts.** Each event carries `prev_hash`, `signature` and `kid`; the chain makes deletion and reordering detectable, which signatures alone cannot catch. Verification is a standalone function over `(events, public key)` so it never depends on the process that produced the log. Off unless a signer is configured, in which case the same RSA key already published at `/.well-known/jwks.json` verifies receipts.
 
-We recommend upgrading promptly, especially if you run with `CONFIDENCE_ALLOW_UNVERIFIED=true` or accept `confidence_signal` from untrusted callers.
+### Fixed
+
+* **Risk band thresholds could collapse an outcome.** Config validation required only `gap > 0` between adjacent thresholds while `evaluate()` applies an epsilon tolerance at each boundary, so a sub-epsilon gap passed validation and then made the middle outcome unreachable at runtime. Validation now requires the gap to exceed `riskScoreEpsilon`. Thanks to @wdwd200 (#53).
+* A scope downgrade (`read_only`) and a `compute` redirect were both represented as `allowed: true` on the wire, same as a clean allow. This was always correct at the engine/API level, but existing SDK wrappers that branched only on `allowed` would run the original action at full, unrestricted scope in both cases — requires SDK ≥ TS 0.0.35 / Python 0.4.3 to take effect.
+
+We recommend upgrading promptly, especially if you run with `CONFIDENCE_ALLOW_UNVERIFIED=true`, accept `confidence_signal` from untrusted callers, or run in `PLATFORM_URL` mode.
+
+Most of the security work in this release came from an external trust-boundary review by Nate Howard, and the payload-binding design from Ayla Croft.
 
 ## [0.1.6](https://github.com/lelu-ai/lelu/compare/engine-v0.1.5...engine-v0.1.6) (2026-03-30)
 

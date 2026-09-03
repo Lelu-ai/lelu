@@ -1,6 +1,6 @@
 module github.com/lelu/platform
 
-go 1.22
+go 1.25.0
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -11,6 +11,6 @@ require (
 
 require (
 	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
 )

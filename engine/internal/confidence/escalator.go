@@ -8,10 +8,19 @@ import (
 
 // ReviewEnqueuer is the narrow interface Escalator needs to submit items for
 // human review. *queue.Queue satisfies this interface.
+//
+// The trailing payloadFingerprint binds an approval to the exact payload it
+// approves, so it can be revalidated at execution time. This path passes it
+// empty on purpose: the confidence auditor runs asynchronously, after the
+// decision has already been returned to the caller, and works from an
+// AuditRequest that carries no resource or args — there is no execution
+// payload here to bind to. An empty fingerprint is not redeemable (see
+// queue.Redeem), which is the correct outcome rather than a review that
+// looks bound but isn't.
 type ReviewEnqueuer interface {
 	Enqueue(ctx context.Context, tenantID, actor, action string,
 		resource map[string]string, confidence float64,
-		reason, actingFor string) (string, error)
+		reason, actingFor, payloadFingerprint string) (string, error)
 }
 
 // Escalator routes audit findings to the human-review queue based on severity.
@@ -125,6 +134,7 @@ func (e *Escalator) EnqueueReview(ctx context.Context, auditReq *AuditRequest, r
 		auditReq.ActorConfidence,
 		reason,
 		auditReq.ActingForUserID,
+		"", // no execution payload to bind — see ReviewEnqueuer's doc comment
 	)
 }
 

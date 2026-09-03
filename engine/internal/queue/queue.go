@@ -51,6 +51,18 @@ type ReviewRequest struct {
 	ResolvedAt      *time.Time        `json:"resolved_at,omitempty"`
 	ResolvedBy      string            `json:"resolved_by,omitempty"`
 	ResolutionNote  string            `json:"resolution_note,omitempty"`
+
+	// PayloadFingerprint is a hash of the effect-determining fields of the
+	// request that triggered this review — action, resource, args,
+	// acting_for, scope. An approval is an approval of *this* payload, not
+	// of the review ID: without binding the two, an agent can get one
+	// payload approved and execute a different one under the same ID,
+	// because nothing downstream ever re-checks what was actually approved.
+	// Redeem() is what closes that gap. Empty when the enqueuing path had no
+	// payload to bind (see the confidence-auditor path in
+	// confidence.Escalator) — an empty fingerprint can never be redeemed,
+	// rather than silently matching anything.
+	PayloadFingerprint string `json:"payload_fingerprint,omitempty"`
 }
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
@@ -126,19 +138,20 @@ func NewInMemory() *Queue {
 // Enqueue adds a new ReviewRequest to the stream and writes the full payload.
 // Returns the assigned review ID. Falls back to the in-memory store when Redis
 // is not configured so no review requests are silently dropped.
-func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, resource map[string]string, confidence float64, reason, actingFor string) (string, error) {
+func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, resource map[string]string, confidence float64, reason, actingFor, payloadFingerprint string) (string, error) {
 	id := uuid.NewString()
 	req := ReviewRequest{
-		ID:              id,
-		TenantID:        tenantID,
-		Actor:           actor,
-		Action:          action,
-		Resource:        resource,
-		ConfidenceScore: confidence,
-		Reason:          reason,
-		ActingFor:       actingFor,
-		EnqueuedAt:      time.Now().UTC(),
-		Status:          StatusPending,
+		ID:                 id,
+		TenantID:           tenantID,
+		Actor:              actor,
+		Action:             action,
+		Resource:           resource,
+		ConfidenceScore:    confidence,
+		Reason:             reason,
+		ActingFor:          actingFor,
+		EnqueuedAt:         time.Now().UTC(),
+		Status:             StatusPending,
+		PayloadFingerprint: payloadFingerprint,
 	}
 
 	if q.rdb == nil {
@@ -260,6 +273,74 @@ func (q *Queue) resolve(ctx context.Context, id string, status Status, resolvedB
 		return fmt.Errorf("queue: update: %w", err)
 	}
 	return nil
+}
+
+// ─── Redeem ───────────────────────────────────────────────────────────────────
+
+// DefaultApprovalTTL is how long an approval stays redeemable after a human
+// resolves it. An approval is a judgement about a moment — the reviewer saw
+// a specific payload, in a specific context, and said yes then. Leaving that
+// yes redeemable indefinitely means an agent can bank approvals and spend
+// them much later against circumstances the reviewer never saw.
+const DefaultApprovalTTL = 15 * time.Minute
+
+// RedeemResult explains a redemption outcome. Reason is safe to hand back to
+// the caller: it says which check failed, never what the approved payload
+// was, so a mismatched fingerprint can't be used as an oracle to discover it.
+type RedeemResult struct {
+	Allowed bool
+	Reason  string
+}
+
+// Redeem checks whether an approved review may actually be executed *with
+// this specific payload, right now*. This is the step that makes a human
+// approval mean something: approval binds to a payload fingerprint at
+// enqueue time, and redemption re-checks it at execution time, so a payload
+// mutated between the two fails closed instead of riding a valid approval.
+//
+// Every failure path returns Allowed=false. There is no path where an
+// unreadable item, an empty fingerprint, or an unexpected status falls
+// through to allowed — the whole point is that ambiguity denies.
+func (q *Queue) Redeem(ctx context.Context, id, payloadFingerprint string, ttl time.Duration) (RedeemResult, error) {
+	if ttl <= 0 {
+		ttl = DefaultApprovalTTL
+	}
+	req, err := q.Get(ctx, id)
+	if err != nil {
+		return RedeemResult{Reason: "review not found"}, err
+	}
+
+	switch req.Status {
+	case StatusApproved:
+		// fall through to the payload and freshness checks below
+	case StatusPending:
+		return RedeemResult{Reason: "review is still pending human decision"}, nil
+	default:
+		return RedeemResult{Reason: fmt.Sprintf("review was %s", req.Status)}, nil
+	}
+
+	// An item enqueued without a fingerprint has nothing to bind against, so
+	// it can never be redeemed — denying is the only honest answer, since
+	// "approved, but we don't know what for" is not an approval of anything
+	// in particular.
+	if req.PayloadFingerprint == "" {
+		return RedeemResult{Reason: "approval is not bound to a payload and cannot be redeemed"}, nil
+	}
+	if payloadFingerprint == "" {
+		return RedeemResult{Reason: "no payload supplied to check against the approval"}, nil
+	}
+	if req.PayloadFingerprint != payloadFingerprint {
+		return RedeemResult{Reason: "payload does not match what was approved"}, nil
+	}
+
+	if req.ResolvedAt == nil {
+		return RedeemResult{Reason: "approval has no resolution time and cannot be aged"}, nil
+	}
+	if time.Since(*req.ResolvedAt) > ttl {
+		return RedeemResult{Reason: fmt.Sprintf("approval expired (older than %s)", ttl)}, nil
+	}
+
+	return RedeemResult{Allowed: true, Reason: "payload matches the approved request"}, nil
 }
 
 // HealthCheck validates Redis connectivity for the review queue.

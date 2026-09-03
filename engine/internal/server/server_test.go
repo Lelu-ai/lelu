@@ -481,9 +481,9 @@ func TestQueueApproveDenyFlows(t *testing.T) {
 	defer srv.Close()
 
 	// Enqueue two separate items so each can be resolved independently.
-	approveID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u")
+	approveID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u", "")
 	require.NoError(t, err)
-	denyID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u")
+	denyID, err := q.Enqueue(context.Background(), "t1", "bot", "act", nil, 0.5, "r", "u", "")
 	require.NoError(t, err)
 
 	approveResp := postJSON(t, srv, "/v1/queue/"+approveID+"/approve", map[string]any{
@@ -504,7 +504,7 @@ func TestQueueApprove_RejectsActorResolvingItsOwnItem(t *testing.T) {
 	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
 	defer srv.Close()
 
-	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u")
+	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u", "")
 	require.NoError(t, err)
 
 	// invoice_bot holds whatever credential got it flagged for review in the
@@ -523,7 +523,7 @@ func TestQueueApprove_AllowsADifferentResolver(t *testing.T) {
 	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
 	defer srv.Close()
 
-	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u")
+	id, err := q.Enqueue(context.Background(), "t1", "invoice_bot", "act", nil, 0.5, "r", "u", "")
 	require.NoError(t, err)
 
 	resp := postJSON(t, srv, "/v1/queue/"+id+"/approve", map[string]any{
@@ -531,6 +531,116 @@ func TestQueueApprove_AllowsADifferentResolver(t *testing.T) {
 		"note":        "checked, looks fine",
 	})
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// ── Approval → redemption, end to end ────────────────────────────────────────
+//
+// The full path the binding exists to protect: an agent's request is flagged
+// for review, a human approves that specific payload, and the agent then
+// comes back to execute. Redemption is where "approved" stops meaning "this
+// review ID is approved" and starts meaning "this exact effect is approved."
+
+func TestRedeem_EndToEnd_ApprovedPayloadSucceedsMutatedPayloadFails(t *testing.T) {
+	q := queue.NewInMemory()
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
+	defer srv.Close()
+
+	// approve_refunds is high-criticality, so this is routed to human review
+	// and enqueued with a fingerprint of exactly this payload.
+	original := map[string]any{
+		"actor":      "invoice_bot",
+		"action":     "approve_refunds",
+		"acting_for": "user_123",
+		"args":       map[string]any{"amount_usd": 100, "invoice": "INV-1"},
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.001, -0.001, -0.001},
+		},
+	}
+	authResp := postJSON(t, srv, "/v1/agent/authorize", original)
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var auth map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&auth))
+	require.True(t, auth["requires_human_review"].(bool), "fixture must produce a human_review decision")
+	reviewID, _ := auth["review_id"].(string)
+	require.NotEmpty(t, reviewID, "human_review must carry a review_id to redeem against")
+
+	// A human approves that specific request.
+	approveResp := postJSON(t, srv, "/v1/queue/"+reviewID+"/approve", map[string]any{
+		"resolved_by": "human_reviewer_1",
+		"note":        "approved a $100 refund on INV-1",
+	})
+	require.Equal(t, http.StatusOK, approveResp.StatusCode)
+
+	// Redeeming with the payload that was actually approved succeeds.
+	okResp := postJSON(t, srv, "/v1/queue/"+reviewID+"/redeem", original)
+	assert.Equal(t, http.StatusOK, okResp.StatusCode)
+
+	// Redeeming with a payload mutated after approval — same review ID, same
+	// action, 1000x the amount — must fail closed. This is the case that
+	// passes today without the fingerprint check: the approval is valid, the
+	// ID is valid, and only the effect changed.
+	mutated := map[string]any{
+		"actor":      "invoice_bot",
+		"action":     "approve_refunds",
+		"acting_for": "user_123",
+		"args":       map[string]any{"amount_usd": 100000, "invoice": "INV-1"},
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.001, -0.001, -0.001},
+		},
+	}
+	badResp := postJSON(t, srv, "/v1/queue/"+reviewID+"/redeem", mutated)
+	assert.Equal(t, http.StatusForbidden, badResp.StatusCode, "a payload mutated after approval must not redeem")
+
+	var bad map[string]any
+	require.NoError(t, json.NewDecoder(badResp.Body).Decode(&bad))
+	assert.False(t, bad["allowed"].(bool))
+	assert.Contains(t, bad["reason"].(string), "does not match")
+}
+
+// Confidence telemetry is deliberately outside the fingerprint: an agent that
+// recomputes its confidence between approval and execution has not changed
+// the effect, and must not be treated as if it had.
+func TestRedeem_ConfidenceChangeDoesNotBreakRedemption(t *testing.T) {
+	q := queue.NewInMemory()
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "", q)
+	defer srv.Close()
+
+	authResp := postJSON(t, srv, "/v1/agent/authorize", map[string]any{
+		"actor":      "invoice_bot",
+		"action":     "approve_refunds",
+		"acting_for": "user_123",
+		"args":       map[string]any{"amount_usd": 100},
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.001, -0.001, -0.001},
+		},
+	})
+	require.Equal(t, http.StatusOK, authResp.StatusCode)
+
+	var auth map[string]any
+	require.NoError(t, json.NewDecoder(authResp.Body).Decode(&auth))
+	reviewID, _ := auth["review_id"].(string)
+	require.NotEmpty(t, reviewID)
+
+	require.Equal(t, http.StatusOK, postJSON(t, srv, "/v1/queue/"+reviewID+"/approve", map[string]any{
+		"resolved_by": "human_reviewer_1",
+	}).StatusCode)
+
+	// Same effect, different confidence numbers.
+	resp := postJSON(t, srv, "/v1/queue/"+reviewID+"/redeem", map[string]any{
+		"actor":      "invoice_bot",
+		"action":     "approve_refunds",
+		"acting_for": "user_123",
+		"args":       map[string]any{"amount_usd": 100},
+		"confidence_signal": map[string]any{
+			"provider":       "openai",
+			"token_logprobs": []float64{-0.002, -0.001, -0.003},
+		},
+	})
+	assert.Equal(t, http.StatusOK, resp.StatusCode, "recomputed confidence is not an effect change and must still redeem")
 }
 
 func TestQueueResolve_BadBody(t *testing.T) {

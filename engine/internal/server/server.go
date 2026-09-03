@@ -411,6 +411,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/queue/{id}/wait", h.handleQueueWait)
 	mux.HandleFunc("POST /v1/queue/{id}/approve", h.handleQueueApprove)
 	mux.HandleFunc("POST /v1/queue/{id}/deny", h.handleQueueDeny)
+	mux.HandleFunc("POST /v1/queue/{id}/redeem", h.handleQueueRedeem)
 
 	// Output scanning — indirect injection defense
 	mux.HandleFunc("POST /v1/scan/output", h.handleScanOutput)
@@ -631,6 +632,38 @@ func payloadHash(v interface{}) string {
 	}
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:])
+}
+
+// effectFingerprint hashes only the fields that determine what an action
+// actually *does* — deliberately narrower than the inputHash covering the
+// whole request.
+//
+// A human approving a review is approving an effect: this action, on this
+// target, with these arguments, on behalf of this user, at this scope. It is
+// not approving the confidence telemetry that happened to accompany the
+// request. Including Confidence/Signal here would make redemption fail
+// whenever an agent recomputed its confidence between the request and the
+// execution — a false mismatch on a payload that is, in every way the
+// reviewer cared about, identical.
+//
+// Fixed field set and fixed order via a struct (not a map, not string
+// concatenation): the fingerprint is the thing an approval binds to, so its
+// encoding has to be unambiguous. Two different payloads must never
+// canonicalize to the same bytes.
+func effectFingerprint(req agentAuthorizeRequest) string {
+	return payloadHash(struct {
+		Action    string                 `json:"action"`
+		Resource  map[string]string      `json:"resource"`
+		Args      map[string]interface{} `json:"args"`
+		ActingFor string                 `json:"acting_for"`
+		Scope     string                 `json:"scope"`
+	}{
+		Action:    req.Action,
+		Resource:  req.Resource,
+		Args:      req.Args,
+		ActingFor: req.ActingFor,
+		Scope:     req.Scope,
+	})
 }
 
 // checkShadowAgent runs shadow-agent detection for an agent authorize request.
@@ -1064,7 +1097,7 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	var reviewID string
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
 		observability.RecordHumanReview(req.Actor, finalReason)
-		id, err := h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor)
+		id, err := h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor, effectFingerprint(req))
 		if err != nil {
 			// The decision itself still stands and is audit-logged below — but
 			// without an ID there is nothing for a caller to poll or resolve,
@@ -1438,7 +1471,7 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 
 	var reviewID string
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
-		id, err := h.queue.Enqueue(ctx, req.TenantID, req.Actor, req.Action, req.Resource, 0, reason, req.ActingFor)
+		id, err := h.queue.Enqueue(ctx, req.TenantID, req.Actor, req.Action, req.Resource, 0, reason, req.ActingFor, effectFingerprint(req))
 		if err != nil {
 			log.Printf("queue enqueue error for actor=%s action=%s: %v", req.Actor, req.Action, err)
 		} else {
@@ -2108,6 +2141,72 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 		h.confCalibrator.RecordReview(rawConfidence, approve)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// handleQueueRedeem re-checks an approval against the payload actually about
+// to be executed.
+//
+// Without this step, a human approval binds to a review ID and nothing more:
+// the agent gets one payload approved, and can then execute a different one
+// under the same ID, because no later stage ever compares the two. The gap
+// isn't that the approval is forgeable — it's that it was never bound to
+// anything specific in the first place. Redemption closes it by recomputing
+// the effect fingerprint from the payload presented here and requiring it to
+// match what was fingerprinted at enqueue time.
+//
+// Deliberately a separate call rather than folding this into
+// /v1/agent/authorize: an authorize request asks "may I?", a redemption
+// asserts "I am about to". Those are different questions, and answering the
+// second one requires the caller to commit to a specific payload.
+func (h *Handler) handleQueueRedeem(w http.ResponseWriter, r *http.Request) {
+	if h.queue == nil {
+		writeError(w, http.StatusServiceUnavailable, "queue not configured")
+		return
+	}
+	id := r.PathValue("id")
+
+	var req agentAuthorizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	res, err := h.queue.Redeem(r.Context(), id, effectFingerprint(req), queue.DefaultApprovalTTL)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("review %q not found", id))
+		return
+	}
+
+	traceID := audit.NewTraceID()
+	decision := "denied"
+	if res.Allowed {
+		decision = "allowed"
+	}
+	// A redemption is a decision about whether an effect may happen, so it
+	// belongs in the audit log exactly like an authorize decision does — a
+	// refused redemption is the interesting record, and it would otherwise
+	// leave no trace at all.
+	h.audit.Log(audit.Event{
+		TenantID:  req.TenantID,
+		TraceID:   traceID,
+		Actor:     req.Actor,
+		Action:    req.Action,
+		Resource:  req.Resource,
+		Decision:  decision,
+		Reason:    "redeem review " + id + ": " + res.Reason,
+		Timestamp: time.Now().UTC(),
+	})
+
+	status := http.StatusOK
+	if !res.Allowed {
+		status = http.StatusForbidden
+	}
+	writeJSON(w, status, map[string]any{
+		"allowed":   res.Allowed,
+		"reason":    res.Reason,
+		"review_id": id,
+		"trace_id":  traceID,
+	})
 }
 
 // handleQueueWait long-polls until the item is resolved or the timeout elapses.

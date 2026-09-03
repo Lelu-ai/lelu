@@ -7,6 +7,7 @@ import httpx
 from pytest_httpx import HTTPXMock
 
 from lelu import (
+    AuthDecision,
     AgentAuthRequest,
     AgentContext,
     AuthEngineError,
@@ -431,3 +432,66 @@ async def test_wait_and_redeem_denied_does_not_redeem(
     res = await client.wait_and_redeem("rev-4", AuthorizeRequest(tool="approve_refunds"))
     assert res.allowed is False
     assert "denied" in res.reason
+
+
+# ─── Review handle resolution ─────────────────────────────────────────────────
+#
+# A decision carries request_id (trace) and review_id (queue key). Reaching for
+# "the request's ID" gets the wrong one, and the only symptom is a redemption
+# that mysteriously fails. Accepting the decision object removes the choice.
+
+
+def _human_review_decision(review_id: str | None = "rev-1") -> AuthDecision:
+    return AuthDecision(
+        request_id="trace-not-a-review-handle",
+        tool="approve_refunds",
+        decision="human_review",
+        reason="queued",
+        rule="r",
+        latency_ms=1.0,
+        mode="live",
+        timestamp="2026-01-01T00:00:00Z",
+        review_id=review_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_redeem_accepts_the_decision_object(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    # The URL asserts it used review_id, not request_id: a mock registered for
+    # /rev-1/redeem simply won't match if the trace ID leaked through.
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-1/redeem",
+        json={"allowed": True, "reason": "ok", "review_id": "rev-1", "trace_id": "t"},
+    )
+    res = await client.redeem_review(
+        _human_review_decision(), AuthorizeRequest(tool="approve_refunds")
+    )
+    assert res.allowed is True
+
+
+@pytest.mark.asyncio
+async def test_redeem_still_accepts_a_raw_review_id(
+    client: LeluClient, httpx_mock: HTTPXMock
+) -> None:
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/queue/rev-7/redeem",
+        json={"allowed": True, "reason": "ok", "review_id": "rev-7", "trace_id": "t"},
+    )
+    res = await client.redeem_review("rev-7", AuthorizeRequest(tool="approve_refunds"))
+    assert res.allowed is True
+
+
+@pytest.mark.asyncio
+async def test_redeem_rejects_a_decision_with_no_review_id() -> None:
+    # An "allow" decision was never queued, so there's nothing to redeem.
+    # Failing here beats sending an empty path segment to the engine.
+    client = LeluClient(base_url="http://localhost:8080")
+    with pytest.raises(ValueError, match="no review_id"):
+        await client.redeem_review(
+            _human_review_decision(review_id=None), AuthorizeRequest(tool="x")
+        )
+    await client.aclose()

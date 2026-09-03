@@ -250,7 +250,7 @@ class LeluClient:
                 # Don't just wait for "approved" and then act — an approval
                 # is bound to the payload it approved. wait_and_redeem()
                 # waits, then re-checks this exact request against it.
-                outcome = await lelu.wait_and_redeem(result.review_id, req)
+                outcome = await lelu.wait_and_redeem(result, req)
                 if not outcome.allowed:
                     return f"Not approved for this action: {outcome.reason}"
             else:
@@ -388,12 +388,41 @@ class LeluClient:
         )
         return bool(data.get("success"))
 
-    async def redeem_review(self, review_id: str, req: AuthorizeRequest) -> RedeemResult:
+    @staticmethod
+    def _review_id_of(review: str | AuthDecision) -> str:
+        """
+        Resolve a review handle from either the decision itself or a raw ID.
+
+        Prefer passing the :class:`AuthDecision`. A decision carries two IDs
+        — ``request_id`` (trace/correlation) and ``review_id`` (the queue
+        key) — and reaching for "the request's ID" gets you the wrong one,
+        with no visible symptom until redemption fails. Taking the decision
+        object removes the choice.
+
+        A raw string is still accepted for callers that only stored the ID,
+        but an ``AuthDecision`` with no ``review_id`` raises here rather
+        than sending an empty path segment to the engine.
+        """
+        if isinstance(review, str):
+            return review
+        if not review.review_id:
+            raise ValueError(
+                "this decision has no review_id — only a human_review decision "
+                "can be redeemed (this one was: "
+                f"{review.decision!r}). Note request_id is the trace ID, not a "
+                "review handle."
+            )
+        return review.review_id
+
+    async def redeem_review(
+        self, review: str | AuthDecision, req: AuthorizeRequest
+    ) -> RedeemResult:
         """
         Check an approval against the request you are about to execute.
 
-        Pass the same :class:`AuthorizeRequest` you passed to
-        :meth:`authorize`. The engine fingerprinted that request's
+        Pass the :class:`AuthDecision` you got back from :meth:`authorize`
+        (or its ``review_id``), plus the same :class:`AuthorizeRequest` you
+        passed in. The engine fingerprinted that request's
         effect-determining fields — action, resource, args, acting_for,
         scope — when it paused for review, and compares them again here.
         A request altered in between is refused rather than executing under
@@ -406,6 +435,7 @@ class LeluClient:
         Returns a :class:`RedeemResult` rather than raising on refusal —
         "not allowed" is an answer, not an error.
         """
+        review_id = self._review_id_of(review)
         resp = await self._client.post(
             f"/v1/queue/{review_id}/redeem", json=self._authorize_body(req)
         )
@@ -416,7 +446,10 @@ class LeluClient:
         return RedeemResult(**resp.json())
 
     async def wait_and_redeem(
-        self, review_id: str, req: AuthorizeRequest, timeout_ms: int = 30_000
+        self,
+        review: str | AuthDecision,
+        req: AuthorizeRequest,
+        timeout_ms: int = 30_000,
     ) -> RedeemResult:
         """
         Wait for a human decision, then redeem the approval against `req`.
@@ -426,11 +459,15 @@ class LeluClient:
         it doesn't bind that yes to what you then execute. This waits, and
         on approval re-checks this exact request against what was approved.
 
+        Pass the :class:`AuthDecision` itself rather than an ID where you
+        can — see :meth:`_review_id_of` for why that's the safer call.
+
         Returns ``allowed=False`` with a reason when the wait times out
         while still pending, when the review was denied, or when the
         payload no longer matches — the caller has one thing to check
         rather than three.
         """
+        review_id = self._review_id_of(review)
         item = await self.wait_review(review_id, timeout_ms=timeout_ms)
         if item.pending:
             return RedeemResult(

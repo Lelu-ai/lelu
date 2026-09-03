@@ -39,7 +39,7 @@ async def main():
         # Queued for a human. Don't just wait for "approved" and then act —
         # an approval is bound to the request it approved, so pass the same
         # request back and let the engine confirm nothing changed.
-        outcome = await auth.wait_and_redeem(result.review_id, tool="invoice:create")
+        outcome = await auth.wait_and_redeem(result, tool="invoice:create")
         if not outcome.allowed:
             raise PermissionError(outcome.reason)
         ...  # proceed

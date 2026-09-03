@@ -102,7 +102,15 @@ class DelegateScopeRequest(BaseModel):
 class AuthDecision(BaseModel):
     """Result of an authorization check."""
 
-    request_id: str = Field(..., description="Unique request identifier")
+    request_id: str = Field(
+        ...,
+        description=(
+            "Correlation/trace ID for this decision — for logs and support, "
+            "NOT a handle to the review queue. Anything that polls, resolves "
+            "or redeems a paused action takes review_id instead; passing this "
+            "there looks plausible and fails. See review_id below."
+        ),
+    )
     tool: str = Field(..., description="Tool name that was evaluated")
     decision: str = Field(..., description="allow | deny | human_review | compute")
     reason: str = Field(..., description="Human-readable explanation")

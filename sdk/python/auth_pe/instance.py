@@ -68,27 +68,32 @@ class LeluInstance:
 
     async def wait_and_redeem(
         self,
-        review_id: str,
+        review: str | AuthDecision,
         req: AuthorizeRequest | None = None,
         /,
         timeout_ms: int = 30_000,
         **kwargs: Any,
     ) -> RedeemResult:
-        """Waits for a human decision on ``review_id``, then re-checks this
-        request against what was actually approved.
+        """Waits for a human decision, then re-checks this request against
+        what was actually approved.
 
         Use this after a ``human_review`` decision instead of just waiting.
         Waiting alone tells you a reviewer approved *something*; it doesn't
-        bind that approval to what you execute next. Pass the same request
-        you passed to :meth:`authorize`::
+        bind that approval to what you execute next. Pass the decision you
+        got back, plus the same request you passed to :meth:`authorize`::
 
             result = await auth.authorize(tool="refund:process", args={"amount": 100})
             if result.decision == "human_review":
                 outcome = await auth.wait_and_redeem(
-                    result.review_id, tool="refund:process", args={"amount": 100}
+                    result, tool="refund:process", args={"amount": 100}
                 )
                 if not outcome.allowed:
                     raise PermissionError(outcome.reason)
+
+        Passing the decision itself is preferred over passing an ID: a
+        decision carries both ``request_id`` (trace) and ``review_id``
+        (queue key), and picking the wrong one fails in a way that only
+        shows up at redemption.
         """
         if req is None:
             req = AuthorizeRequest(**kwargs)
@@ -96,7 +101,7 @@ class LeluInstance:
             raise TypeError("pass either an AuthorizeRequest or keyword fields, not both")
         if req.actor is None and self.actor is not None:
             req = req.model_copy(update={"actor": self.actor})
-        return await self.api.wait_and_redeem(review_id, req, timeout_ms=timeout_ms)
+        return await self.api.wait_and_redeem(review, req, timeout_ms=timeout_ms)
 
     async def aclose(self) -> None:
         await self.api.aclose()

@@ -223,6 +223,22 @@ func New(cfg ...Config) *Writer {
 	return w
 }
 
+// HighWater returns the highest sequence number assigned so far — that is,
+// how many events this log has ever created, including ones that were dropped
+// or failed to write.
+//
+// A verifier needs this number. Sequence gaps reveal events missing *between*
+// two events that were written, but they cannot reveal events missing after
+// the last one, because there is no later event to compare against. Deleting
+// the tail of a log is both the easiest tampering to perform and the most
+// likely to be worth performing — the newest records are the incriminating
+// ones — so completeness cannot be established from the events alone.
+//
+// This value is persisted in the chain state file (Config.StatePath) as
+// next_seq, so it survives the process and is available to an auditor who
+// does not have the running writer.
+func (w *Writer) HighWater() uint64 { return w.seq.Load() }
+
 // Dropped returns how many events were discarded because the queue was full.
 // Non-zero means the log is incomplete and any VerifyChain result over it
 // attests only to what survived.
@@ -245,6 +261,17 @@ func loadChainState(path string) (chainState, error) {
 		return chainState{}, err
 	}
 	return st, nil
+}
+
+// ReadChainState returns the persisted chain hash and sequence high-water mark
+// from a writer's state file, for use by an independent verifier. The
+// high-water mark is what makes tail truncation detectable — see HighWater.
+func ReadChainState(path string) (chainHash string, highWater uint64, err error) {
+	st, err := loadChainState(path)
+	if err != nil {
+		return "", 0, err
+	}
+	return st.ChainHash, st.NextSeq, nil
 }
 
 // saveChainState rewrites the continuity state atomically (write + rename),
@@ -448,13 +475,52 @@ type ChainReport struct {
 	// sequencing existed. Their absence cannot be detected, so a log
 	// containing them cannot be certified complete.
 	Unnumbered int `json:"unnumbered"`
+	// Truncated is how many events were assigned a sequence number after the
+	// last event present here — events the log should contain and does not.
+	// Only meaningful when HighWaterKnown is true.
+	Truncated uint64 `json:"truncated"`
+	// HighWaterKnown records whether the verifier was given the writer's
+	// sequence high-water mark. Without it, truncation of the tail is
+	// undetectable and completeness cannot be certified at all.
+	HighWaterKnown bool `json:"high_water_known"`
 }
 
-// Complete reports whether every link verifies AND no sequence number is
-// missing. This, not FirstInvalidIndex alone, is the question an auditor is
-// asking.
+// Complete reports whether this log can be certified whole: every link
+// verifies, no sequence number is missing between events, every event is
+// numbered, and nothing was cut from the end.
+//
+// It returns false when the high-water mark was not supplied, and that is
+// deliberate rather than pedantic. Events are only comparable to their
+// neighbours, so a log whose last N events were deleted looks exactly like a
+// log that ended N events earlier. Without knowing how many events the writer
+// actually created, "no gaps found" means "no gaps found in what I was
+// given" — which is not the question an auditor is asking.
 func (r ChainReport) Complete() bool {
-	return r.FirstInvalidIndex == -1 && r.Missing == 0 && r.Unnumbered == 0
+	return r.FirstInvalidIndex == -1 &&
+		r.Missing == 0 &&
+		r.Unnumbered == 0 &&
+		r.HighWaterKnown && r.Truncated == 0
+}
+
+// VerifyChainReportAt is VerifyChainReport plus the writer's sequence
+// high-water mark (from Writer.HighWater, or ReadChainState on the persisted
+// state file). Supplying it is what lets the result distinguish "the log ends
+// here" from "the log was cut here", and it is required for Complete() to
+// return true.
+func VerifyChainReportAt(events []Event, pub *rsa.PublicKey, genesisPrevHash string, highWater uint64) ChainReport {
+	rep := VerifyChainReport(events, pub, genesisPrevHash)
+	rep.HighWaterKnown = true
+
+	var lastSeq uint64
+	for _, e := range events {
+		if e.Seq > lastSeq {
+			lastSeq = e.Seq
+		}
+	}
+	if highWater > lastSeq {
+		rep.Truncated = highWater - lastSeq
+	}
+	return rep
 }
 
 // VerifyChainReport checks link integrity and completeness together. Events
@@ -465,6 +531,10 @@ func (r ChainReport) Complete() bool {
 // Note that gap detection describes the supplied slice: verifying a window of
 // a log will naturally show the numbers outside it as absent. Feed it whole
 // logs, or expect to interpret the edges.
+//
+// This function cannot see events removed from the end of the log — there is
+// no following event to reveal the gap. Use VerifyChainReportAt with the
+// writer's high-water mark when you need to detect that.
 func VerifyChainReport(events []Event, pub *rsa.PublicKey, genesisPrevHash string) ChainReport {
 	gaps, missing, unnumbered := SeqGaps(events)
 	rep := ChainReport{

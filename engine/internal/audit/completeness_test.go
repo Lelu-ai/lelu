@@ -13,54 +13,111 @@ import (
 // (A1, A2, A4).
 
 // TestSeq_AssignedBeforeDrop covers A2/A4. An event dropped because the queue
-// was full must still have consumed a sequence number, so the gap is visible
-// to a verifier. Assigning the number in the flush loop instead would mean a
-// dropped event leaves no evidence anywhere and a fully verified chain can be
-// missing most of the decisions the engine made.
+// was full must still have consumed a sequence number, so that every event the
+// engine created is accounted for — either present in the log, or identifiable
+// as absent.
+//
+// The assertion is deliberately about accounting rather than about gaps.
+// Whether a drop shows up as an internal gap or as a shortfall against the
+// high-water mark depends on scheduling: if the last events logged are the
+// ones dropped, there is no following event to reveal a gap. Both are losses
+// and both must be countable, which is exactly why the high-water mark is part
+// of verification.
 func TestSeq_AssignedBeforeDrop(t *testing.T) {
 	buf := &bytes.Buffer{}
-	// Depth 1 with a flush interval long enough that the writer will not
-	// drain: everything after the first couple of events is dropped.
+	// Depth 1 with a long flush interval: the writer cannot keep up, so most
+	// events are dropped.
 	w := New(Config{QueueDepth: 1, BatchSize: 100, FlushEvery: time.Hour, Sink: buf})
 
 	const total = 200
 	for i := 0; i < total; i++ {
 		w.Log(Event{Actor: "bot", Action: "act", Decision: "allowed"})
 	}
+	highWater := w.HighWater()
 	w.Close()
 
+	if highWater != total {
+		t.Fatalf("high-water mark is %d, want %d — every event must consume a number before it can be dropped", highWater, total)
+	}
 	if w.Dropped() == 0 {
-		t.Skip("writer drained faster than the test could fill it; nothing to assert")
+		t.Skip("writer kept up; nothing was dropped, so there is no loss to account for")
 	}
 
 	written := decodeEvents(t, buf)
 	if len(written) == 0 {
 		t.Fatal("expected at least one written event")
 	}
-
-	// The highest sequence number seen must account for every event created,
-	// not just the ones that survived.
-	var maxSeq uint64
 	for _, e := range written {
 		if e.Seq == 0 {
 			t.Fatal("every event must carry a sequence number")
 		}
-		if e.Seq > maxSeq {
-			maxSeq = e.Seq
-		}
 	}
 
-	// Gap counting needs no key: these events are unsigned.
-	_, missing, unnumbered := SeqGaps(written)
-	if unnumbered != 0 {
-		t.Fatalf("%d events carried no sequence number", unnumbered)
+	rep := VerifyChainReportAt(written, nil, "", highWater)
+	if rep.Unnumbered != 0 {
+		t.Fatalf("%d events carried no sequence number", rep.Unnumbered)
 	}
-	if uint64(len(written))+missing < maxSeq {
-		t.Fatalf("gap accounting is incomplete: %d written + %d missing < highest seq %d",
-			len(written), missing, maxSeq)
+
+	// Everything the engine created is either in the log, missing between two
+	// events, or missing from the end. Nothing may be unaccounted for.
+	accounted := uint64(len(written)) + rep.Missing + rep.Truncated
+	if accounted != highWater {
+		t.Fatalf("%d events created, but only %d accounted for (%d written + %d gaps + %d truncated)",
+			highWater, accounted, len(written), rep.Missing, rep.Truncated)
 	}
-	if missing == 0 {
-		t.Fatal("events were dropped but no sequence gaps are reported — absence must be countable")
+	if rep.Missing+rep.Truncated == 0 {
+		t.Fatal("events were dropped but the report accounts for no loss at all")
+	}
+	if rep.Complete() {
+		t.Fatal("a log with dropped events must never report Complete()")
+	}
+}
+
+// TestVerifyChainReport_DetectsTruncation covers the case sequence gaps alone
+// cannot: events removed from the *end* of a log. There is no following event
+// to reveal the absence, so without the writer's high-water mark a truncated
+// log is indistinguishable from a log that simply ended earlier — which is the
+// easiest and most attractive tampering there is, since the newest records are
+// the incriminating ones.
+func TestVerifyChainReport_DetectsTruncation(t *testing.T) {
+	key := testKey(t)
+	buf := &bytes.Buffer{}
+	w := New(Config{BatchSize: 1, FlushEvery: time.Hour, Sink: buf})
+	w.SetSigner(key, "kid-1")
+	for i := 0; i < 6; i++ {
+		w.Log(Event{Actor: "bot", Action: "act", Decision: "allowed"})
+	}
+	highWater := w.HighWater()
+	w.Close()
+
+	events := decodeEvents(t, buf)
+	if len(events) != 6 {
+		t.Fatalf("expected 6 events, got %d", len(events))
+	}
+
+	// Cut the last two. Every remaining link still verifies.
+	truncated := events[:4]
+
+	blind := VerifyChainReport(truncated, &key.PublicKey, "")
+	if blind.FirstInvalidIndex != -1 || blind.Missing != 0 {
+		t.Fatal("truncation should leave the remaining chain intact — that is the whole problem")
+	}
+	if blind.Complete() {
+		t.Fatal("a report with no high-water mark must not claim completeness")
+	}
+
+	seeing := VerifyChainReportAt(truncated, &key.PublicKey, "", highWater)
+	if seeing.Truncated != 2 {
+		t.Fatalf("expected 2 truncated events, got %d", seeing.Truncated)
+	}
+	if seeing.Complete() {
+		t.Fatal("a truncated log must not report Complete()")
+	}
+
+	// The untouched log, checked the same way, must pass.
+	whole := VerifyChainReportAt(events, &key.PublicKey, "", highWater)
+	if !whole.Complete() {
+		t.Fatalf("an intact log must report Complete(): %+v", whole)
 	}
 }
 

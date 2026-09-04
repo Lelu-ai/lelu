@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.41] (2026-09-04)
+
+### Features
+
+* **Strands Agents integration** (`lelu.strands`). `LeluHook` registers against Strands' `BeforeToolCallEvent` and authorizes every tool call before it runs. The four decisions map onto what Strands already offers, so this is a mapping rather than a translation: `allow` runs the tool, `deny` cancels the call with the policy's reason attached, `compute` renames the tool so Strands re-resolves it to the safe alternative from its own registry, and `human_review` cancels and surfaces the review id.
+* **`LeluHook.redeem()`** resumes a paused call once a human has acted. It replays the exact request that was paused rather than rebuilding one — the engine binds an approval to the payload it was granted for, so a reconstructed request would be refused for no visible reason.
+* `action_for` maps tool names to policy permissions when your policy uses a different vocabulary; `confidence_for` supplies a confidence signal when you have a real one.
+
+### Behaviour worth knowing
+
+* **Fails closed.** If the engine is unreachable the tool call is cancelled, not allowed. An authorization engine that permits everything when it breaks is not an authorization engine. `fail_open=True` overrides this and has to be asked for.
+* **A redirect that cannot be applied cancels the call.** An unauthorized tool never runs because a field was not where the integration expected it.
+* **Confidence is omitted unless supplied**, leaving the engine's `MissingSignalMode` to decide rather than the integration inventing a perfect score.
+* A `compute` decision is detected before `allowed` is read, because the engine reports compute as not-allowed *for the tool that was requested*. Reading `allowed` first would turn every redirect into a denial.
+
 ## [0.4.4] (2026-09-03)
 
 **Requires engine ≥ 0.2.0.** The redemption endpoint this release calls does not exist in earlier engines — `wait_and_redeem()` against an older engine will 404. (If you were waiting on engine `0.1.1` for the `review_id` fix in 0.4.3: that was never tagged, and everything it covered shipped in `0.2.0` instead.)

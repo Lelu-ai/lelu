@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.36] (2026-09-04)
+
+**Requires engine ≥ 0.2.0** for the redemption endpoint. Against an earlier engine `waitAndRedeem()` will 404.
+
+### Features
+
+* **Redemption, finally.** `redeemReview()` and `waitAndRedeem()` bring this SDK to parity with the Python one. Until now a `human_review` decision could be *waited on* but never *redeemed* — and waiting alone only tells you a reviewer said yes to something; it does not bind that yes to what you then execute. These re-check your request against the one actually approved, so a payload altered in between is refused rather than riding a valid approval. `allowed` is false for timeout, denial and mismatch alike, so there is one thing to check rather than three.
+* Both accept the `AuthDecision` from `authorize()` as well as a raw review id. Prefer the decision: it carries both `requestId` (trace) and `reviewId` (queue key), and reaching for "the request's id" gets the wrong one with no symptom until redemption fails. A decision with no `reviewId` now throws with an explanation instead of building a broken URL.
+* **Strands Agents integration** (`lelu-agent-auth/strands`). `leluGuard()` drops into a Strands `plugins` array and authorizes every tool call: `allow` runs the tool, `deny` cancels with the policy's reason, `compute` renames the tool so Strands re-resolves it to the safe alternative, `human_review` cancels and surfaces the review id. `guard.redeem()` resumes the call once a human has acted, replaying the exact request that was paused.
+
+### Internal
+
+* `authorize()` and `redeemReview()` now share one request-body builder. The engine fingerprints the effect-determining fields of that body to bind an approval to a payload; two call sites building it even slightly differently would make an unmodified request fail redemption with no visible cause. This mirrors the Python client, deliberately.
+
 ## [0.0.35] (2026-08-01)
 
 ### Security Fixes

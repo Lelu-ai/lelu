@@ -4,16 +4,40 @@
 
 ### Features
 
-* **Strands Agents integration** (`lelu.strands`). `LeluHook` registers against Strands' `BeforeToolCallEvent` and authorizes every tool call before it runs. The four decisions map onto what Strands already offers, so this is a mapping rather than a translation: `allow` runs the tool, `deny` cancels the call with the policy's reason attached, `compute` renames the tool so Strands re-resolves it to the safe alternative from its own registry, and `human_review` cancels and surfaces the review id.
-* **`LeluHook.redeem()`** resumes a paused call once a human has acted. It replays the exact request that was paused rather than rebuilding one — the engine binds an approval to the payload it was granted for, so a reconstructed request would be refused for no visible reason.
-* `action_for` maps tool names to policy permissions when your policy uses a different vocabulary; `confidence_for` supplies a confidence signal when you have a real one.
+* **Strands Agents integration** (`lelu.strands`). `LeluIntervention` is an
+  `InterventionHandler` — register it with `Agent(interventions=[...])` and every
+  tool call is authorized before it runs. Lelu's four decisions map onto actions
+  Strands already has, so this is a mapping rather than a translation:
+
+  | Lelu | Strands | Effect |
+  |---|---|---|
+  | `allow` | `Proceed` | the tool runs as the model intended |
+  | `deny` | `Deny` | cancelled; the model is told why and can choose again |
+  | `compute` | `Transform` | re-pointed at the safe tool the policy names |
+  | `human_review` | `Confirm` | paused for a human via Strands' interrupt system |
+
+* **`Confirm` for human review.** A person has to decide, and Strands already has
+  the machinery to pause for one — so the integration does not have to cancel the
+  call and hope the caller resumes it. Set `on_review="deny"` if approval lives in
+  Lelu's own review queue instead, and resume with `LeluIntervention.redeem()`,
+  which replays the exact request that was paused rather than rebuilding one.
+* `action_for` maps tool names to policy permissions when your policy uses a
+  different vocabulary; `confidence_for` supplies a confidence signal when you have
+  a real one.
 
 ### Behaviour worth knowing
 
-* **Fails closed.** If the engine is unreachable the tool call is cancelled, not allowed. An authorization engine that permits everything when it breaks is not an authorization engine. `fail_open=True` overrides this and has to be asked for.
-* **A redirect that cannot be applied cancels the call.** An unauthorized tool never runs because a field was not where the integration expected it.
-* **Confidence is omitted unless supplied**, leaving the engine's `MissingSignalMode` to decide rather than the integration inventing a perfect score.
-* A `compute` decision is detected before `allowed` is read, because the engine reports compute as not-allowed *for the tool that was requested*. Reading `allowed` first would turn every redirect into a denial.
+* **Two failures, both closed by default.** If the engine is unreachable the call
+  is denied (`fail_open=True` overrides). If the handler itself throws, `on_error`
+  defaults to `"deny"` — Strands' own default is `"throw"`, and a broken
+  authorization check should block a tool call rather than surface as an unhandled
+  error.
+* **Confidence is omitted unless supplied**, leaving the engine's
+  `MissingSignalMode` to decide rather than the integration inventing a perfect
+  score.
+* A `compute` decision is detected before `allowed` is read, because the engine
+  reports compute as not-allowed *for the tool that was requested*. Reading
+  `allowed` first would turn every redirect into a denial.
 
 ## [0.4.4] (2026-09-03)
 

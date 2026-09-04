@@ -8,7 +8,25 @@
 
 * **Redemption, finally.** `redeemReview()` and `waitAndRedeem()` bring this SDK to parity with the Python one. Until now a `human_review` decision could be *waited on* but never *redeemed* — and waiting alone only tells you a reviewer said yes to something; it does not bind that yes to what you then execute. These re-check your request against the one actually approved, so a payload altered in between is refused rather than riding a valid approval. `allowed` is false for timeout, denial and mismatch alike, so there is one thing to check rather than three.
 * Both accept the `AuthDecision` from `authorize()` as well as a raw review id. Prefer the decision: it carries both `requestId` (trace) and `reviewId` (queue key), and reaching for "the request's id" gets the wrong one with no symptom until redemption fails. A decision with no `reviewId` now throws with an explanation instead of building a broken URL.
-* **Strands Agents integration** (`lelu-agent-auth/strands`). `leluGuard()` drops into a Strands `plugins` array and authorizes every tool call: `allow` runs the tool, `deny` cancels with the policy's reason, `compute` renames the tool so Strands re-resolves it to the safe alternative, `human_review` cancels and surfaces the review id. `guard.redeem()` resumes the call once a human has acted, replaying the exact request that was paused.
+* **Strands Agents integration** (`lelu-agent-auth/strands`). `LeluIntervention`
+  extends `InterventionHandler` — pass it to `new Agent({ interventions: [...] })`
+  and every tool call is authorized before it runs. `allow` returns `Proceed`,
+  `deny` returns `Deny` so the model is told why, `compute` returns `Transform`
+  re-pointing the call at the safe tool, and `human_review` returns `Confirm`,
+  pausing for a human through Strands' own interrupt system. Set
+  `onReview: "deny"` if approval lives in Lelu's review queue instead, and resume
+  with `guard.redeem()`.
+* `onError` defaults to `"deny"` rather than Strands' `"throw"`: a broken
+  authorization check should block a tool call, not surface as an unhandled error.
+* `@strands-agents/sdk` is an **optional peer dependency**, so it costs nothing to
+  anyone not using Strands.
+
+### Compatibility
+
+* **`zod` widened to `^3.23.0 || ^4.0.0`.** Strands requires zod 4, and this
+  package pinned 3. The only blocker was three single-argument `z.record()` calls,
+  which v4 removed; the two-argument form is valid in both, so the change carries
+  no compatibility cost. The test suite runs on zod 4.5.4.
 
 ### Internal
 

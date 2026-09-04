@@ -6,6 +6,7 @@ import {
   DelegateScopeRequestSchema,
   type AuthDecision,
   type AgentAuthDecision,
+  type RedeemResult,
   type MintTokenResult,
   type DelegateScopeResult,
   type DelegateScopeRequest,
@@ -273,7 +274,18 @@ export class LeluClient {
    * if (decision === "human_review") return `Awaiting approval (id: ${requestId})`;
    * ```
    */
-  async authorize(req: AuthorizeRequest): Promise<AuthDecision> {
+  /**
+   * Builds the engine's agent-authorize body. `tool` maps to `action`;
+   * confidence is sent only when present, so the engine's MissingSignalMode
+   * decides on absence rather than a fabricated perfect score.
+   *
+   * Shared by authorize() and redeemReview() on purpose. The engine
+   * fingerprints the effect-determining fields of this body to bind an
+   * approval to a payload; if the two call sites built the body even slightly
+   * differently, an unmodified request would fail redemption for no reason the
+   * caller could see.
+   */
+  private authorizeBody(req: AuthorizeRequest): Record<string, unknown> {
     const validated = AuthorizeRequestSchema.parse(req);
     const ctx = validated.context;
 
@@ -293,6 +305,12 @@ export class LeluClient {
     if (ctx?.actingFor)                body.acting_for = ctx.actingFor;
     if (ctx?.scope)                    body.scope       = ctx.scope;
     if (validated.args)                body.args        = validated.args;
+    return body;
+  }
+
+  async authorize(req: AuthorizeRequest): Promise<AuthDecision> {
+    const validated = AuthorizeRequestSchema.parse(req);
+    const body = this.authorizeBody(validated);
 
     const data = await this.post<{
       allowed: boolean;
@@ -487,6 +505,83 @@ export class LeluClient {
 
   async getQueueItem(id: string): Promise<ReviewQueueItem> {
     return this.get<ReviewQueueItem>(`/v1/queue/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * Resolves a review handle from either the decision itself or a raw id.
+   *
+   * Prefer passing the AuthDecision. A decision carries two ids —
+   * `requestId` (trace/correlation) and `reviewId` (the queue key) — and
+   * reaching for "the request's id" gets you the wrong one, with no visible
+   * symptom until redemption fails.
+   */
+  private reviewIdOf(review: string | AuthDecision): string {
+    if (typeof review === "string") return review;
+    if (!review.reviewId) {
+      throw new Error(
+        "this decision has no reviewId — only a human_review decision has one. " +
+        "Did you mean requestId? That is the trace id and will not redeem.",
+      );
+    }
+    return review.reviewId;
+  }
+
+  /**
+   * Checks an approval against the request you are about to execute.
+   *
+   * Pass the AuthDecision you got back from authorize() (or its `reviewId`),
+   * plus the same AuthorizeRequest you passed in. The engine fingerprinted
+   * that request's effect-determining fields — actor, tenant, action,
+   * resource, args, acting_for, scope — when it paused for review, and
+   * compares them again here. A request altered in between is refused rather
+   * than executing under an approval granted for something else.
+   *
+   * Confidence is deliberately outside that comparison: a reviewer approves an
+   * effect, not the model's confidence in it, so an agent that recomputed
+   * confidence in the meantime still redeems fine.
+   *
+   * Returns a RedeemResult rather than throwing on refusal — "not allowed" is
+   * an answer, not an error. Requires engine >= 0.2.0.
+   */
+  async redeemReview(review: string | AuthDecision, req: AuthorizeRequest): Promise<RedeemResult> {
+    const reviewId = this.reviewIdOf(review);
+    return this.post<RedeemResult>(
+      `/v1/queue/${encodeURIComponent(reviewId)}/redeem`,
+      this.authorizeBody(req),
+    );
+  }
+
+  /**
+   * Waits for a human decision, then redeems the approval against `req`.
+   *
+   * This is the path you want after a `human_review` decision. Waiting alone
+   * only tells you a reviewer said yes to *something*; it does not bind that
+   * yes to what you then execute. This waits, and on approval re-checks this
+   * exact request against what was approved.
+   *
+   * `allowed` is false for every failure — timed out while pending, denied, or
+   * payload no longer matching — so the caller has one thing to check rather
+   * than three.
+   */
+  async waitAndRedeem(
+    review: string | AuthDecision,
+    req: AuthorizeRequest,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
+  ): Promise<RedeemResult> {
+    const reviewId = this.reviewIdOf(review);
+    const item = await this.waitForApproval(reviewId, opts);
+
+    if (item.status === "pending") {
+      return {
+        allowed: false,
+        reason: `still pending after ${opts?.timeoutMs ?? 30_000}ms`,
+        reviewId,
+      };
+    }
+    if (item.status !== "approved") {
+      return { allowed: false, reason: `review was ${item.status}`, reviewId };
+    }
+    return this.redeemReview(reviewId, req);
   }
 
   async approveQueueItem(id: string, resolvedBy: string, note = ""): Promise<{ success: boolean }> {

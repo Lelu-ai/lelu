@@ -100,7 +100,7 @@ only deliberately.
 blocking the agent. The call is cancelled and the review id surfaced so you can
 resume when a human has acted.
 
-In Python you can then redeem the approval:
+Once a human has acted, redeem the approval:
 
 ```python
 outcome = guard.evaluate(call)
@@ -108,12 +108,17 @@ if outcome.action == "review":
     result = guard.redeem(outcome, timeout_ms=60_000)
 ```
 
-Redemption re-checks the payload against what the reviewer actually approved,
-so an approval cannot be spent on a call they never saw, and it is single-use.
+```typescript
+const outcome = await guard.evaluate(call);
+if (outcome.action === "review") {
+  const result = await guard.redeem(outcome, { timeoutMs: 60_000 });
+}
+```
 
-**Known gap:** the TypeScript SDK does not implement redemption yet, so on
-TypeScript a `human_review` decision stops the call and nothing resumes it
-automatically. Use the Python SDK where that flow matters.
+Redemption re-checks the payload against what the reviewer actually approved,
+so an approval cannot be spent on a call they never saw. It is single-use, and
+`allowed` is false for every failure — timed out, denied, or payload no longer
+matching — so there is one thing to check rather than three.
 
 ## Requirements
 

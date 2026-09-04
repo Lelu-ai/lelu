@@ -31,16 +31,14 @@
  * cannot wait for without blocking the agent indefinitely. The call is
  * cancelled and the reviewId surfaced so the caller can resume deliberately.
  *
- * Note that this SDK cannot yet *redeem* an approval — redeeming re-checks the
- * payload against what the reviewer actually approved, so that an approval
- * cannot be spent on a call they never saw. The Python SDK has it; this one
- * does not, so on TypeScript a human_review decision currently stops the call
- * and nothing resumes it automatically. Treat that as a known gap rather than
- * a design choice.
+ * The call is cancelled rather than blocked forever, and `guard.redeem()`
+ * resumes it once a human has acted — redemption re-checks the payload against
+ * what the reviewer actually approved, so an approval cannot be spent on a
+ * call they never saw.
  */
 
 import { LeluClient } from "../client.js";
-import type { AuthDecision, AuthorizeRequest } from "../types.js";
+import type { AuthDecision, AuthorizeRequest, RedeemResult } from "../types.js";
 
 // ─── The pieces of a Strands tool call we need ────────────────────────────────
 
@@ -52,10 +50,10 @@ import type { AuthDecision, AuthorizeRequest } from "../types.js";
  */
 export interface BeforeToolCallEventLike {
   toolUse?: {
-    name?: string;
-    input?: Record<string, unknown>;
-    toolUseId?: string;
-  };
+    name?: string | undefined;
+    input?: Record<string, unknown> | undefined;
+    toolUseId?: string | undefined;
+  } | undefined;
   /** Set to prevent the tool from executing. */
   cancel?: unknown;
   /** Set to run a different tool in place of the registry's match. */
@@ -77,10 +75,16 @@ export interface GuardOutcome {
   message: string;
   reason: string;
   traceId: string;
-  reviewId?: string;
-  replacementTool?: string;
-  replacementArgs?: Record<string, unknown>;
-  decision?: AuthDecision;
+  reviewId?: string | undefined;
+  replacementTool?: string | undefined;
+  replacementArgs?: Record<string, unknown> | undefined;
+  decision?: AuthDecision | undefined;
+  /**
+   * The exact request that was authorized. Kept so a paused call can be
+   * redeemed against an identical fingerprint — the engine binds an approval
+   * to the payload it was granted for, so a rebuilt request would be refused.
+   */
+  request?: AuthorizeRequest | undefined;
 }
 
 export interface LeluGuardOptions {
@@ -100,7 +104,7 @@ export interface LeluGuardOptions {
    */
   confidenceFor?: (call: ToolCall) => number | undefined;
   /** User the agent is acting on behalf of, when there is one. */
-  actingFor?: string;
+  actingFor?: string | undefined;
   /**
    * Throw instead of cancelling on a denial. Cancelling is the default because
    * it lets the model read the reason and choose something else, which is
@@ -139,6 +143,7 @@ export function decide(
   decision: AuthDecision,
   call: ToolCall,
   actor: string,
+  request?: AuthorizeRequest,
 ): GuardOutcome {
   const traceId = decision.requestId ?? "";
   const reason = decision.reason ?? "";
@@ -151,6 +156,7 @@ export function decide(
       traceId,
       reviewId: decision.reviewId,
       decision,
+      request,
     };
   }
 
@@ -166,6 +172,7 @@ export function decide(
       replacementTool: decision.safeTool,
       replacementArgs: decision.safeArgs,
       decision,
+      request,
     };
   }
 
@@ -176,10 +183,11 @@ export function decide(
       reason,
       traceId,
       decision,
+      request,
     };
   }
 
-  return { action: "allow", message: "", reason, traceId, decision };
+  return { action: "allow", message: "", reason, traceId, decision, request };
 }
 
 /** Lifts the fields Lelu needs out of a Strands event. */
@@ -224,7 +232,7 @@ export class LeluGuard {
   private readonly actor: string;
   private readonly actionFor: (call: ToolCall) => string;
   private readonly confidenceFor: (call: ToolCall) => number | undefined;
-  private readonly actingFor?: string;
+  private readonly actingFor: string | undefined;
   private readonly throwOnDeny: boolean;
   private readonly failOpen: boolean;
   private readonly log: Pick<Console, "debug" | "warn" | "error">;
@@ -242,15 +250,17 @@ export class LeluGuard {
 
   /** Asks Lelu about one tool call. */
   async evaluate(call: ToolCall): Promise<GuardOutcome> {
+    const confidence = this.confidenceFor(call);
+    const context: AuthorizeRequest["context"] = {};
+    if (confidence !== undefined) context.confidence = confidence;
+    if (this.actingFor !== undefined) context.actingFor = this.actingFor;
+
     const request: AuthorizeRequest = {
       tool: this.actionFor(call),
       actor: this.actor,
-      args: Object.keys(call.arguments).length > 0 ? call.arguments : undefined,
-      context: {
-        confidence: this.confidenceFor(call),
-        actingFor: this.actingFor,
-      },
-    } as AuthorizeRequest;
+      context,
+    };
+    if (Object.keys(call.arguments).length > 0) request.args = call.arguments;
 
     let decision: AuthDecision;
     try {
@@ -272,11 +282,31 @@ export class LeluGuard {
       };
     }
 
-    const outcome = decide(decision, call, this.actor);
+    const outcome = decide(decision, call, this.actor, request);
     this.log.debug(
       `lelu: tool=${call.name} action=${outcome.action} traceId=${outcome.traceId}`,
     );
     return outcome;
+  }
+
+  /**
+   * Waits for a human decision on a paused call, then redeems it.
+   *
+   * Pass the GuardOutcome returned by evaluate() — it carries both the
+   * decision and the exact request that was paused. Redemption re-checks that
+   * payload against what the reviewer actually approved, so an approval cannot
+   * be spent on a call they never saw, and it is single-use.
+   */
+  async redeem(
+    outcome: GuardOutcome,
+    opts?: { timeoutMs?: number; signal?: AbortSignal },
+  ): Promise<RedeemResult> {
+    if (!outcome.decision || !outcome.request) {
+      throw new Error(
+        "this outcome carries no request to redeem — only a review outcome can be redeemed",
+      );
+    }
+    return this.client.waitAndRedeem(outcome.decision, outcome.request, opts);
   }
 
   /** The BeforeToolCall hook itself. */

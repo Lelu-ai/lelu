@@ -602,6 +602,20 @@ export interface ShadowSummaryResponse {
 
 export type QueueItemStatus = "pending" | "approved" | "denied";
 
+/**
+ * The outcome of redeeming a human approval against a specific request.
+ *
+ * `allowed` is false for every failure — mismatched payload, still pending,
+ * denied, expired, or already spent — so a caller has one thing to check
+ * rather than five. `reason` says which.
+ */
+export interface RedeemResult {
+  allowed: boolean;
+  reason: string;
+  reviewId?: string;
+  traceId?: string;
+}
+
 export interface ReviewQueueItem {
   id: string;
   tenant_id: string;

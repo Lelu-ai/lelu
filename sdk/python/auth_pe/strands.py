@@ -31,7 +31,7 @@ authorization checks first, so this belongs at the front of the list.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Callable, Literal
 
 from .client import LeluClient
 from .models import AgentContext, AuthorizeRequest
@@ -53,7 +53,13 @@ __all__ = [
 # anyone who has Lelu but not Strands. The handler class itself needs the real
 # base class, so constructing one without Strands raises with an explanation.
 
-try:  # pragma: no cover - depends on the environment, not the logic
+# Split on TYPE_CHECKING so a type checker always analyses against the real
+# classes, while the runtime keeps its fallback. Rebinding the imported names
+# in an except branch — the obvious way to write this — makes mypy reject the
+# assignment to a type, and leaves the base class as Any, which quietly
+# disables checking of the handler below. This way the fallback exists only at
+# runtime, where it is actually needed.
+if TYPE_CHECKING:
     from strands.interventions import (
         Confirm,
         Deny,
@@ -63,10 +69,21 @@ try:  # pragma: no cover - depends on the environment, not the logic
     )
 
     _STRANDS_AVAILABLE = True
-except ImportError:  # pragma: no cover
-    Confirm = Deny = Proceed = Transform = None  # type: ignore[assignment]
-    InterventionHandler = object  # type: ignore[assignment,misc]
-    _STRANDS_AVAILABLE = False
+else:
+    try:  # pragma: no cover - depends on the environment, not the logic
+        from strands.interventions import (
+            Confirm,
+            Deny,
+            InterventionHandler,
+            Proceed,
+            Transform,
+        )
+
+        _STRANDS_AVAILABLE = True
+    except ImportError:  # pragma: no cover
+        Confirm = Deny = Proceed = Transform = None
+        InterventionHandler = object
+        _STRANDS_AVAILABLE = False
 
 
 # ─── Framework-independent core ──────────────────────────────────────────────
@@ -209,7 +226,7 @@ def extract_call(event: Any) -> ToolCall:
 # ─── The intervention handler ────────────────────────────────────────────────
 
 
-class LeluIntervention(InterventionHandler):  # type: ignore[misc]
+class LeluIntervention(InterventionHandler):
     """Authorizes every Strands tool call through Lelu before it executes.
 
     Parameters

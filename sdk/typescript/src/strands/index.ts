@@ -1,64 +1,55 @@
 /**
- * Lelu integration for Strands Agents (TypeScript).
+ * Lelu authorization for Strands Agents.
  *
- * Strands fires `BeforeToolCallEvent` after a tool has been resolved but
- * before it runs, and lets a hook cancel the call, swap in a different tool,
- * or rewrite the arguments. Those are the same outcomes Lelu returns, so this
- * is a mapping rather than a translation:
+ * Strands' intervention system asks a handler what to do before each tool
+ * call, and the actions it accepts line up with Lelu's decisions almost
+ * exactly. That makes this a mapping rather than a translation:
  *
- *   Lelu decision   Strands action
- *   ─────────────   ────────────────────────────────────────────────
- *   allow           return; the tool runs as the model intended
- *   deny            cancel the call, with the policy's reason
- *   compute         re-point the call at the engine's safeTool
- *   human_review    cancel and surface the reviewId (see below)
+ *   Lelu decision   Strands action   Effect
+ *   ─────────────   ──────────────   ─────────────────────────────────────
+ *   allow           proceed()        the tool runs as the model intended
+ *   deny            deny(reason)     cancelled; the model is told why
+ *   compute         transform(...)   re-pointed at the policy's safe tool
+ *   human_review    confirm(prompt)  paused for a human via the interrupt
  *
  * Usage:
  * ```typescript
  * import { Agent } from '@strands-agents/sdk';
  * import { LeluClient } from 'lelu-agent-auth';
- * import { leluGuard } from 'lelu-agent-auth/strands';
+ * import { LeluIntervention } from 'lelu-agent-auth/strands';
  *
  * const agent = new Agent({
- *   tools: [refund, lookup],
- *   plugins: [leluGuard({ client, actor: 'invoice_bot' })],
+ *   tools: [refund, lookupInvoice],
+ *   interventions: [new LeluIntervention({ client, actor: 'invoice_bot' })],
  * });
  * ```
  *
- * On human review
- * ---------------
- * `human_review` means a person has to decide, which a synchronous hook
- * cannot wait for without blocking the agent indefinitely. The call is
- * cancelled and the reviewId surfaced so the caller can resume deliberately.
- *
- * The call is cancelled rather than blocked forever, and `guard.redeem()`
- * resumes it once a human has acted — redemption re-checks the payload against
- * what the reviewer actually approved, so an approval cannot be spent on a
- * call they never saw.
+ * Strands evaluates handlers in registration order and suggests putting cheap
+ * authorization checks first, so this belongs at the front of the array.
  */
+
+import {
+  InterventionHandler,
+  InterventionActions,
+} from "@strands-agents/sdk";
+import type { BeforeToolCallEvent, OnError } from "@strands-agents/sdk";
 
 import { LeluClient } from "../client.js";
-import type { AuthDecision, AuthorizeRequest, RedeemResult } from "../types.js";
-
-// ─── The pieces of a Strands tool call we need ────────────────────────────────
 
 /**
- * Structural type for the event Strands passes to a BeforeToolCall hook.
- * Declared here rather than imported so this module does not add a hard
- * dependency on the Strands SDK, and so a field moving does not break the
- * build for people who never use this integration.
+ * The union of actions `beforeToolCall` may return.
+ *
+ * Derived from the base class rather than imported: the SDK exports the action
+ * *helpers* from its root but not the union type, and deriving it here means a
+ * change to the set of permitted actions surfaces as a type error rather than
+ * a stale local copy that still compiles.
  */
-export interface BeforeToolCallEventLike {
-  toolUse?: {
-    name?: string | undefined;
-    input?: Record<string, unknown> | undefined;
-    toolUseId?: string | undefined;
-  } | undefined;
-  /** Set to prevent the tool from executing. */
-  cancel?: unknown;
-  /** Set to run a different tool in place of the registry's match. */
-  selectedTool?: unknown;
-}
+type InterventionAction = Awaited<
+  ReturnType<InterventionHandler["beforeToolCall"]>
+>;
+import type { AuthDecision, AuthorizeRequest, RedeemResult } from "../types.js";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 /** The parts of a tool invocation Lelu evaluates. */
 export interface ToolCall {
@@ -69,7 +60,7 @@ export interface ToolCall {
 
 export type GuardAction = "allow" | "deny" | "redirect" | "review";
 
-/** What the guard decided to do about a tool call. */
+/** What the guard decided about a tool call, before it becomes a Strands action. */
 export interface GuardOutcome {
   action: GuardAction;
   message: string;
@@ -80,64 +71,64 @@ export interface GuardOutcome {
   replacementArgs?: Record<string, unknown> | undefined;
   decision?: AuthDecision | undefined;
   /**
-   * The exact request that was authorized. Kept so a paused call can be
-   * redeemed against an identical fingerprint — the engine binds an approval
-   * to the payload it was granted for, so a rebuilt request would be refused.
+   * The exact request that was authorized, kept so a paused call can be
+   * redeemed against an identical fingerprint. The engine binds an approval to
+   * the payload it was granted for, so a rebuilt request would be refused.
    */
   request?: AuthorizeRequest | undefined;
 }
 
-export interface LeluGuardOptions {
+export interface LeluInterventionOptions {
   /** Configured LeluClient. */
   client: LeluClient;
   /** Agent identity Lelu evaluates policy against. */
   actor: string;
   /**
    * Maps a tool name to the permission string checked in policy. Defaults to
-   * the tool name unchanged, which is usually what you want.
+   * the tool name unchanged.
    */
-  actionFor?: (call: ToolCall) => string;
+  actionFor?: ((call: ToolCall) => string) | undefined;
   /**
    * Model confidence for this call (0–1). Omit it and the engine applies its
    * configured MissingSignalMode rather than assuming a value — Lelu does not
    * treat a caller-supplied number as verified.
    */
-  confidenceFor?: (call: ToolCall) => number | undefined;
+  confidenceFor?: ((call: ToolCall) => number | undefined) | undefined;
   /** User the agent is acting on behalf of, when there is one. */
   actingFor?: string | undefined;
   /**
-   * Throw instead of cancelling on a denial. Cancelling is the default because
-   * it lets the model read the reason and choose something else, which is
-   * usually more useful than an exception.
+   * What a `human_review` decision does.
+   *
+   * - `"confirm"` (default) returns Strands' Confirm action, pausing the agent
+   *   through its interrupt system so a human can approve or refuse in the
+   *   flow the application already has.
+   * - `"deny"` cancels the call instead, leaving Lelu's own review queue as
+   *   the authority. Use this when approval happens out of band and you intend
+   *   to resume with `redeem()`.
    */
-  throwOnDeny?: boolean;
+  onReview?: "confirm" | "deny" | undefined;
   /**
-   * If the engine is unreachable: false (default) cancels the call, true
-   * allows it. Default closed — an authorization engine that allows
-   * everything when it breaks is not an authorization engine.
+   * What happens if this handler itself throws — Strands' own OnError setting.
+   * Defaults to `"deny"`, which is fail-closed. Strands' default is `"throw"`;
+   * we override it because a broken authorization check must not become a
+   * permitted tool call.
    */
-  failOpen?: boolean;
+  onError?: OnError | undefined;
+  /**
+   * If the engine is unreachable: false (default) denies the call, true allows
+   * it. Default closed — an authorization engine that permits everything when
+   * it breaks is not an authorization engine.
+   */
+  failOpen?: boolean | undefined;
   /** Optional logger. Defaults to console. */
-  logger?: Pick<Console, "debug" | "warn" | "error">;
-}
-
-export class LeluPermissionDeniedError extends Error {
-  constructor(
-    message: string,
-    public readonly reason: string,
-    public readonly traceId: string = "",
-  ) {
-    super(message);
-    this.name = "LeluPermissionDeniedError";
-  }
+  logger?: Pick<Console, "debug" | "warn" | "error"> | undefined;
 }
 
 // ─── Framework-independent core ───────────────────────────────────────────────
 
 /**
- * Turns a Lelu decision into a Strands outcome. Pure and synchronous: no
- * network, no framework. This is where the mapping lives, and it is the part
- * worth testing.
+ * Turns a Lelu decision into a guard outcome. Pure and synchronous: no
+ * network, no framework. This is the mapping, and the part worth testing.
  */
 export function decide(
   decision: AuthDecision,
@@ -151,7 +142,7 @@ export function decide(
   if (decision.decision === "human_review") {
     return {
       action: "review",
-      message: `[Lelu] '${call.name}' requires human review before it can run. Reason: ${reason}`,
+      message: `[Lelu] '${call.name}' requires human approval. Reason: ${reason}`,
       reason,
       traceId,
       reviewId: decision.reviewId,
@@ -161,8 +152,8 @@ export function decide(
   }
 
   // Checked before `allowed`, because the engine reports a compute decision as
-  // not-allowed for the tool that was actually asked for. Reading `allowed`
-  // first would turn a redirect into a denial.
+  // not-allowed for the tool that was actually requested. Reading `allowed`
+  // first would turn every redirect into a denial.
   if (decision.safeTool) {
     return {
       action: "redirect",
@@ -191,64 +182,50 @@ export function decide(
 }
 
 /** Lifts the fields Lelu needs out of a Strands event. */
-export function extractCall(event: BeforeToolCallEventLike): ToolCall {
+export function extractCall(event: {
+  toolUse?: { name?: string; input?: unknown; toolUseId?: string } | undefined;
+}): ToolCall {
   const toolUse = event?.toolUse ?? {};
+  const input = toolUse.input;
   return {
     name: toolUse.name ?? "",
-    arguments: toolUse.input ?? {},
+    arguments:
+      input && typeof input === "object" ? (input as Record<string, unknown>) : {},
     toolUseId: toolUse.toolUseId ?? "",
   };
 }
 
-/** Writes an outcome back onto a Strands event. */
-export function applyOutcome(
-  event: BeforeToolCallEventLike,
-  outcome: GuardOutcome,
-): void {
-  if (outcome.action === "allow") return;
+// ─── The intervention handler ─────────────────────────────────────────────────
 
-  if (outcome.action === "redirect" && outcome.replacementTool) {
-    // Renaming makes Strands re-resolve the tool from its own registry, which
-    // is what we want: the safe tool is looked up by name rather than smuggled
-    // in as an object this integration constructed.
-    if (event.toolUse) {
-      event.toolUse.name = outcome.replacementTool;
-      if (outcome.replacementArgs !== undefined) {
-        event.toolUse.input = outcome.replacementArgs;
-      }
-      return;
-    }
-    // No usable toolUse — fall through and cancel rather than let an
-    // unauthorized call proceed because a field was not where expected.
-  }
+export class LeluIntervention extends InterventionHandler {
+  readonly name = "lelu-authorization";
+  override readonly onError: OnError;
 
-  event.cancel = outcome.message || true;
-}
-
-// ─── The guard ────────────────────────────────────────────────────────────────
-
-export class LeluGuard {
   private readonly client: LeluClient;
   private readonly actor: string;
   private readonly actionFor: (call: ToolCall) => string;
   private readonly confidenceFor: (call: ToolCall) => number | undefined;
   private readonly actingFor: string | undefined;
-  private readonly throwOnDeny: boolean;
+  private readonly onReview: "confirm" | "deny";
   private readonly failOpen: boolean;
   private readonly log: Pick<Console, "debug" | "warn" | "error">;
 
-  constructor(options: LeluGuardOptions) {
+  constructor(options: LeluInterventionOptions) {
+    super();
     this.client = options.client;
     this.actor = options.actor;
     this.actionFor = options.actionFor ?? ((call) => call.name);
     this.confidenceFor = options.confidenceFor ?? (() => undefined);
     this.actingFor = options.actingFor;
-    this.throwOnDeny = options.throwOnDeny ?? false;
+    this.onReview = options.onReview ?? "confirm";
+    // Fail closed by default. Strands defaults to 'throw'; a broken policy
+    // check should stop the call, not surface as an unhandled error.
+    this.onError = options.onError ?? "deny";
     this.failOpen = options.failOpen ?? false;
     this.log = options.logger ?? console;
   }
 
-  /** Asks Lelu about one tool call. */
+  /** Asks Lelu about one tool call. Usable directly, and testable without an event. */
   async evaluate(call: ToolCall): Promise<GuardOutcome> {
     const confidence = this.confidenceFor(call);
     const context: AuthorizeRequest["context"] = {};
@@ -289,13 +266,62 @@ export class LeluGuard {
     return outcome;
   }
 
+  override async beforeToolCall(event: BeforeToolCallEvent): Promise<InterventionAction> {
+    const call = extractCall(event);
+    const outcome = await this.evaluate(call);
+    return this.toAction(event, outcome);
+  }
+
+  /**
+   * Translates an outcome into the Strands action that expresses it.
+   * Separated from beforeToolCall so the mapping can be tested without
+   * standing up an agent.
+   */
+  toAction(event: BeforeToolCallEvent, outcome: GuardOutcome): InterventionAction {
+    switch (outcome.action) {
+      case "allow":
+        return InterventionActions.proceed({ reason: outcome.reason });
+
+      case "redirect":
+        if (outcome.replacementTool) {
+          const tool = outcome.replacementTool;
+          const args = outcome.replacementArgs;
+          return InterventionActions.transform(
+            () => {
+              event.toolUse.name = tool;
+              if (args !== undefined) {
+                // safeArgs comes off the wire as JSON, so this is a
+                // representation cast, not a claim about unchecked data.
+                event.toolUse.input = args as typeof event.toolUse.input;
+              }
+            },
+            { reason: outcome.message },
+          );
+        }
+        // A redirect we cannot express must stop the call, not fall through to
+        // running the tool that was never authorized.
+        return InterventionActions.deny(outcome.message);
+
+      case "review":
+        return this.onReview === "confirm"
+          ? InterventionActions.confirm(outcome.message, { reason: outcome.reason })
+          : InterventionActions.deny(outcome.message);
+
+      case "deny":
+      default:
+        return InterventionActions.deny(outcome.message);
+    }
+  }
+
   /**
    * Waits for a human decision on a paused call, then redeems it.
    *
-   * Pass the GuardOutcome returned by evaluate() — it carries both the
-   * decision and the exact request that was paused. Redemption re-checks that
-   * payload against what the reviewer actually approved, so an approval cannot
-   * be spent on a call they never saw, and it is single-use.
+   * Pass the GuardOutcome from evaluate() — it carries both the decision and
+   * the exact request that was paused. Redemption re-checks that payload
+   * against what the reviewer actually approved, so an approval cannot be
+   * spent on a call they never saw, and it is single-use.
+   *
+   * Relevant when onReview is "deny" and approval happens in Lelu's own queue.
    */
   async redeem(
     outcome: GuardOutcome,
@@ -308,28 +334,9 @@ export class LeluGuard {
     }
     return this.client.waitAndRedeem(outcome.decision, outcome.request, opts);
   }
-
-  /** The BeforeToolCall hook itself. */
-  async beforeToolCall(event: BeforeToolCallEventLike): Promise<void> {
-    const call = extractCall(event);
-    const outcome = await this.evaluate(call);
-    applyOutcome(event, outcome);
-
-    if (outcome.action === "deny" && this.throwOnDeny) {
-      throw new LeluPermissionDeniedError(outcome.message, outcome.reason, outcome.traceId);
-    }
-  }
 }
 
-/**
- * Convenience factory returning a plugin-shaped object, so it can be dropped
- * straight into a Strands `plugins` array.
- */
-export function leluGuard(options: LeluGuardOptions) {
-  const guard = new LeluGuard(options);
-  return {
-    name: "lelu-authorization",
-    guard,
-    beforeToolCall: (event: BeforeToolCallEventLike) => guard.beforeToolCall(event),
-  };
+/** Convenience factory, for `interventions: [leluIntervention({...})]`. */
+export function leluIntervention(options: LeluInterventionOptions): LeluIntervention {
+  return new LeluIntervention(options);
 }

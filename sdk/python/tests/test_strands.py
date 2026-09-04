@@ -12,15 +12,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from auth_pe.models import AuthDecision, AuthorizeRequest
+from strands.interventions import Confirm, Deny, Proceed, Transform
+
 from auth_pe.strands import (
     GuardOutcome,
-    HumanReviewRequired,
-    LeluHook,
-    PermissionDeniedError,
+    LeluIntervention,
     ToolCall,
-    _apply,
-    _extract_call,
     decide,
+    extract_call,
 )
 
 
@@ -41,11 +40,15 @@ def _decision(**overrides):
 
 
 class _FakeEvent:
-    """Stands in for Strands' BeforeToolCallEvent."""
+    """Stands in for Strands' BeforeToolCallEvent.
+
+    Only tool_use is needed: the handler returns actions rather than mutating
+    the event, and the one mutation that does happen (Transform) goes through
+    the apply callback, which this exercises directly.
+    """
 
     def __init__(self, name="refund", tool_input=None):
         self.tool_use = {"name": name, "input": tool_input or {}, "toolUseId": "tu-1"}
-        self.cancel = None
 
 
 # ── The decision mapping ─────────────────────────────────────────────────────
@@ -101,7 +104,7 @@ def test_compute_is_checked_before_allowed():
 
 
 def test_extract_call_reads_the_tool_use():
-    call = _extract_call(_FakeEvent("refund", {"amount": 10}))
+    call = extract_call(_FakeEvent("refund", {"amount": 10}))
     assert call.name == "refund"
     assert call.arguments == {"amount": 10}
     assert call.tool_use_id == "tu-1"
@@ -111,148 +114,150 @@ def test_extract_call_survives_a_missing_tool_use():
     class _Empty:
         pass
 
-    call = _extract_call(_Empty())
+    call = extract_call(_Empty())
     assert call.name == ""
 
 
-def test_apply_allow_changes_nothing():
-    event = _FakeEvent()
-    _apply(event, GuardOutcome(action="allow"))
-    assert event.cancel is None
-    assert event.tool_use["name"] == "refund"
+# ── The intervention ─────────────────────────────────────────────────────────────────
 
 
-def test_apply_deny_cancels():
-    event = _FakeEvent()
-    _apply(event, GuardOutcome(action="deny", message="blocked"))
-    assert event.cancel == "blocked"
-
-
-def test_apply_redirect_renames_so_strands_reresolves():
-    event = _FakeEvent()
-    _apply(
-        event,
-        GuardOutcome(action="redirect", replacement_tool="refund_sandbox", replacement_args={"dry_run": True}),
-    )
-    assert event.tool_use["name"] == "refund_sandbox"
-    assert event.tool_use["input"] == {"dry_run": True}
-    assert event.cancel is None
-
-
-def test_apply_redirect_without_a_usable_tool_use_cancels():
-    """Failing to apply a redirect must stop the call, not let the original
-    unauthorized tool run because a field was not where we expected."""
-
-    class _NoToolUse:
-        def __init__(self):
-            self.cancel = None
-
-    event = _NoToolUse()
-    _apply(event, GuardOutcome(action="redirect", replacement_tool="safe", message="redirect failed"))
-    assert event.cancel == "redirect failed"
-
-
-# ── The hook ─────────────────────────────────────────────────────────────────
-
-
-def _hook(decision, **kwargs):
+def _guard(decision, **kwargs):
     client = MagicMock()
     client.authorize = AsyncMock(return_value=decision)
-    return LeluHook(client, actor="invoice_bot", **kwargs), client
+    return LeluIntervention(client, actor="invoice_bot", **kwargs), client
 
 
-def test_hook_authorizes_and_allows():
-    hook, client = _hook(_decision(decision="allow"))
-    event = _FakeEvent()
-    hook.before_tool_call(event)
-    assert event.cancel is None
+async def _act(guard, event):
+    return await guard.before_tool_call(event)
+
+
+def test_registers_a_name_strands_can_identify():
+    guard, _ = _guard(_decision())
+    assert guard.name == "lelu-authorization"
+
+
+def test_defaults_to_fail_closed_on_handler_error():
+    """Strands defaults on_error to 'throw'. A broken authorization check must
+    block the call, not surface as an unhandled exception."""
+    guard, _ = _guard(_decision())
+    assert guard.on_error == "deny"
+
+
+@pytest.mark.asyncio
+async def test_allow_returns_proceed():
+    guard, client = _guard(_decision(decision="allow"))
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Proceed)
     client.authorize.assert_awaited_once()
 
 
-def test_hook_sends_the_tool_name_as_the_action_by_default():
-    hook, client = _hook(_decision(decision="allow"))
-    hook.before_tool_call(_FakeEvent("refund"))
+@pytest.mark.asyncio
+async def test_deny_returns_deny_with_the_reason():
+    guard, _ = _guard(_decision(decision="deny", reason="destructive action"))
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Deny)
+    assert "destructive action" in action.reason
+
+
+@pytest.mark.asyncio
+async def test_compute_returns_transform_that_repoints_the_call():
+    guard, _ = _guard(
+        _decision(decision="compute", safe_tool="refund_sandbox", safe_args={"dry_run": True})
+    )
+    event = _FakeEvent()
+    action = await _act(guard, event)
+    assert isinstance(action, Transform)
+
+    # Strands calls apply() to mutate the event in place.
+    action.apply(event)
+    assert event.tool_use["name"] == "refund_sandbox"
+    assert event.tool_use["input"] == {"dry_run": True}
+
+
+@pytest.mark.asyncio
+async def test_human_review_returns_confirm_by_default():
+    """Confirm pauses through Strands' interrupt system, which is the whole
+    reason human_review maps onto it rather than onto a plain denial."""
+    guard, _ = _guard(_decision(decision="human_review", review_id="rev-42"))
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Confirm)
+    assert "human approval" in action.prompt
+
+
+@pytest.mark.asyncio
+async def test_human_review_can_defer_to_lelus_own_queue():
+    guard, _ = _guard(
+        _decision(decision="human_review", review_id="rev-42"), on_review="deny"
+    )
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Deny)
+
+
+@pytest.mark.asyncio
+async def test_sends_the_tool_name_as_the_action_by_default():
+    guard, client = _guard(_decision(decision="allow"))
+    await _act(guard, _FakeEvent("refund"))
     sent: AuthorizeRequest = client.authorize.await_args.args[0]
     assert sent.tool == "refund"
     assert sent.actor == "invoice_bot"
-    assert sent.resource == {"tool": "refund"}
 
 
-def test_hook_honours_a_custom_action_mapping():
-    hook, client = _hook(_decision(decision="allow"), action_for=lambda c: f"tool:{c.name}")
-    hook.before_tool_call(_FakeEvent("refund"))
+@pytest.mark.asyncio
+async def test_honours_a_custom_action_mapping():
+    guard, client = _guard(_decision(decision="allow"), action_for=lambda c: f"tool:{c.name}")
+    await _act(guard, _FakeEvent("refund"))
     assert client.authorize.await_args.args[0].tool == "tool:refund"
 
 
-def test_hook_omits_confidence_when_none_is_supplied():
+@pytest.mark.asyncio
+async def test_omits_confidence_when_none_is_supplied():
     """Absent confidence must stay absent so the engine applies its configured
     MissingSignalMode, rather than the integration inventing a perfect score."""
-    hook, client = _hook(_decision(decision="allow"))
-    hook.before_tool_call(_FakeEvent())
+    guard, client = _guard(_decision(decision="allow"))
+    await _act(guard, _FakeEvent())
     assert client.authorize.await_args.args[0].context.confidence is None
 
 
-def test_hook_cancels_on_deny():
-    hook, _ = _hook(_decision(decision="deny", reason="nope"))
-    event = _FakeEvent()
-    hook.before_tool_call(event)
-    assert "nope" in event.cancel
-
-
-def test_hook_raises_on_deny_when_asked():
-    hook, _ = _hook(_decision(decision="deny", reason="nope"), raise_on_deny=True)
-    with pytest.raises(PermissionDeniedError) as exc:
-        hook.before_tool_call(_FakeEvent())
-    assert exc.value.reason == "nope"
-
-
-def test_hook_interrupts_on_review_when_asked():
-    hook, _ = _hook(
-        _decision(decision="human_review", review_id="rev-42"), on_review="interrupt"
-    )
-    with pytest.raises(HumanReviewRequired) as exc:
-        hook.before_tool_call(_FakeEvent())
-    assert exc.value.review_id == "rev-42"
-
-
-def test_hook_fails_closed_when_the_engine_is_unreachable():
+@pytest.mark.asyncio
+async def test_fails_closed_when_the_engine_is_unreachable():
     """An authorization engine that allows everything when it breaks is not an
     authorization engine."""
     client = MagicMock()
     client.authorize = AsyncMock(side_effect=RuntimeError("connection refused"))
-    hook = LeluHook(client, actor="invoice_bot")
-    event = _FakeEvent()
-    hook.before_tool_call(event)
-    assert event.cancel
-    assert "unreachable" in event.cancel
+    guard = LeluIntervention(client, actor="invoice_bot")
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Deny)
+    assert "unreachable" in action.reason
 
 
-def test_hook_fails_open_only_when_explicitly_configured():
+@pytest.mark.asyncio
+async def test_fails_open_only_when_explicitly_configured():
     client = MagicMock()
     client.authorize = AsyncMock(side_effect=RuntimeError("connection refused"))
-    hook = LeluHook(client, actor="invoice_bot", fail_open=True)
-    event = _FakeEvent()
-    hook.before_tool_call(event)
-    assert event.cancel is None
+    guard = LeluIntervention(client, actor="invoice_bot", fail_open=True)
+    action = await _act(guard, _FakeEvent())
+    assert isinstance(action, Proceed)
 
 
-def test_redeem_reuses_the_paused_request():
+@pytest.mark.asyncio
+async def test_redeem_reuses_the_paused_request():
     """The engine fingerprints the request body to bind an approval to a
     payload. Redemption must present the same object, not a rebuilt one."""
     decision = _decision(decision="human_review", review_id="rev-42")
-    hook, client = _hook(decision)
+    guard, client = _guard(decision)
     client.wait_and_redeem = AsyncMock(return_value="redeemed")
 
-    outcome = hook.evaluate(ToolCall("refund", {"amount": 10}))
+    outcome = await guard.evaluate(ToolCall("refund", {"amount": 10}))
     assert outcome.action == "review"
 
-    hook.redeem(outcome)
+    await guard.redeem(outcome)
     passed_decision, passed_request = client.wait_and_redeem.await_args.args
     assert passed_decision is decision
     assert passed_request is outcome.request
 
 
-def test_redeem_refuses_an_outcome_with_nothing_to_redeem():
-    hook, _ = _hook(_decision(decision="allow"))
+@pytest.mark.asyncio
+async def test_redeem_refuses_an_outcome_with_nothing_to_redeem():
+    guard, _ = _guard(_decision(decision="allow"))
     with pytest.raises(ValueError):
-        hook.redeem(GuardOutcome(action="deny"))
+        await guard.redeem(GuardOutcome(action="deny"))

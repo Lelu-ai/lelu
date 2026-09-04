@@ -95,7 +95,7 @@
   "license": "MIT",
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0 || ^4.0.0"
   },
   "peerDependencies": {
     "@ai-sdk/react": ">=3",
@@ -103,7 +103,8 @@
     "better-sqlite3": ">=9",
     "express": ">=4",
     "openai": ">=4",
-    "react": ">=18"
+    "react": ">=18",
+    "@strands-agents/sdk": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "@ai-sdk/react": {
@@ -123,6 +124,9 @@
     },
     "react": {
       "optional": true
+    },
+    "@strands-agents/sdk": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -135,7 +139,8 @@
     "react": "^18.3.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "@strands-agents/sdk": "^1.16.0"
   },
   "engines": {
     "node": ">=18"
@@ -144,5 +149,8 @@
     "type": "git",
     "url": "git+https://github.com/lelu-ai/lelu.git",
     "directory": "sdk/typescript"
+  },
+  "overrides": {
+    "express": "^4.19.0"
   }
 }

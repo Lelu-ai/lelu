@@ -53,20 +53,20 @@ export const AuthorizeRequestSchema = z.object({
   /** Agent identity — selects the agent_scopes policy. Omit for the default scope. */
   actor: z.string().optional(),
   context: AgentContextSchema.optional(),
-  args: z.record(z.unknown()).optional(),
+  args: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Legacy schemas kept for backward compatibility
 export const AuthRequestSchema = z.object({
   userId: z.string().min(1, "userId is required"),
   action: z.string().min(1, "action is required"),
-  resource: z.record(z.string()).optional(),
+  resource: z.record(z.string(), z.string()).optional(),
 });
 
 export const AgentAuthRequestSchema = z.object({
   actor: z.string().min(1, "actor is required"),
   action: z.string().min(1, "action is required"),
-  resource: z.record(z.string()).optional(),
+  resource: z.record(z.string(), z.string()).optional(),
   context: AgentContextSchema,
 });
 

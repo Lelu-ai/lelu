@@ -19,12 +19,16 @@ bypassed.
 Lelu returns one of four decisions for any tool call, and `BeforeToolCallEvent`
 expresses all four:
 
-| Lelu decision | Strands action |
-|---|---|
-| `allow` | the tool runs as the model intended |
-| `deny` | the call is cancelled, with the policy's reason attached |
-| `compute` | the call is re-pointed at a safer tool the policy names |
-| `human_review` | the call is paused for a person to decide |
+| Lelu decision | Strands action | Effect |
+|---|---|---|
+| `allow` | `Proceed` | the tool runs as the model intended |
+| `deny` | `Deny` | cancelled; the model is told why and can choose differently |
+| `compute` | `Transform` | re-pointed at the safer tool the policy names |
+| `human_review` | `Confirm` | paused for a human through Strands' interrupt system |
+
+Lelu registers as an `InterventionHandler`. Strands evaluates handlers in
+registration order and recommends putting cheap authorization checks first, so
+this belongs at the front of the list.
 
 ## Quick start
 
@@ -39,14 +43,14 @@ npx -y lelu-mcp start
 ```python
 from strands import Agent
 from lelu import LeluClient
-from lelu.strands import LeluHook
+from lelu.strands import LeluIntervention
 
-guard = LeluHook(
-    LeluClient(base_url="http://localhost:8080"),
-    actor="invoice_bot",
+agent = Agent(
+    tools=[refund, lookup_invoice],
+    interventions=[
+        LeluIntervention(LeluClient(base_url="http://localhost:8080"), actor="invoice_bot"),
+    ],
 )
-
-agent = Agent(tools=[refund, lookup_invoice], hooks=[guard])
 ```
 
 ### TypeScript
@@ -54,11 +58,11 @@ agent = Agent(tools=[refund, lookup_invoice], hooks=[guard])
 ```typescript
 import { Agent } from "@strands-agents/sdk";
 import { LeluClient } from "lelu-agent-auth";
-import { leluGuard } from "lelu-agent-auth/strands";
+import { LeluIntervention } from "lelu-agent-auth/strands";
 
 const agent = new Agent({
   tools: [refund, lookupInvoice],
-  plugins: [leluGuard({ client, actor: "invoice_bot" })],
+  interventions: [new LeluIntervention({ client, actor: "invoice_bot" })],
 });
 ```
 
@@ -72,7 +76,7 @@ By default the tool name is the permission checked. Pass `action_for` /
 `actionFor` if your policy uses a different vocabulary:
 
 ```python
-LeluHook(client, actor="invoice_bot", action_for=lambda call: f"tool:{call.name}")
+LeluIntervention(client, actor="invoice_bot", action_for=lambda call: f"tool:{call.name}")
 ```
 
 ## Confidence
@@ -80,7 +84,7 @@ LeluHook(client, actor="invoice_bot", action_for=lambda call: f"tool:{call.name}
 If you have a real confidence signal from your model provider, pass it:
 
 ```python
-LeluHook(client, actor="invoice_bot", confidence_for=lambda call: current_confidence())
+LeluIntervention(client, actor="invoice_bot", confidence_for=lambda call: current_confidence())
 ```
 
 Omit it and the engine applies its configured `MissingSignalMode` rather than
@@ -89,16 +93,24 @@ verified — a self-reported score is a claim, not evidence.
 
 ## Failure behaviour
 
-If the engine is unreachable the call is **cancelled**, not allowed. An
-authorization engine that permits everything when it breaks is not an
-authorization engine. `fail_open=True` / `failOpen: true` overrides this; use it
-only deliberately.
+Two independent failures, both closed by default:
+
+- **Engine unreachable** — the call is denied, not allowed. An authorization
+  engine that permits everything when it breaks is not an authorization engine.
+  `fail_open=True` / `failOpen: true` overrides this; use it deliberately.
+- **Handler throws** — `on_error` defaults to `"deny"`. Strands' own default is
+  `"throw"`; this integration overrides it, because a broken policy check
+  should block the call rather than surface as an unhandled error.
 
 ## Human review
 
-`human_review` needs a person, which a synchronous hook cannot wait for without
-blocking the agent. The call is cancelled and the review id surfaced so you can
-resume when a human has acted.
+`human_review` returns Strands' `Confirm` action, which pauses the agent
+through its interrupt system so a human can approve in the flow your
+application already has.
+
+If approval happens out of band in Lelu's own review queue instead, set
+`on_review="deny"` / `onReview: "deny"`. The call is then cancelled and you
+resume it yourself:
 
 Once a human has acted, redeem the approval:
 

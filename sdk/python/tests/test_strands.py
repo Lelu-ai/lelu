@@ -12,7 +12,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from auth_pe.models import AuthDecision, AuthorizeRequest
-from strands.interventions import Confirm, Deny, Proceed, Transform
+# These tests assert against the real action classes rather than stand-ins, so
+# they need the SDK. Skip the module cleanly when it is absent instead of
+# failing collection for everyone who has Lelu but not Strands.
+pytest.importorskip("strands", reason="strands-agents is not installed")
+
+from strands.interventions import Confirm, Deny, Proceed, Transform  # noqa: E402
 
 from auth_pe.strands import (
     GuardOutcome,

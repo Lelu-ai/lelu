@@ -32,6 +32,9 @@ dev = [
     "pytest-httpx>=0.30.0",
     "mypy>=1.10.0",
     "ruff>=0.4.0",
+    # The Strands tests assert against the real Proceed/Deny/Transform/Confirm
+    # classes rather than stand-ins, so the SDK has to be present to run them.
+    "strands-agents>=1.0.0",
 ]
 langchain = [
     "langchain-core>=0.2.0",
@@ -41,6 +44,9 @@ langgraph = [
 ]
 fastapi = [
     "fastapi>=0.111.0",
+]
+strands = [
+    "strands-agents>=1.0.0",
 ]
 
 [project.urls]

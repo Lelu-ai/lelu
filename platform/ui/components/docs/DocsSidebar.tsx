@@ -137,6 +137,7 @@ const sections: NavSection[] = [
       { href: "/docs/integrations/anthropic", label: "Anthropic" },
       { href: "/docs/integrations/langchain", label: "LangChain" },
       { href: "/docs/integrations/langgraph", label: "LangGraph" },
+      { href: "/docs/integrations/strands", label: "Strands Agents" },
       { href: "/docs/integrations/mcp", label: "MCP" },
       { href: "/docs/integrations/claude-code-plugin", label: "Claude Code Plugin" },
       { href: "/docs/integrations/vercel-ai", label: "Vercel AI SDK" },

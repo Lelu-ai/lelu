@@ -132,7 +132,7 @@ if (decision.decision === "allow") {
 }
 ```
 
-**Four outcomes. Every decision audited. No other changes to how you build.** Works with OpenAI, Anthropic, LangChain, LangGraph, CrewAI, Vercel AI SDK, and MCP.
+**Four outcomes. Every decision audited. No other changes to how you build.** Works with OpenAI, Anthropic, LangChain, LangGraph, CrewAI, Strands Agents, Vercel AI SDK, and MCP.
 
 ---
 
@@ -160,6 +160,7 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 - [quickstart](examples/quickstart) — the real engine on SQLite: one request per outcome, live prompt-injection catch
 - [langchain](examples/langchain) — gate a plain LangChain `StructuredTool` before execution
 - [crewai](examples/crewai) — gate CrewAI tool calls; a prompt-injected refund agent gets stopped
+- [strands](docs/integrations/strands.md) — register as a Strands intervention handler; denials, safe-tool redirects and human approval all use Strands' own actions
 - [bedrock](examples/bedrock) — gate Amazon Bedrock agents on the model's *own verified* confidence
 - [agentgateway](examples/agentgateway) — Lelu as the decision brain behind agentgateway (ext-authz PEP)
 
@@ -199,7 +200,7 @@ The agent pauses, a reviewer gets pinged (Slack / Teams / PagerDuty), and the ac
 
 ## Contributing
 
-Contributions of every size are welcome — from a typo fix to a new framework integration. Most wanted right now: 🔌 framework integrations (LangChain, OpenAI Agents SDK, LlamaIndex), 📜 Rego policy templates (SOC 2, HIPAA, GDPR), and 📚 examples.
+Contributions of every size are welcome — from a typo fix to a new framework integration. Most wanted right now: 🔌 framework integrations (OpenAI Agents SDK, LlamaIndex, AutoGen), 📜 Rego policy templates (SOC 2, HIPAA, GDPR), and 📚 examples.
 
 Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20first%20issue), grab a [`help wanted`](https://github.com/lelu-ai/lelu/labels/help%20wanted) task, or start a thread in [Discussions](https://github.com/lelu-ai/lelu/discussions). Setup and guidelines → [CONTRIBUTING.md](CONTRIBUTING.md)
 

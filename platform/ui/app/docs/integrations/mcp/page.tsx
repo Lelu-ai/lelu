@@ -138,9 +138,9 @@ allow  read_file        — Read-only ops are always fine`}</pre>
       </div>
 
       <div className="flex justify-between items-center pt-12 mt-12 border-t border-zinc-200 dark:border-white/10">
-        <a href="/docs/integrations/langgraph" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+        <a href="/docs/integrations/strands" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          Previous: LangGraph
+          Previous: Strands Agents
         </a>
         <a href="/docs/integrations/claude-code-plugin" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
           Next: Claude Code Plugin

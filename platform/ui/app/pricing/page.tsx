@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -40,7 +38,6 @@ const TIERS = [
       "Sandbox environment",
     ],
     cta: { label: "Create free account", href: "/register" },
-    upgrade: { label: "Upgrade — $19/mo · 100,000 calls", priceUsd: 19 },
     highlight: false,
     badge: "Account required",
   },
@@ -77,41 +74,11 @@ const FAQ = [
   },
   {
     q: "What happens if I go over the free cloud quota?",
-    a: "Requests beyond the free tier's monthly limit are declined with a clear quota error — nothing bills automatically. Upgrade to a paid plan for a much higher quota.",
-  },
-  {
-    q: "How do I upgrade to a paid cloud plan?",
-    a: "Sign in and click \"Upgrade\" on the Cloud plan — it opens a secure Stripe checkout for $19/mo, no manual approval needed. That raises your quota to 100,000 authorize calls/month. Cancel anytime from the billing portal.",
+    a: "Requests beyond the free tier's monthly limit are declined with a clear quota error — nothing bills automatically, because there is nothing to bill. If you need a higher quota, open a discussion and we will raise it, or self-host, where there is no limit at all.",
   },
 ];
 
 export default function PricingPage() {
-  const router = useRouter();
-  const [upgrading, setUpgrading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState("");
-
-  async function handleUpgrade() {
-    setUpgrading(true);
-    setUpgradeError("");
-    try {
-      const res = await fetch("/api/billing/checkout", { method: "POST" });
-      if (res.status === 401) {
-        router.push("/login?next=/pricing");
-        return;
-      }
-      const data = await res.json();
-      if (!res.ok || !data.url) {
-        setUpgradeError(data.error || "Failed to start checkout");
-        return;
-      }
-      window.location.href = data.url;
-    } catch {
-      setUpgradeError("Something went wrong. Please try again.");
-    } finally {
-      setUpgrading(false);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#0A0B10] text-[#18181B] dark:text-[#EDEEF0] antialiased">
       {/* Head */}
@@ -186,18 +153,6 @@ export default function PricingPage() {
                 >
                   {t.cta.label}
                 </Link>
-              )}
-              {t.upgrade && (
-                <button
-                  onClick={handleUpgrade}
-                  disabled={upgrading}
-                  className="mt-2.5 rounded-md border border-[#D6D3D1] dark:border-white/[0.12] px-4 py-2.5 text-center text-[13px] font-medium text-[#0A0A0A] dark:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors disabled:opacity-50"
-                >
-                  {upgrading ? "Redirecting…" : t.upgrade.label}
-                </button>
-              )}
-              {t.upgrade && upgradeError && (
-                <p className="mt-2 text-[12px] text-red-500">{upgradeError}</p>
               )}
             </motion.div>
           ))}

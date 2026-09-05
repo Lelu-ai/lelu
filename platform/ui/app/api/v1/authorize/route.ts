@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     if (!quota.allowed) {
       return NextResponse.json(
         {
-          error: `Monthly quota exceeded (${quota.used}/${quota.limit} on the ${quota.plan} plan). Upgrade for a higher limit.`,
+          error: `Monthly quota exceeded (${quota.used}/${quota.limit} on the ${quota.plan} plan). Self-host for no limit, or open a discussion at https://github.com/lelu-ai/lelu/discussions to have it raised.`,
           plan: quota.plan,
           used: quota.used,
           limit: quota.limit,

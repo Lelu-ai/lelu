@@ -36,6 +36,24 @@ func (o decisionOutcome) severity() int {
 	}
 }
 
+// String renders the outcome the way the API and RISK_HIGH_CRITICALITY_FLOOR
+// spell it, so a decision reason and a startup warning read the same words an
+// operator configures.
+func (o decisionOutcome) String() string {
+	switch o {
+	case outcomeAllow:
+		return "allow"
+	case outcomeReadOnly:
+		return "read_only"
+	case outcomeReview:
+		return "review"
+	case outcomeDeny:
+		return "deny"
+	default:
+		return fmt.Sprintf("decisionOutcome(%d)", int(o))
+	}
+}
+
 func moreRestrictive(a, b decisionOutcome) decisionOutcome {
 	if a.severity() >= b.severity() {
 		return a
@@ -72,6 +90,23 @@ type RiskConfig struct {
 
 	HighCriticalityMin float64
 	MidCriticalityMin  float64
+
+	// HighCriticalityFloor is the least restrictive outcome an action at or
+	// above HighCriticalityMin can receive, applied in evaluate() after the
+	// HighBand thresholds have produced an outcome (the floor from
+	// https://github.com/Lelu-ai/lelu/issues/44). The floor is selected by
+	// the same predicate that selects HighBand, so whatever it removes makes
+	// the matching HighBand threshold unable to change any verdict:
+	//
+	//	outcomeReview   (default) HighBand.Allow and HighBand.ReadOnly are inert
+	//	outcomeReadOnly           HighBand.Allow is inert
+	//	outcomeAllow    ("off")   no floor — all three HighBand thresholds act
+	//
+	// InertThresholdWarnings names the thresholds an operator has tuned away
+	// from their defaults while the floor keeps them inert, so the server can
+	// say so at startup instead of silently ignoring them. See
+	// https://github.com/Lelu-ai/lelu/issues/54.
+	HighCriticalityFloor decisionOutcome
 }
 
 func DefaultRiskConfig() RiskConfig {
@@ -82,7 +117,49 @@ func DefaultRiskConfig() RiskConfig {
 
 		HighCriticalityMin: 0.80,
 		MidCriticalityMin:  0.50,
+
+		HighCriticalityFloor: outcomeReview,
 	}
+}
+
+// highCriticalityFloorNames are the RISK_HIGH_CRITICALITY_FLOOR spellings and
+// the floor each selects. "off" maps to outcomeAllow: flooring to the least
+// restrictive outcome cannot change anything, which is exactly "no floor".
+// deny is deliberately not offered — a floor at deny would refuse every
+// high-criticality action outright, which is a policy, not a threshold.
+var highCriticalityFloorNames = map[string]decisionOutcome{
+	"review":    outcomeReview,
+	"read_only": outcomeReadOnly,
+	"readonly":  outcomeReadOnly,
+	"off":       outcomeAllow,
+}
+
+// InertThresholdWarnings returns one line per HighBand threshold that has been
+// moved away from its default while HighCriticalityFloor makes it unable to
+// change any verdict. It is empty for the shipped defaults, so a deployment
+// that has not touched the high band sees nothing; a deployment that tuned
+// RISK_ALLOW_THRESHOLD_HIGH under the default floor — the situation in
+// https://github.com/Lelu-ai/lelu/issues/54 — is told, at startup, that the
+// value it set does nothing and which floor setting would make it act.
+func (c RiskConfig) InertThresholdWarnings() []string {
+	def := DefaultRiskConfig().HighBand
+	var out []string
+	inert := func(key string, got, want float64, outcome decisionOutcome, remedy string) {
+		if got == want {
+			return
+		}
+		out = append(out, fmt.Sprintf(
+			"%s=%.4f is inert: RISK_HIGH_CRITICALITY_FLOOR=%s means no high-criticality action can resolve to %s, so this threshold cannot change any verdict — set RISK_HIGH_CRITICALITY_FLOOR=%s to make it effective",
+			key, got, c.HighCriticalityFloor, outcome, remedy,
+		))
+	}
+	if c.HighCriticalityFloor.severity() > outcomeAllow.severity() {
+		inert("RISK_ALLOW_THRESHOLD_HIGH", c.HighBand.Allow, def.Allow, outcomeAllow, "off")
+	}
+	if c.HighCriticalityFloor.severity() > outcomeReadOnly.severity() {
+		inert("RISK_READONLY_THRESHOLD_HIGH", c.HighBand.ReadOnly, def.ReadOnly, outcomeReadOnly, "read_only or off")
+	}
+	return out
 }
 
 // NewRiskConfigFromEnv loads risk thresholds from the environment. It
@@ -109,6 +186,13 @@ func NewRiskConfigFromEnv() (RiskConfig, error) {
 
 	cfg.HighCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_HIGH_MIN", cfg.HighCriticalityMin, 0, 1)
 	cfg.MidCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_MID_MIN", cfg.MidCriticalityMin, 0, 1)
+
+	// An unknown floor is an error, not a fallback: a typo here would
+	// silently keep the default floor and leave the operator believing the
+	// high band behaves as they configured it — the exact silence #54 is about.
+	if cfg.HighCriticalityFloor, err = loadFloorFromEnv("RISK_HIGH_CRITICALITY_FLOOR", cfg.HighCriticalityFloor); err != nil {
+		return RiskConfig{}, err
+	}
 
 	// Same collapse shape as loadBandFromEnv, one level up: evaluate() picks
 	// the mid band via `else if criticality >= MidCriticalityMin`, which is
@@ -164,6 +248,24 @@ func loadBandFromEnv(prefix string, fallback riskBandThresholds) (riskBandThresh
 
 	return b, nil
 }
+
+// loadFloorFromEnv reads a floor name (see highCriticalityFloorNames). Unset
+// or blank keeps the fallback; anything else that is not a known name is an
+// error, for the reason given at the call site.
+func loadFloorFromEnv(key string, fallback decisionOutcome) (decisionOutcome, error) {
+	v, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(v) == "" {
+		return fallback, nil
+	}
+	if f, known := highCriticalityFloorNames[strings.ToLower(strings.TrimSpace(v))]; known {
+		return f, nil
+	}
+	return 0, fmt.Errorf(
+		"%s misconfigured: %q is not a floor — use review (default: high-criticality actions are never auto-allowed or read-only), read_only, or off (no floor, every HIGH band threshold is effective)",
+		key, v,
+	)
+}
+
 func getEnvFloatInRange(key string, fallback float64, minVal float64, maxVal float64) float64 {
 	v, ok := os.LookupEnv(key)
 	if !ok || strings.TrimSpace(v) == "" {
@@ -235,13 +337,19 @@ func (m *riskModel) evaluate(action string, confidenceScore float64, reliability
 	// nearly cancels the criticality ratio (0.90/0.25=3.6) besides, so the
 	// score alone stops reflecting what the action actually does well before
 	// confidence reaches 1.0. For the highest-criticality tier, never let the
-	// outcome go below review no matter how confident the model claims to be.
-	// See https://github.com/Lelu-ai/lelu/issues/44.
-	if criticality >= m.cfg.HighCriticalityMin {
-		floored := moreRestrictive(outcome, outcomeReview)
+	// outcome go below the configured floor (review by default) no matter how
+	// confident the model claims to be. See https://github.com/Lelu-ai/lelu/issues/44.
+	//
+	// The floor is selected by the same predicate as HighBand, so every
+	// HighBand threshold below the floor is unreachable by construction — an
+	// operator who tunes one is warned at startup (InertThresholdWarnings) and
+	// can lower the floor with RISK_HIGH_CRITICALITY_FLOOR. A floor at allow
+	// is no floor at all and is skipped. See https://github.com/Lelu-ai/lelu/issues/54.
+	if criticality >= m.cfg.HighCriticalityMin && m.cfg.HighCriticalityFloor.severity() > outcomeAllow.severity() {
+		floored := moreRestrictive(outcome, m.cfg.HighCriticalityFloor)
 		if floored != outcome {
 			outcome = floored
-			reason += " — floored to review: criticality at or above the high-criticality threshold is never auto-allowed or read-only-only, regardless of confidence"
+			reason += fmt.Sprintf(" — floored to %s: criticality at or above the high-criticality threshold is never resolved below RISK_HIGH_CRITICALITY_FLOOR, regardless of confidence", floored)
 		}
 	}
 

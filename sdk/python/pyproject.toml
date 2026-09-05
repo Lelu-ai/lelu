@@ -35,6 +35,8 @@ dev = [
     # The Strands tests assert against the real Proceed/Deny/Transform/Confirm
     # classes rather than stand-ins, so the SDK has to be present to run them.
     "strands-agents>=1.0.0",
+    # Validates the Strands catalog submission entry.
+    "pyyaml>=6.0",
 ]
 langchain = [
     "langchain-core>=0.2.0",

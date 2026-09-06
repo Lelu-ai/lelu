@@ -1,7 +1,7 @@
 {
   "name": "lelu-agent-auth",
-  "version": "0.0.36",
-  "description": "TypeScript SDK for Lelu \u2014 the authorization engine for autonomous AI agents",
+  "version": "0.2.8",
+  "description": "TypeScript SDK for Lelu — the authorization engine for autonomous AI agents",
   "author": "Abenezer Getachew",
   "contributors": [
     {

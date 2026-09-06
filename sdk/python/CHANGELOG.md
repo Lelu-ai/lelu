@@ -1,5 +1,84 @@
 # Changelog
 
+## [0.3.7](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.3.6...python-sdk-v0.3.7) (2026-09-06)
+
+
+### Features
+
+* Add anonymous rate limiting, dashboard, and API key management ([4842938](https://github.com/Lelu-ai/lelu/commit/4842938dc95676effc4ea78a69c42f6282914c70))
+* Add built-in CLI audit-log command to all SDKs ([1438b23](https://github.com/Lelu-ai/lelu/commit/1438b2356f47dab8e4696a7fcbffa66e3ac4f73e))
+* Add comprehensive CLI functionality to all SDKs ([0e0a5d3](https://github.com/Lelu-ai/lelu/commit/0e0a5d3b64bbfa16020172e99a39f32b5801d24b))
+* add LangChain tool authorization wrapper ([dda6280](https://github.com/Lelu-ai/lelu/commit/dda628077235b5095428339eb484f26a7ad1735e))
+* add LangChain tool authorization wrapper ([2c3b7c9](https://github.com/Lelu-ai/lelu/commit/2c3b7c9743a135137a7b31e922962bb160e3d5a1))
+* Add SQLite local storage for all SDKs ([10bf96e](https://github.com/Lelu-ai/lelu/commit/10bf96e89aca024032a2c0de894da720ef00a72a))
+* Complete Phase 2 Behavioral Analytics SDK Updates ([6d63112](https://github.com/Lelu-ai/lelu/commit/6d63112231d885126da27f6333720af42371fc92))
+* **engine:** OAuth Token Vault — Feature 1 complete ([b73f4f8](https://github.com/Lelu-ai/lelu/commit/b73f4f8c4323d26e2506d379034bf6cecd3c3f7e))
+* fix SDK tab link and remove Go SDK from UI ([b57bbc4](https://github.com/Lelu-ai/lelu/commit/b57bbc47353b4d0111e185ee64ce54677d174f1b))
+* implement Phase 1 Enhanced Observability & Telemetry for AI Agents ([895c74f](https://github.com/Lelu-ai/lelu/commit/895c74f019d4ca3e20abc8c107833e6486a93a98))
+* implement Phase 3 Real-time Intelligence for AI agent observability ([f50bc4b](https://github.com/Lelu-ai/lelu/commit/f50bc4bf972095dccb8825ba3094178dd64f850f))
+* **python-sdk:** expose approval redemption via wait_and_redeem ([6e04bee](https://github.com/Lelu-ai/lelu/commit/6e04bee24ac8ee63819b351359a7f03d6f9ae807))
+* release Python SDK v0.3.6 with hosted engine integration ([0862203](https://github.com/Lelu-ai/lelu/commit/08622032bdc39c3ebc2c7c3f69126cf8c3be6e26))
+* release TypeScript SDK v0.2.7 with hosted engine integration ([34cac33](https://github.com/Lelu-ai/lelu/commit/34cac33eaa78abdf9ff5226a046784fdb4069ac1))
+* **sdk-python:** 0.4.0 — align with current engine API ([b016b17](https://github.com/Lelu-ai/lelu/commit/b016b1757617eed43e8732b3121ed7e4397b7019))
+* **sdk-python:** lelu() factory + zero-config local engine discovery ([db7b7b0](https://github.com/Lelu-ai/lelu/commit/db7b7b0ca58a46aa9e6f0c14d1a8c635cdf36b20))
+* **sdk/python:** add COMPUTE decision — safe alternative routing (v0.3.62) ([8f652d9](https://github.com/Lelu-ai/lelu/commit/8f652d94cd7070e4f37859b0381270b5aaff873e))
+* **sdk/python:** bump to 0.3.65 — add agent registry, NHI, MCP OAuth methods ([615d4bb](https://github.com/Lelu-ai/lelu/commit/615d4bbd6a3cb38b57ac2c3c46beaa28a6f29722))
+* **sdk/python:** bump to v0.3.63 — forensic hash/digest fields aligned with engine ([c204f3b](https://github.com/Lelu-ai/lelu/commit/c204f3bc15fc20a8d2ae2589203e307c99d9be13))
+* **sdk:** add Strands Agents integration for Python and TypeScript ([23f3dcb](https://github.com/Lelu-ai/lelu/commit/23f3dcb0f3a3988a7926235e644b720be35cb122))
+* **sdk:** bump TS to v0.0.20, Python to v0.3.64 — OAuth Token Vault ([1efed34](https://github.com/Lelu-ai/lelu/commit/1efed3421f1333066ce50776161827f8a6534b2d))
+* **sdk:** close TS/Python SDK parity gaps + backfill changelogs ([ae42b0e](https://github.com/Lelu-ai/lelu/commit/ae42b0ee9664a0d7626b2c99d14403b1a395bb24))
+
+
+### Bug Fixes
+
+* Add type annotations to LocalStorage context manager methods ([81201c5](https://github.com/Lelu-ai/lelu/commit/81201c5389b25ec89f10a00047a39053342eea3a))
+* Improve error handling in Python SDK CLI ([140ca45](https://github.com/Lelu-ai/lelu/commit/140ca45889e5cd1fd53cdda53cebb89cabe2877a))
+* **platform:** align all layers with engine compute/hash/digest features ([77b548b](https://github.com/Lelu-ai/lelu/commit/77b548b020335165f451d8675d05b44f34b56265))
+* **python-sdk:** take the decision object for redemption, not a bare ID ([e54a24f](https://github.com/Lelu-ai/lelu/commit/e54a24f9a7272618c589e381d4c95914c865c333))
+* resolve final mypy errors in Python SDK observability ([8fff4da](https://github.com/Lelu-ai/lelu/commit/8fff4da2fcea71beb240abfb97752313a7aacc3f))
+* resolve mypy redefinition errors in Python SDK observability ([43e052c](https://github.com/Lelu-ai/lelu/commit/43e052c00bb6b1bfaaa7bda9f87f6f3cf92177d4))
+* resolve mypy type checking errors in Python SDK observability ([626f5e1](https://github.com/Lelu-ai/lelu/commit/626f5e169391992bc087b199e15d3090c14af241))
+* Resolve mypy type errors in Python SDK Phase 2 methods ([f7d39db](https://github.com/Lelu-ai/lelu/commit/f7d39db603e9b8badd284a36645eb0b7515f2c99))
+* **sdk-python:** silence mypy no-any-return on raw-payload engine status methods ([12c215d](https://github.com/Lelu-ai/lelu/commit/12c215de967d96d7837f0dac51dd7c509e5e2493))
+* **sdk-python:** skip test_fastapi.py gracefully when fastapi isn't installed ([50ee7eb](https://github.com/Lelu-ai/lelu/commit/50ee7eb9570c9df4e470ac292d239a2ed0744c2a))
+* **sdk/python:** add generic type args to safe_args dict for mypy ([9898e0f](https://github.com/Lelu-ai/lelu/commit/9898e0f59addf221e5d582964b779a7dbe2149d3))
+* **sdk/python:** align authorize() with engine API + bump to 0.3.66 ([dab1d3c](https://github.com/Lelu-ai/lelu/commit/dab1d3c6032282942588275fd53db09e7403769b))
+* **sdk/python:** change latency_ms from int to float in AuthDecision and AuditEvent ([c8ccf27](https://github.com/Lelu-ai/lelu/commit/c8ccf27a1ac5150d6a9fd3f8ca9e2ed1b870bd71))
+* **sdk/python:** fix mypy errors in client.py and observability.py ([fa4ec9b](https://github.com/Lelu-ai/lelu/commit/fa4ec9b87aa359f3bf3a0abff47068465b81db9c))
+* **sdk/python:** fix mypy unused-ignore in observability.py ([b56bc5f](https://github.com/Lelu-ai/lelu/commit/b56bc5fbfa04c4fdd4ead388acf99eacad0ab09f))
+* **sdk/python:** satisfy mypy in LangChain fallback base tool ([489e2f4](https://github.com/Lelu-ai/lelu/commit/489e2f4179f073d534ddc7591e545518d2e106ec))
+* **sdk/python:** update tests to match new API shapes ([1b6906f](https://github.com/Lelu-ai/lelu/commit/1b6906f0ff25a0f0d94c9b56561a0b4dd02dbc83))
+* **sdk:** align all layers with engine vault — 6 issues resolved ([d29ff2d](https://github.com/Lelu-ai/lelu/commit/d29ff2d0fe5c8b1848c53d7a991989148a565217))
+* **sdk:** correct SimulatorDecision.outcome literal to match the engine ([a85360a](https://github.com/Lelu-ai/lelu/commit/a85360a133373d9a1e8dd72f03c4c4e493fdfab9))
+* **sdk:** forward actor to the engine (TS 0.0.29, Python 0.3.67) ([5108f96](https://github.com/Lelu-ai/lelu/commit/5108f963ee2e29757bcebd316fd392857704ebb1))
+* **sdk:** make both CI gates pass — mypy on the Strands module, tsc on openai ([bbd9cdf](https://github.com/Lelu-ai/lelu/commit/bbd9cdfc8af81fa0e1d66315e0430da7d6eba94f))
+* **sdk:** rewrite the Strands integration against the real intervention API ([6c0c590](https://github.com/Lelu-ai/lelu/commit/6c0c590e3aee6a27e6725daa53f15e14f51415e2))
+* **sdk:** stop the Strands tests breaking collection without strands-agents ([88fd4e8](https://github.com/Lelu-ai/lelu/commit/88fd4e874561e6c2eb4d2247d671ea885a91d03f))
+* **security:** correct four confidence/enforcement bugs across engine and SDKs ([73498cb](https://github.com/Lelu-ai/lelu/commit/73498cb0c7896f9b12fafab9dbfc4d38c1833f3a))
+
+
+### Documentation
+
+* Add Docker deployment documentation and update SDK packages ([1ad35a4](https://github.com/Lelu-ai/lelu/commit/1ad35a4956f1a5bd5ce904f9a21d29601b607ea4))
+* add Docker Hub engine usage across READMEs ([a6fbd98](https://github.com/Lelu-ai/lelu/commit/a6fbd98587ea48e3100d5bfe9f9585c512c68e27))
+* add LangChain authorization example ([69f1000](https://github.com/Lelu-ai/lelu/commit/69f1000767aad5b04b30538e5f2d493f3a4fd2c6))
+* **sdk:** correct the changelogs to the API that actually ships ([ff945d0](https://github.com/Lelu-ai/lelu/commit/ff945d0114eccce98831fc61982faa3221c36850))
+
+
+### Miscellaneous
+
+* bump Python SDK to v0.2.0 for PyPI publication ([7dff874](https://github.com/Lelu-ai/lelu/commit/7dff8746a3e8aa0251d165307e92386351240ec7))
+* bump version to 0.0.5 and add author information ([2aa4d09](https://github.com/Lelu-ai/lelu/commit/2aa4d09e1848f2d22c46611f8cd1cb9c313328bf))
+* migrate repo references from lelu-auth to lelu-ai ([2b8a524](https://github.com/Lelu-ai/lelu/commit/2b8a524613376750e89df272597176fde9930fc1))
+* **python-sdk:** release 0.4.4 ([450221a](https://github.com/Lelu-ai/lelu/commit/450221aade022bc9815cb3e754161021e9de7363))
+* release main ([f2a4977](https://github.com/Lelu-ai/lelu/commit/f2a4977604033c428c6a223d8e0d1328383a2826))
+* **release:** prepare engine 0.2.0 and python-sdk 0.5.0 ([904788e](https://github.com/Lelu-ai/lelu/commit/904788ebdff5b3cd07fb1a42f7ef2af0667170cb))
+* remove Docker Hub deployment and references ([2cbf98a](https://github.com/Lelu-ai/lelu/commit/2cbf98a2f5bf495074699a73e69bd8c8eebc79c3))
+* replace all old engine URLs with lelu-ai.com ([09cc1db](https://github.com/Lelu-ai/lelu/commit/09cc1dbed11e5f1abf84ce414bee21e7d1e270bc))
+* **sdk:** release python 0.4.41 and typescript 0.0.36 ([5e7dfe1](https://github.com/Lelu-ai/lelu/commit/5e7dfe19e5d5c2d4fc4efb646aefd4968d15de88))
+* **sdk:** stop tracking stale Python build artifacts ([73afc66](https://github.com/Lelu-ai/lelu/commit/73afc665bee91786723985f738f25960d678a4cc))
+* Update SDK exports and engine dependencies ([25e6f32](https://github.com/Lelu-ai/lelu/commit/25e6f32c49d87891f3ca3e9bed6e004f770c235b))
+
 ## [0.4.41] (2026-09-04)
 
 ### Features

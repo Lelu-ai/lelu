@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.2.8](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.2.7...typescript-sdk-v0.2.8) (2026-09-06)
+
+
+### Features
+
+* add 'lelu studio' command for visual UI management ([e36c016](https://github.com/Lelu-ai/lelu/commit/e36c01667a47ba9b5f41463bdd033cebaab3d92b))
+* Add anonymous rate limiting, dashboard, and API key management ([4842938](https://github.com/Lelu-ai/lelu/commit/4842938dc95676effc4ea78a69c42f6282914c70))
+* Add built-in CLI audit-log command to all SDKs ([1438b23](https://github.com/Lelu-ai/lelu/commit/1438b2356f47dab8e4696a7fcbffa66e3ac4f73e))
+* Add comprehensive CLI functionality to all SDKs ([0e0a5d3](https://github.com/Lelu-ai/lelu/commit/0e0a5d3b64bbfa16020172e99a39f32b5801d24b))
+* Add SQLite local storage for all SDKs ([10bf96e](https://github.com/Lelu-ai/lelu/commit/10bf96e89aca024032a2c0de894da720ef00a72a))
+* Complete Phase 2 Behavioral Analytics SDK Updates ([6d63112](https://github.com/Lelu-ai/lelu/commit/6d63112231d885126da27f6333720af42371fc92))
+* **confidence:** add Amazon Bedrock confidence provider ([93921c8](https://github.com/Lelu-ai/lelu/commit/93921c8c7c172b975656a0ab6907a15b32811e64))
+* **engine:** add durable agent identity registry and MCP OAuth 2.1 server ([9f9f3c0](https://github.com/Lelu-ai/lelu/commit/9f9f3c0404b99bec05c5f5d2e3ce040ff6292a37))
+* **engine:** add NHI discovery and ISPM posture layer (Feature 3) ([9088a07](https://github.com/Lelu-ai/lelu/commit/9088a07e9b7d6ef0c97d3aaf7100b9bf8aac81d2))
+* **engine:** OAuth Token Vault — Feature 1 complete ([b73f4f8](https://github.com/Lelu-ai/lelu/commit/b73f4f8c4323d26e2506d379034bf6cecd3c3f7e))
+* fix SDK tab link and remove Go SDK from UI ([b57bbc4](https://github.com/Lelu-ai/lelu/commit/b57bbc47353b4d0111e185ee64ce54677d174f1b))
+* implement Phase 1 Enhanced Observability & Telemetry for AI Agents ([895c74f](https://github.com/Lelu-ai/lelu/commit/895c74f019d4ca3e20abc8c107833e6486a93a98))
+* implement Phase 2 behavioral analytics across all SDKs ([30fed09](https://github.com/Lelu-ai/lelu/commit/30fed09a5b3b4c7a433b8e3fe28702b22b7b787c))
+* implement Prisma-like simple flow for lelu studio ([f8633fd](https://github.com/Lelu-ai/lelu/commit/f8633fd74ff3145d5620bd78da3112c220aa4221))
+* release TypeScript SDK v0.2.7 with hosted engine integration ([34cac33](https://github.com/Lelu-ai/lelu/commit/34cac33eaa78abdf9ff5226a046784fdb4069ac1))
+* **sdk-ts:** lelu() factory, mountable handler, zero-config local engine discovery ([5acd082](https://github.com/Lelu-ai/lelu/commit/5acd08291a1ba81dca1bae203b4dccbef140dde4))
+* **sdk/ts:** add COMPUTE decision — safe alternative routing (v0.0.17) ([619f540](https://github.com/Lelu-ai/lelu/commit/619f540ad8097ece21a6bb1f80653cc2713b5e72))
+* **sdk/ts:** bump to v0.0.18 — engine algorithm upgrades ([8200108](https://github.com/Lelu-ai/lelu/commit/8200108049cdf6abbf7a116bc542dd5058437568))
+* **sdk/ts:** bump to v0.0.19 — forensic hash/digest fields aligned with engine ([6331f1b](https://github.com/Lelu-ai/lelu/commit/6331f1b19bc76521b7447e4bef349eb55ac324d0))
+* **sdk/typescript:** 0.0.26 — fix paths, add queue/shadow/simulator methods ([703b52d](https://github.com/Lelu-ai/lelu/commit/703b52df905b68b31355faab800e3980bcac0f1c))
+* **sdk:** add Strands Agents integration for Python and TypeScript ([23f3dcb](https://github.com/Lelu-ai/lelu/commit/23f3dcb0f3a3988a7926235e644b720be35cb122))
+* **sdk:** bump TS to v0.0.20, Python to v0.3.64 — OAuth Token Vault ([1efed34](https://github.com/Lelu-ai/lelu/commit/1efed3421f1333066ce50776161827f8a6534b2d))
+* **sdk:** close TS/Python SDK parity gaps + backfill changelogs ([ae42b0e](https://github.com/Lelu-ai/lelu/commit/ae42b0ee9664a0d7626b2c99d14403b1a395bb24))
+* **ts-sdk:** add dashboard bootstrap CLI command ([d516cdd](https://github.com/Lelu-ai/lelu/commit/d516cdd5d4eec028754d73d2736f872feed2f010))
+
+
+### Bug Fixes
+
+* Bump TypeScript SDK to v0.1.10 and deprecate v0.1.9 ([671785b](https://github.com/Lelu-ai/lelu/commit/671785b30b44fa15ff483b951ee589bf60505aab))
+* close 4 post-review gaps in HITL, confidence defaults, and engine errors ([e3fbaba](https://github.com/Lelu-ai/lelu/commit/e3fbaba6b0e0c351f54c14569dc5387d6aea45e0))
+* include README.md and LICENSE in npm package (v0.0.13) ([7fec473](https://github.com/Lelu-ai/lelu/commit/7fec473be50a9c6df9bb9ec0791f62ec63329354))
+* **platform:** align all layers with engine compute/hash/digest features ([77b548b](https://github.com/Lelu-ai/lelu/commit/77b548b020335165f451d8675d05b44f34b56265))
+* resolve TypeScript type checking errors in observability ([10b84a2](https://github.com/Lelu-ai/lelu/commit/10b84a2703c9db757d887c8845cd87958359065e))
+* **sdk-ts:** bin paths were silently dropped from every npm publish ([b8506e1](https://github.com/Lelu-ai/lelu/commit/b8506e13442c11c77f1a5112fddc4f93de25db50))
+* **sdk-ts:** lazy-load better-sqlite3 so plain import doesn't crash ([6e0f820](https://github.com/Lelu-ai/lelu/commit/6e0f820eb43a78b2ffc924e021db9f9a6b6d2519))
+* **sdk,platform:** verified confidence signals, honest default URL, API-key policy routes ([eb3a417](https://github.com/Lelu-ai/lelu/commit/eb3a41721df65a59fe474f8d46ce44423968a7e4))
+* **sdk/ts:** fix 12 of 14 npm audit vulnerabilities, pin vitest to v3 ([0eca407](https://github.com/Lelu-ai/lelu/commit/0eca4073e14fcd47c668360e7150e124d8ef53e8))
+* **sdk/ts:** update tests to match new API shapes ([7462dc2](https://github.com/Lelu-ai/lelu/commit/7462dc225d203323cd16bf8aa1c87b5852583391))
+* **sdk/typescript:** sync package-lock.json to lelu-agent-auth@0.0.20 ([e60c7bc](https://github.com/Lelu-ai/lelu/commit/e60c7bc7b90432b79e725f53f16df9a1676e2ae6))
+* **sdk:** align all layers with engine vault — 6 issues resolved ([d29ff2d](https://github.com/Lelu-ai/lelu/commit/d29ff2d0fe5c8b1848c53d7a991989148a565217))
+* **sdk:** align authorize() with engine API + bump to 0.0.28 ([a927a42](https://github.com/Lelu-ai/lelu/commit/a927a424b14332a444677a322616c4cf182a9e70))
+* **sdk:** correct SimulatorDecision.outcome literal to match the engine ([a85360a](https://github.com/Lelu-ai/lelu/commit/a85360a133373d9a1e8dd72f03c4c4e493fdfab9))
+* **sdk:** forward actor to the engine (TS 0.0.29, Python 0.3.67) ([5108f96](https://github.com/Lelu-ai/lelu/commit/5108f963ee2e29757bcebd316fd392857704ebb1))
+* **sdk:** give the TypeScript SDK the redemption path, and verify both sides ([03c9a33](https://github.com/Lelu-ai/lelu/commit/03c9a33a45207cb61c1d033abd91443ba7ccbe2a))
+* **sdk:** make both CI gates pass — mypy on the Strands module, tsc on openai ([bbd9cdf](https://github.com/Lelu-ai/lelu/commit/bbd9cdfc8af81fa0e1d66315e0430da7d6eba94f))
+* **sdk:** rewrite the Strands integration against the real intervention API ([6c0c590](https://github.com/Lelu-ai/lelu/commit/6c0c590e3aee6a27e6725daa53f15e14f51415e2))
+* **sdk:** route to GCP cloud engine by default when API key is provided ([55d872c](https://github.com/Lelu-ai/lelu/commit/55d872c23dd6e71e433967c3895098d5a8ba3707))
+* **sdk:** update exports to use .js for both import/require (v0.0.15) ([a920008](https://github.com/Lelu-ai/lelu/commit/a920008adca498a2cc90534f2bdca83c13617e51))
+* **security:** address 5 implementation gaps from design review ([43d5350](https://github.com/Lelu-ai/lelu/commit/43d5350a250bb769aa8041e25c8a5c8804c26620))
+* **security:** correct four confidence/enforcement bugs across engine and SDKs ([73498cb](https://github.com/Lelu-ai/lelu/commit/73498cb0c7896f9b12fafab9dbfc4d38c1833f3a))
+
+
+### Documentation
+
+* Add Docker deployment documentation and update SDK packages ([1ad35a4](https://github.com/Lelu-ai/lelu/commit/1ad35a4956f1a5bd5ce904f9a21d29601b607ea4))
+* add Docker Hub engine usage across READMEs ([a6fbd98](https://github.com/Lelu-ai/lelu/commit/a6fbd98587ea48e3100d5bfe9f9585c512c68e27))
+* **sdk-ts:** quick start leads with zero-config, key moved to optional section ([b27e8c0](https://github.com/Lelu-ai/lelu/commit/b27e8c0ccbec3bc43771583f4515dcdf205b573a))
+* **sdk:** correct the changelogs to the API that actually ships ([ff945d0](https://github.com/Lelu-ai/lelu/commit/ff945d0114eccce98831fc61982faa3221c36850))
+
+
+### Miscellaneous
+
+* bump TypeScript SDK to 0.0.25, drop unshipped SDK rows from README ([eec01fd](https://github.com/Lelu-ai/lelu/commit/eec01fd76ddad5bb0ab2480f60ef1b7f2c93ee54))
+* bump TypeScript SDK to v0.1.5 and publish with audit-log CLI ([21633d2](https://github.com/Lelu-ai/lelu/commit/21633d22ada8ce0aed37a969f3b100960844b278))
+* bump TypeScript SDK to v0.2.71-beta and add contributor info ([a1b533f](https://github.com/Lelu-ai/lelu/commit/a1b533feb0dcb685b6b2f7c490436deddb94dd8d))
+* bump version to 0.0.5 and add author information ([2aa4d09](https://github.com/Lelu-ai/lelu/commit/2aa4d09e1848f2d22c46611f8cd1cb9c313328bf))
+* fix diligence inconsistencies — versions, package names, CI codename ([1dfe479](https://github.com/Lelu-ai/lelu/commit/1dfe47982be09eb94137a72056c71c8103c8d593))
+* improve npm discoverability and create deprecation package ([4605ce7](https://github.com/Lelu-ai/lelu/commit/4605ce77b42f13d6d2a9551bef58ccbedb5e9f1d))
+* migrate repo references from lelu-auth to lelu-ai ([2b8a524](https://github.com/Lelu-ai/lelu/commit/2b8a524613376750e89df272597176fde9930fc1))
+* prepare v0.0.14 release with improved README and API key fixes ([f5c6f25](https://github.com/Lelu-ai/lelu/commit/f5c6f2520e386aec9e4972519641a4bab08b1346))
+* release main ([f2a4977](https://github.com/Lelu-ai/lelu/commit/f2a4977604033c428c6a223d8e0d1328383a2826))
+* remove Docker Hub deployment and references ([2cbf98a](https://github.com/Lelu-ai/lelu/commit/2cbf98a2f5bf495074699a73e69bd8c8eebc79c3))
+* rename npm package to lelu-agent-auth and update all references ([eaec587](https://github.com/Lelu-ai/lelu/commit/eaec5879fd556af8ea852a039b129e27de03cf2e))
+* replace all old engine URLs with lelu-ai.com ([09cc1db](https://github.com/Lelu-ai/lelu/commit/09cc1dbed11e5f1abf84ce414bee21e7d1e270bc))
+* **sdk-ts:** bump to 0.0.33 — republish with corrected README ([743fe04](https://github.com/Lelu-ai/lelu/commit/743fe04969fa29a2b4c170b881a5c8baede05715))
+* **sdk:** release python 0.4.41 and typescript 0.0.36 ([5e7dfe1](https://github.com/Lelu-ai/lelu/commit/5e7dfe19e5d5c2d4fc4efb646aefd4968d15de88))
+* **sdk:** update npm logo/docs links and bump to 0.1.3 ([bdc8d70](https://github.com/Lelu-ai/lelu/commit/bdc8d705fabe0b187828bfd559472656fdc9f3cc))
+* Update package-lock.json for TypeScript SDK ([3fe3e48](https://github.com/Lelu-ai/lelu/commit/3fe3e48ef0967137ae43858025c01a9364081d1e))
+* Update SDK exports and engine dependencies ([25e6f32](https://github.com/Lelu-ai/lelu/commit/25e6f32c49d87891f3ca3e9bed6e004f770c235b))
+* update to v0.0.12 with corrected package name in all docs and smaller logo ([57fdda4](https://github.com/Lelu-ai/lelu/commit/57fdda466a137e1292deb2fba54e5e43098699dc))
+
 ## [0.0.36] (2026-09-04)
 
 **Requires engine ≥ 0.2.0** for the redemption endpoint. Against an earlier engine `waitAndRedeem()` will 404.

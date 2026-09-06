@@ -265,6 +265,16 @@ export default function DocsRiskAssessment() {
               computed score is or how confident the model reports being. A risk score of 0.01 on a
               wire transfer still requires human review; it is never auto-allowed.
             </p>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              The floor is set by <code>RISK_HIGH_CRITICALITY_FLOOR</code>: <code>review</code> (the
+              default, above), <code>read_only</code>, or <code>off</code>. While it is{' '}
+              <code>review</code>, <code>RISK_ALLOW_THRESHOLD_HIGH</code> and{' '}
+              <code>RISK_READONLY_THRESHOLD_HIGH</code> cannot change any verdict — the floor
+              removes exactly the two outcomes they select — and the engine logs a warning at
+              startup if either is tuned away from its default. Lower the floor to give them
+              effect; only <code>RISK_REVIEW_THRESHOLD_HIGH</code> (the review / deny boundary)
+              acts under the default floor.
+            </p>
           </div>
         </section>
 
@@ -399,7 +409,12 @@ RISK_REVIEW_THRESHOLD_LOW=0.75
 
 # Criticality boundaries
 RISK_CRITICALITY_HIGH_MIN=0.80
-RISK_CRITICALITY_MID_MIN=0.50`}</code>
+RISK_CRITICALITY_MID_MIN=0.50
+
+# Least restrictive outcome at or above RISK_CRITICALITY_HIGH_MIN:
+# review (default) | read_only | off — under review, the HIGH allow and
+# read_only thresholds above cannot change a verdict
+RISK_HIGH_CRITICALITY_FLOOR=review`}</code>
               </pre>
             </div>
           </div>

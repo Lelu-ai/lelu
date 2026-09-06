@@ -82,6 +82,11 @@ services:
       RISK_REVIEW_THRESHOLD_HIGH: "${RISK_REVIEW_THRESHOLD_HIGH:-0.40}"
       RISK_CRITICALITY_MID_MIN: "${RISK_CRITICALITY_MID_MIN:-0.50}"
       RISK_CRITICALITY_HIGH_MIN: "${RISK_CRITICALITY_HIGH_MIN:-0.80}"
+      # Least restrictive outcome for actions at or above RISK_CRITICALITY_HIGH_MIN:
+      # review (default) | read_only | off. While it is review, RISK_ALLOW_THRESHOLD_HIGH
+      # and RISK_READONLY_THRESHOLD_HIGH cannot change any verdict (the engine says so at
+      # startup if they are tuned). See https://github.com/Lelu-ai/lelu/issues/54.
+      RISK_HIGH_CRITICALITY_FLOOR: "${RISK_HIGH_CRITICALITY_FLOOR:-review}"
     volumes:
       # Policy stays read-only: PUT /v1/policy reports 501 rather than failing
       # at write time. Mount it rw if you want the endpoint live.

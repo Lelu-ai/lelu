@@ -435,6 +435,12 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("risk config: %w", err)
 	}
+	// A HighBand threshold tuned under a floor that makes it inert is not an
+	// error — the floor is the stricter of the two — but it must not be a
+	// silent no-op either. See https://github.com/Lelu-ai/lelu/issues/54.
+	for _, w := range riskCfg.InertThresholdWarnings() {
+		log.Printf("risk config: %s", w)
+	}
 
 	h := &Handler{
 		eval:           eval,

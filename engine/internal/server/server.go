@@ -85,6 +85,11 @@ var (
 		Help: "Total number of anomaly spike alerts fired per actor",
 	}, []string{"actor"})
 
+	actorStatePressureTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "lelu_actor_state_pressure_total",
+		Help: "Capacity pressure events in bounded per-actor state",
+	}, []string{"store", "action"})
+
 	// Audit pipeline loss. Previously the only way to notice that decisions
 	// were going unrecorded was to compare lelu_auth_decisions_total against
 	// a hand count of log lines — which nobody does, so silent loss stayed
@@ -156,14 +161,14 @@ type Handler struct {
 	// PUT /v1/policy can say "this deployment cannot do that" instead of
 	// failing at write time with a filesystem error.
 	policyWritable bool
-	confCfg   ConfidenceConfig
-	mode      EnforcementMode
-	shadow    *shadowStats
-	incident  *incident.Notifier
-	anomaly   *anomalyTracker
-	rateLimit *ratelimit.Limiter
-	fallback  *fallback.Strategy
-	tracer    trace.Tracer
+	confCfg        ConfidenceConfig
+	mode           EnforcementMode
+	shadow         *shadowStats
+	incident       *incident.Notifier
+	anomaly        *anomalyTracker
+	rateLimit      *ratelimit.Limiter
+	fallback       *fallback.Strategy
+	tracer         trace.Tracer
 
 	// Phase 1: Enhanced Observability
 	agentTracer    *observability.AgentTracer
@@ -221,28 +226,74 @@ func (h *Handler) SetPolicyPath(path string) {
 	h.policyWritable = true
 }
 
-// ─── Anomaly Tracker ──────────────────────────────────────────────────────────
+// anomalyTracker counts recent denials for each actor.
+//
+// Actor identifiers are stored as fixed-size fingerprints and the number of
+// live actor buckets is bounded so attacker-controlled actor churn cannot grow
+// this map indefinitely.
+const defaultAnomalyActorCapacity = 4096
 
-// anomalyTracker counts agent denials using a sliding window to detect
-// abnormal denial spikes for a single actor within a configurable time window.
 type anomalyTracker struct {
 	mu        sync.Mutex
-	buckets   map[string][]time.Time
+	buckets   map[actorStateKey][]time.Time
 	threshold int
 	window    time.Duration
+	capacity  int
 }
 
 func newAnomalyTracker(threshold int, window time.Duration) *anomalyTracker {
+	return newAnomalyTrackerWithCapacity(
+		threshold,
+		window,
+		defaultAnomalyActorCapacity,
+	)
+}
+
+func newAnomalyTrackerWithCapacity(
+	threshold int,
+	window time.Duration,
+	capacity int,
+) *anomalyTracker {
 	if threshold <= 0 {
 		threshold = 5
 	}
 	if window <= 0 {
 		window = 60 * time.Second
 	}
+	if capacity <= 0 {
+		capacity = defaultAnomalyActorCapacity
+	}
+
 	return &anomalyTracker{
-		buckets:   make(map[string][]time.Time),
+		buckets:   make(map[actorStateKey][]time.Time),
 		threshold: threshold,
 		window:    window,
+		capacity:  capacity,
+	}
+}
+
+func pruneAnomalyTimes(times []time.Time, cutoff time.Time) []time.Time {
+	filtered := times[:0]
+
+	for _, t := range times {
+		if t.After(cutoff) {
+			filtered = append(filtered, t)
+		}
+	}
+
+	return filtered
+}
+
+func (a *anomalyTracker) pruneExpiredLocked(cutoff time.Time) {
+	for key, times := range a.buckets {
+		filtered := pruneAnomalyTimes(times, cutoff)
+
+		if len(filtered) == 0 {
+			delete(a.buckets, key)
+			continue
+		}
+
+		a.buckets[key] = filtered
 	}
 }
 
@@ -254,19 +305,42 @@ func (a *anomalyTracker) record(actor string) bool {
 
 	now := time.Now()
 	cutoff := now.Add(-a.window)
+	key := actorKey(actor)
 
-	// Prune old entries.
-	times := a.buckets[actor]
-	filtered := times[:0]
-	for _, t := range times {
-		if t.After(cutoff) {
-			filtered = append(filtered, t)
+	if times, ok := a.buckets[key]; ok {
+		filtered := pruneAnomalyTimes(times, cutoff)
+		filtered = append(filtered, now)
+
+		// Once threshold timestamps are retained, older timestamps no longer
+		// affect either the spike decision or the risk factor.
+		if len(filtered) > a.threshold {
+			filtered = filtered[len(filtered)-a.threshold:]
 		}
-	}
-	filtered = append(filtered, now)
-	a.buckets[actor] = filtered
 
-	return len(filtered) >= a.threshold
+		a.buckets[key] = filtered
+		return len(filtered) >= a.threshold
+	}
+
+	// Only pay the O(n) global-prune cost when capacity is actually under
+	// pressure.
+	if len(a.buckets) >= a.capacity {
+		a.pruneExpiredLocked(cutoff)
+	}
+
+	if len(a.buckets) >= a.capacity {
+		// Do not evict another actor's still-live denial history merely to
+		// admit attacker-controlled churn.
+		actorStatePressureTotal.WithLabelValues(
+			"anomaly_tracker",
+			"reject",
+		).Inc()
+
+		return false
+	}
+
+	a.buckets[key] = []time.Time{now}
+
+	return a.threshold <= 1
 }
 
 func (a *anomalyTracker) currentCount(actor string) int {
@@ -275,15 +349,35 @@ func (a *anomalyTracker) currentCount(actor string) int {
 
 	now := time.Now()
 	cutoff := now.Add(-a.window)
-	times := a.buckets[actor]
-	filtered := times[:0]
-	for _, t := range times {
-		if t.After(cutoff) {
-			filtered = append(filtered, t)
+	key := actorKey(actor)
+
+	if times, ok := a.buckets[key]; ok {
+		filtered := pruneAnomalyTimes(times, cutoff)
+
+		if len(filtered) == 0 {
+			// This is the subtle leak the maintainer pointed out:
+			// remove the key itself, not just its expired timestamps.
+			delete(a.buckets, key)
+			return 0
+		}
+
+		a.buckets[key] = filtered
+		return len(filtered)
+	}
+
+	// A lookup miss must never create an empty bucket.
+	if len(a.buckets) >= a.capacity {
+		a.pruneExpiredLocked(cutoff)
+
+		if len(a.buckets) >= a.capacity {
+			// The cache is full of still-live actor histories. An unseen actor
+			// is therefore treated conservatively instead of receiving an
+			// anomaly count of zero.
+			return a.threshold
 		}
 	}
-	a.buckets[actor] = filtered
-	return len(filtered)
+
+	return 0
 }
 
 type EnforcementMode string
@@ -717,12 +811,12 @@ type agentAuthorizeRequest struct {
 }
 
 type agentAuthorizeResponse struct {
-	Allowed             bool    `json:"allowed"`
-	Reason              string  `json:"reason"`
-	TraceID             string  `json:"trace_id"`
-	DowngradedScope     string  `json:"downgraded_scope,omitempty"`
-	EffectiveScope      string  `json:"effective_scope,omitempty"`
-	RequiresHumanReview bool    `json:"requires_human_review"`
+	Allowed             bool   `json:"allowed"`
+	Reason              string `json:"reason"`
+	TraceID             string `json:"trace_id"`
+	DowngradedScope     string `json:"downgraded_scope,omitempty"`
+	EffectiveScope      string `json:"effective_scope,omitempty"`
+	RequiresHumanReview bool   `json:"requires_human_review"`
 	// ActorVerified is true only when Actor came from a signed WorkloadToken
 	// (X-Lelu-Agent-Token) validated against the identity registry, not from
 	// the self-reported "actor" field in the request body. Unlike
@@ -734,8 +828,8 @@ type agentAuthorizeResponse struct {
 	// caller needs this to poll GET /v1/queue/{id}, long-poll
 	// /v1/queue/{id}/wait, or resolve it via approve/deny. Without it, a
 	// human_review decision is unaddressable: nothing to poll or resolve.
-	ReviewID string `json:"review_id,omitempty"`
-	ConfidenceUsed      float64 `json:"confidence_used"`
+	ReviewID       string  `json:"review_id,omitempty"`
+	ConfidenceUsed float64 `json:"confidence_used"`
 	// ProviderSignalPresent is true only when ConfidenceUsed came from a
 	// caller-submitted confidence_signal (confidence.ExtractScore) rather
 	// than the AllowUnverifiedConfidence self-reported fallback or a missing
@@ -747,7 +841,7 @@ type agentAuthorizeResponse struct {
 	// fabricated numbers shaped like a real signal for OpenAI/Bedrock and
 	// this will be true. Was named ConfidenceVerified until Nate Howard's
 	// review pointed out that name claimed more than the check establishes.
-	ProviderSignalPresent bool `json:"provider_signal_present"`
+	ProviderSignalPresent        bool    `json:"provider_signal_present"`
 	RiskScore                    float64 `json:"risk_score,omitempty"`
 	RiskCriticality              float64 `json:"risk_criticality,omitempty"`
 	RiskReliability              float64 `json:"risk_reliability,omitempty"`
@@ -857,11 +951,11 @@ func (h *Handler) checkShadowAgent(w http.ResponseWriter, r *http.Request, req a
 			Reason:              "shadow detector unavailable — request held for review",
 		}, false, true)
 		writeJSON(w, http.StatusOK, agentAuthorizeResponse{
-			Allowed:             false,
-			RequiresHumanReview: true,
-			Reason:              "shadow detection check failed — request escalated for safety",
-			TraceID:             traceID,
-			ConfidenceUsed:      0,
+			Allowed:               false,
+			RequiresHumanReview:   true,
+			Reason:                "shadow detection check failed — request escalated for safety",
+			TraceID:               traceID,
+			ConfidenceUsed:        0,
 			ProviderSignalPresent: false,
 		})
 		return true
@@ -1271,25 +1365,25 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	isCompute := evalDec.Compute && allowed && !requiresReview
 
 	resp := agentAuthorizeResponse{
-		Allowed:             allowed,
-		Reason:              finalReason,
-		TraceID:             traceID,
-		DowngradedScope:     downgradedScope,
-		EffectiveScope:      effectiveScope,
-		RequiresHumanReview: requiresReview,
-		ReviewID:            reviewID,
+		Allowed:               allowed,
+		Reason:                finalReason,
+		TraceID:               traceID,
+		DowngradedScope:       downgradedScope,
+		EffectiveScope:        effectiveScope,
+		RequiresHumanReview:   requiresReview,
+		ReviewID:              reviewID,
 		ConfidenceUsed:        confidenceScore,
 		ProviderSignalPresent: providerSignalPresent,
 		ActorVerified:         actorVerified,
-		RiskScore:           riskDec.Score,
-		RiskCriticality:     riskDec.Criticality,
-		RiskReliability:     riskDec.Reliability,
-		RiskAnomalyFactor:   riskDec.AnomalyFactor,
-		Compute:             isCompute,
-		SafeTool:            evalDec.SafeTool,
-		SafeArgs:            evalDec.SafeArgs,
-		PolicyDigest:        evalDec.PolicyDigest,
-		InputHash:           inputHash,
+		RiskScore:             riskDec.Score,
+		RiskCriticality:       riskDec.Criticality,
+		RiskReliability:       riskDec.Reliability,
+		RiskAnomalyFactor:     riskDec.AnomalyFactor,
+		Compute:               isCompute,
+		SafeTool:              evalDec.SafeTool,
+		SafeArgs:              evalDec.SafeArgs,
+		PolicyDigest:          evalDec.PolicyDigest,
+		InputHash:             inputHash,
 	}
 	resp.OutputHash = payloadHash(struct {
 		TraceID  string `json:"trace_id"`
@@ -1299,21 +1393,21 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 
 	// Audit log with full forensic fields.
 	h.audit.Log(audit.Event{
-		TenantID:           req.TenantID,
-		TraceID:            traceID,
-		Actor:              req.Actor,
-		Action:             req.Action,
-		Resource:           req.Resource,
+		TenantID:              req.TenantID,
+		TraceID:               traceID,
+		Actor:                 req.Actor,
+		Action:                req.Action,
+		Resource:              req.Resource,
 		ConfidenceScore:       confidenceScore,
 		ProviderSignalPresent: providerSignalPresent,
 		ActorVerified:         actorVerified,
-		Decision:           decisionStringFull(allowed, requiresReview, isCompute),
-		Reason:             finalReason,
-		DowngradedScope:    downgradedScope,
-		LatencyMS:          totalLatency,
-		InputHash:          inputHash,
-		OutputHash:         resp.OutputHash,
-		PolicyDigest:       evalDec.PolicyDigest,
+		Decision:              decisionStringFull(allowed, requiresReview, isCompute),
+		Reason:                finalReason,
+		DowngradedScope:       downgradedScope,
+		LatencyMS:             totalLatency,
+		InputHash:             inputHash,
+		OutputHash:            resp.OutputHash,
+		PolicyDigest:          evalDec.PolicyDigest,
 	})
 	h.notifyIncident(r.Context(), incident.Event{
 		Type:                eventTypeFrom(resp.Allowed, resp.RequiresHumanReview),
@@ -1636,13 +1730,13 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 	}
 
 	return agentAuthorizeResponse{
-		Allowed:             allowed,
-		Reason:              reason,
-		TraceID:             traceID,
-		DowngradedScope:     downgradedScope,
-		RequiresHumanReview: requiresReview,
-		ReviewID:            reviewID,
-		ConfidenceUsed:      0,
+		Allowed:               allowed,
+		Reason:                reason,
+		TraceID:               traceID,
+		DowngradedScope:       downgradedScope,
+		RequiresHumanReview:   requiresReview,
+		ReviewID:              reviewID,
+		ConfidenceUsed:        0,
 		ProviderSignalPresent: false,
 	}
 }

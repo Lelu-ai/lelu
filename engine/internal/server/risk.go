@@ -1,6 +1,8 @@
 package server
 
 import (
+	"container/list"
+	"crypto/sha256"
 	"fmt"
 	"math"
 	"os"
@@ -461,46 +463,232 @@ func riskScore(criticality float64, confidenceScore float64, reliability float64
 	return math.Min(1, risk)
 }
 
+const (
+	defaultActorStatsCapacity   = 4096
+	defaultTrustedActorCapacity = 4096
+
+	// Once the hot cache is full, a missing actor may be genuinely new or may
+	// have been evicted with negative history. Do not silently restore the
+	// favourable 1.0 default in that ambiguous state.
+	//
+	// Note: this narrows but does not eliminate reputation reset. An actor that
+	// earned a score below 0.5 and then forces its own eviction returns at 0.5.
+	// Closing that fully needs history outside the process.
+	conservativeUnknownReliability = 0.5
+
+	// A conservative prior used when an unknown actor enters a full cache.
+	// total=2, denies=1 corresponds to reliability 0.5.
+	conservativePriorTotal  = 2
+	conservativePriorDenies = 1
+)
+
+// actorStateKey keeps attacker-controlled actor identifiers out of the cache.
+// Every key consumes a fixed 32 bytes regardless of actor string length.
+type actorStateKey [32]byte
+
+func actorKey(actor string) actorStateKey {
+	return actorStateKey(sha256.Sum256([]byte(actor)))
+}
+
+type actorStatEntry struct {
+	key    actorStateKey
+	total  int
+	denies int
+}
+
 type actorStats struct {
-	mu     sync.Mutex
-	totals map[string]int
-	denies map[string]int
+	mu sync.Mutex
+
+	capacity int
+	entries  map[actorStateKey]*list.Element
+	lru      *list.List
+
+	trustedCapacity int
+	trusted         map[actorStateKey]*list.Element
+	trustedLRU      *list.List
 }
 
 func newActorStats() *actorStats {
+	return newActorStatsWithCapacity(
+		defaultActorStatsCapacity,
+		defaultTrustedActorCapacity,
+	)
+}
+
+func newActorStatsWithCapacity(capacity, trustedCapacity int) *actorStats {
+	if capacity <= 0 {
+		capacity = defaultActorStatsCapacity
+	}
+	if trustedCapacity <= 0 {
+		trustedCapacity = defaultTrustedActorCapacity
+	}
+
 	return &actorStats{
-		totals: make(map[string]int),
-		denies: make(map[string]int),
+		capacity:        capacity,
+		entries:         make(map[actorStateKey]*list.Element),
+		lru:             list.New(),
+		trustedCapacity: trustedCapacity,
+		trusted:         make(map[actorStateKey]*list.Element),
+		trustedLRU:      list.New(),
 	}
 }
 
-func (s *actorStats) reliability(actor string) float64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	total := s.totals[actor]
+func reliabilityFromCounts(total, denies int) float64 {
 	if total == 0 {
 		return 1.0
 	}
-	deny := s.denies[actor]
-	rel := 1 - (float64(deny) / float64(total))
+
+	rel := 1 - (float64(denies) / float64(total))
+
 	if rel < 0 {
 		return 0
 	}
 	if rel > 1 {
 		return 1
 	}
+
 	return rel
+}
+
+func (s *actorStats) reliability(actor string) float64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	key := actorKey(actor)
+
+	if elem, ok := s.entries[key]; ok {
+		entry := elem.Value.(*actorStatEntry)
+		return reliabilityFromCounts(entry.total, entry.denies)
+	}
+
+	if elem, ok := s.trusted[key]; ok {
+		s.trustedLRU.MoveToFront(elem)
+		return 1.0
+	}
+
+	// Before the cache fills, preserve Lelu's existing new-actor behaviour.
+	if len(s.entries) < s.capacity {
+		return 1.0
+	}
+
+	// Once capacity pressure exists, a cache miss cannot be distinguished from
+	// an actor whose negative history was evicted.
+	return conservativeUnknownReliability
 }
 
 func (s *actorStats) record(actor string, outcome decisionOutcome) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.totals[actor]++
-	if outcome == outcomeDeny {
-		s.denies[actor]++
+	key := actorKey(actor)
+
+	if elem, ok := s.entries[key]; ok {
+		entry := elem.Value.(*actorStatEntry)
+
+		entry.total++
+		if outcome == outcomeDeny {
+			entry.denies++
+		}
+
+		// Completing a decision counts as recent use.
+		s.lru.MoveToFront(elem)
+		return
 	}
+
+	wasTrusted := s.removeTrustedLocked(key)
+	underPressure := len(s.entries) >= s.capacity
+
+	entry := &actorStatEntry{
+		key: key,
+	}
+
+	// Unknown actors entering a full cache start from the same conservative
+	// 0.5 state used during the decision instead of jumping to 1.0 after one
+	// successful request.
+	if underPressure && !wasTrusted {
+		entry.total = conservativePriorTotal
+		entry.denies = conservativePriorDenies
+	}
+
+	entry.total++
+	if outcome == outcomeDeny {
+		entry.denies++
+	}
+
+	if len(s.entries) >= s.capacity {
+		s.evictOldestLocked()
+	}
+
+	s.entries[key] = s.lru.PushFront(entry)
+}
+
+func (s *actorStats) evictOldestLocked() {
+	const maxScan = 8
+
+	// Prefer evicting an actor with no denial history. Bad reputation should be
+	// sticky under pressure: an attacker wanting to shed a poor score then has
+	// to fill the cache with their own denied actors, which is self-limiting.
+	victim := s.lru.Back()
+	if victim == nil {
+		return
+	}
+
+	for elem, n := victim, 0; elem != nil && n < maxScan; elem, n = elem.Prev(), n+1 {
+		if elem.Value.(*actorStatEntry).denies == 0 {
+			victim = elem
+			break
+		}
+	}
+
+	entry := victim.Value.(*actorStatEntry)
+
+	delete(s.entries, entry.key)
+	s.lru.Remove(victim)
+
+	actorStatePressureTotal.WithLabelValues("actor_stats", "evict").Inc()
+
+	// Only an actor with no denial history can safely retain a 1.0 cold-state
+	// marker. Forgetting negative history must never make an actor more trusted.
+	if entry.denies == 0 {
+		s.addTrustedLocked(entry.key)
+	}
+}
+
+func (s *actorStats) addTrustedLocked(key actorStateKey) {
+	if elem, ok := s.trusted[key]; ok {
+		s.trustedLRU.MoveToFront(elem)
+		return
+	}
+
+	if len(s.trusted) >= s.trustedCapacity {
+		oldest := s.trustedLRU.Back()
+
+		if oldest != nil {
+			oldKey := oldest.Value.(actorStateKey)
+
+			delete(s.trusted, oldKey)
+			s.trustedLRU.Remove(oldest)
+
+			actorStatePressureTotal.WithLabelValues(
+				"trusted_actors",
+				"evict",
+			).Inc()
+		}
+	}
+
+	s.trusted[key] = s.trustedLRU.PushFront(key)
+}
+
+func (s *actorStats) removeTrustedLocked(key actorStateKey) bool {
+	elem, ok := s.trusted[key]
+	if !ok {
+		return false
+	}
+
+	delete(s.trusted, key)
+	s.trustedLRU.Remove(elem)
+
+	return true
 }
 
 func confidenceOutcome(dec *confidence.Decision) decisionOutcome {

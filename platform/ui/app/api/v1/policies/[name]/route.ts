@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 const PLATFORM_URL = process.env.PLATFORM_URL ?? "http://platform:9090";
 const API_KEY = process.env.PLATFORM_API_KEY ?? "platform-dev-key";
 
-export async function PUT(request: NextRequest, { params }: { params: { name: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   try {
     const body = await request.json();
+    const { name } = await params;
 
-    const response = await fetch(`${PLATFORM_URL}/api/v1/policies/${params.name}`, {
+    const response = await fetch(`${PLATFORM_URL}/api/v1/policies/${name}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -35,9 +36,10 @@ export async function PUT(request: NextRequest, { params }: { params: { name: st
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { name: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ name: string }> }) {
   try {
-    const response = await fetch(`${PLATFORM_URL}/api/v1/policies/${params.name}`, {
+    const { name } = await params;
+    const response = await fetch(`${PLATFORM_URL}/api/v1/policies/${name}`, {
       headers: {
         Authorization: `Bearer ${API_KEY}`,
       },

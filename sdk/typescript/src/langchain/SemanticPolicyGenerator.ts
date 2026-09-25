@@ -52,7 +52,8 @@ Requirements:
 `;
 
     const response = await this.openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      // gpt-4-turbo-preview was shut down on 2026-03-26: https://developers.openai.com/api/docs/deprecations
+      model: "gpt-4.1",
       messages: [
         { role: "system", content: "You are a Rego policy generation assistant. Output only raw Rego code." },
         { role: "user", content: prompt }

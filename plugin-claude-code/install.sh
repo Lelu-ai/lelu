@@ -12,7 +12,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DATA_DIR="${LELU_DATA_DIR:-$HOME/.lelu/claude-plugin}"
+DATA_DIR="${LELU_DATA_DIR:-${LELU_HOME:-$HOME/.lelu/claude-plugin}}"
 REPO="lelu-ai/lelu"
 TAG_PREFIX="plugin-claude-code-v"
 

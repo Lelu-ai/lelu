@@ -6,12 +6,17 @@ Expansion-aware policy checks before every `Bash`, `Edit`, and `Write` call — 
 
 ```bash
 git clone https://github.com/lelu-ai/lelu.git && cd lelu
-claude plugin marketplace add .
+claude plugin marketplace add ./
 claude plugin install lelu@lelu
 ./plugin-claude-code/install.sh
 ```
 
 `install.sh` builds from source if you have Go, or downloads a prebuilt binary from this repo's [releases](https://github.com/lelu-ai/lelu/releases) if you don't. No account, no cloud dependency — everything runs and stays on your machine.
+
+The plugin stores its ledger, mode, socket, and daemon log in
+`$HOME/.lelu/claude-plugin` by default. Set `LELU_DATA_DIR` to use another
+directory. `LELU_HOME` is accepted as a compatibility alias when
+`LELU_DATA_DIR` is not set.
 
 ## What it catches
 
@@ -25,7 +30,7 @@ Also:
 
 ## Shadow mode by default
 
-Nothing is blocked on install. Every decision is still logged to `~/.lelu/claude-plugin/ledger.jsonl` regardless of mode. Run `/lelu:lelu-status` inside Claude Code to see what it would have done, and `/lelu:lelu-enforce` when you're ready to turn on real blocking. `/lelu:lelu-shadow` reverts anytime.
+Nothing is blocked on install. Every decision is still logged to the configured data directory's `ledger.jsonl` regardless of mode. Run `/lelu:lelu-status` inside Claude Code to see what it would have done, and `/lelu:lelu-enforce` when you're ready to turn on real blocking. `/lelu:lelu-shadow` reverts anytime.
 
 ## Commands
 

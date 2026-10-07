@@ -27,7 +27,7 @@ export default function DocsClaudeCodePlugin() {
               <span className="text-xs text-zinc-500 font-mono">Terminal</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`git clone https://github.com/lelu-ai/lelu.git && cd lelu
-claude plugin marketplace add .
+claude plugin marketplace add ./
 claude plugin install lelu@lelu
 ./plugin-claude-code/install.sh`}</pre>
           </div>
@@ -36,6 +36,12 @@ claude plugin install lelu@lelu
             builds from source if you have Go, or downloads a prebuilt binary from{" "}
             <a href="https://github.com/lelu-ai/lelu/releases" className="underline hover:text-zinc-900 dark:hover:text-white">GitHub Releases</a>{" "}
             if you don&apos;t. No account, no cloud dependency — everything runs and stays on your machine.
+          </p>
+          <p className="text-zinc-600 dark:text-zinc-400 mt-4">
+            The plugin uses <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">$HOME/.lelu/claude-plugin</code>{" "}
+            by default. Set <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">LELU_DATA_DIR</code>{" "}
+            to choose another directory; <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">LELU_HOME</code>{" "}
+            is supported as a compatibility alias.
           </p>
         </section>
 
@@ -62,8 +68,8 @@ False positives (benign)   4/4      0/4`}</pre>
         <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Shadow mode by default</h2>
           <p className="text-zinc-600 dark:text-zinc-400">
-            Nothing is blocked on install. Every decision is still logged to{" "}
-            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">~/.lelu/claude-plugin/ledger.jsonl</code>{" "}
+            Nothing is blocked on install. Every decision is still logged to the configured data directory&apos;s{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">ledger.jsonl</code>{" "}
             regardless of mode — run <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">/lelu:lelu-status</code>{" "}
             inside Claude Code to see what it would have done, and{" "}
             <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">/lelu:lelu-enforce</code>{" "}

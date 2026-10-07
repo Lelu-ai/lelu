@@ -18,6 +18,15 @@ TAG_PREFIX="plugin-claude-code-v"
 
 mkdir -p "$SCRIPT_DIR/bin"
 
+socket_path="$DATA_DIR/daemon.sock"
+if [ "$(uname -s)" = "Darwin" ]; then
+  socket_length=$(printf '%s' "$socket_path" | wc -c | tr -d ' ')
+  if [ "$socket_length" -gt 103 ]; then
+    echo "error: daemon socket path is ${socket_length} bytes; macOS supports at most 103: ${socket_path}" >&2
+    exit 1
+  fi
+fi
+
 build_from_source() {
   echo "==> Building lelu-hook and lelu-daemon from source"
   cd "$SCRIPT_DIR/daemon"
@@ -45,28 +54,70 @@ download_prebuilt() {
   if [ -n "${LELU_PLUGIN_VERSION:-}" ]; then
     tag="${TAG_PREFIX}${LELU_PLUGIN_VERSION}"
   else
-    tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases" 2>/dev/null \
-      | grep -o "\"tag_name\": *\"${TAG_PREFIX}[^\"]*\"" \
-      | head -1 | sed -E 's/.*"([^"]+)"$/\1/' || true)"
+    release_json=$(mktemp)
+    release_curl_args=(-sS)
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      release_curl_args+=("-H" "Authorization: Bearer ${GITHUB_TOKEN}")
+    fi
+    release_status=$(curl "${release_curl_args[@]}" -o "$release_json" -w '%{http_code}' "https://api.github.com/repos/${REPO}/releases" || true)
+    case "$release_status" in
+      2[0-9][0-9])
+        tag="$(grep -o "\"tag_name\": *\"${TAG_PREFIX}[^\"]*\"" "$release_json" \
+          | head -1 | sed -E 's/.*"([^"]+)"$/\1/' || true)"
+        ;;
+      *)
+        echo "error: GitHub release lookup failed (HTTP ${release_status:-unknown}). Set LELU_PLUGIN_VERSION or provide GITHUB_TOKEN and retry." >&2
+        rm -f "$release_json"
+        return 1
+        ;;
+    esac
+    rm -f "$release_json"
   fi
   if [ -z "${tag:-}" ]; then
-    echo "error: could not find a published ${TAG_PREFIX}* release to download a prebuilt binary from." >&2
+    echo "error: no published ${TAG_PREFIX}* release was found. Set LELU_PLUGIN_VERSION to a published version and retry." >&2
     return 1
   fi
 
   base="https://github.com/${REPO}/releases/download/${tag}"
   tmp_daemon="$(mktemp)"
   tmp_hook="$(mktemp)"
+  tmp_sums="$(mktemp)"
   echo "==> Downloading prebuilt binaries (${tag}, ${os}/${arch})"
   if ! curl -fsSL -o "$tmp_daemon" "${base}/lelu-daemon-${os}-${arch}" \
-    || ! curl -fsSL -o "$tmp_hook" "${base}/lelu-hook-${os}-${arch}"; then
+    || ! curl -fsSL -o "$tmp_hook" "${base}/lelu-hook-${os}-${arch}" \
+    || ! curl -fsSL -o "$tmp_sums" "${base}/SHA256SUMS.txt"; then
     echo "error: failed to download prebuilt binaries from ${base}" >&2
-    rm -f "$tmp_daemon" "$tmp_hook"
+    rm -f "$tmp_daemon" "$tmp_hook" "$tmp_sums"
     return 1
   fi
 
-  mv "$tmp_daemon" "$SCRIPT_DIR/bin/lelu-daemon"
-  mv "$tmp_hook" "$SCRIPT_DIR/hooks/lelu-hook"
+  if command -v sha256sum >/dev/null 2>&1; then
+    checksum_command=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    checksum_command=(shasum -a 256)
+  else
+    echo "error: sha256sum or shasum is required to verify downloaded binaries." >&2
+    rm -f "$tmp_daemon" "$tmp_hook" "$tmp_sums"
+    return 1
+  fi
+
+  checksum_dir=$(mktemp -d)
+  daemon_name="lelu-daemon-${os}-${arch}"
+  hook_name="lelu-hook-${os}-${arch}"
+  mv "$tmp_daemon" "$checksum_dir/$daemon_name"
+  mv "$tmp_hook" "$checksum_dir/$hook_name"
+  if ! grep -E "^[[:xdigit:]]{64}[[:space:]]+\*?(${daemon_name}|${hook_name})$" "$tmp_sums" > "$checksum_dir/SHA256SUMS.txt" \
+    || [ "$(wc -l < "$checksum_dir/SHA256SUMS.txt")" -ne 2 ] \
+    || ! (cd "$checksum_dir" && "${checksum_command[@]}" -c SHA256SUMS.txt); then
+    echo "error: checksum verification failed for prebuilt binaries from ${base}" >&2
+    rm -rf "$checksum_dir" "$tmp_sums"
+    return 1
+  fi
+  rm -f "$tmp_sums"
+
+  mv "$checksum_dir/$daemon_name" "$SCRIPT_DIR/bin/lelu-daemon"
+  mv "$checksum_dir/$hook_name" "$SCRIPT_DIR/hooks/lelu-hook"
+  rmdir "$checksum_dir"
   chmod +x "$SCRIPT_DIR/bin/lelu-daemon" "$SCRIPT_DIR/hooks/lelu-hook"
 }
 
@@ -97,11 +148,19 @@ LELU_POLICY_PATH="$SCRIPT_DIR/policies/defaults.json" \
   nohup "$SCRIPT_DIR/bin/lelu-daemon" >>"$DATA_DIR/daemon.log" 2>&1 &
 echo $! > "$PID_FILE"
 
-sleep 0.3
-if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+for _ in $(seq 1 30); do
+  if [ -S "$socket_path" ]; then
+    break
+  fi
+  if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if kill -0 "$(cat "$PID_FILE")" 2>/dev/null && [ -S "$socket_path" ]; then
   echo "==> lelu-daemon running (pid $(cat "$PID_FILE")), socket at $DATA_DIR/daemon.sock"
   echo "==> Done. The PreToolUse hook is registered via hooks/hooks.json — no further setup needed inside Claude Code."
 else
-  echo "error: lelu-daemon failed to start — check $DATA_DIR/daemon.log" >&2
+  echo "error: lelu-daemon failed to listen on $socket_path — check $DATA_DIR/daemon.log" >&2
   exit 1
 fi

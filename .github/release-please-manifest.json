@@ -1,6 +1,6 @@
 {
-  "engine": "0.1.6",
-  "sdk/typescript": "0.2.7",
-  "sdk/go": "0.1.8",
-  "sdk/python": "0.3.6"
+  "engine": "0.1.7",
+  "sdk/typescript": "0.2.8",
+  "sdk/go": "0.1.9",
+  "sdk/python": "0.3.7"
 }

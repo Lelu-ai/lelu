@@ -77,6 +77,7 @@ func (r *regoPolicy) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*
 		"confidence": req.Confidence,
 		"acting_for": req.ActingFor,
 		"scope":      req.Scope,
+		"args":       req.Args,
 	}
 	return r.evaluate(ctx, input)
 }

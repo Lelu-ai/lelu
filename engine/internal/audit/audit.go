@@ -87,6 +87,12 @@ type Event struct {
 	// PolicyDigest is the SHA-256 of the policy bytes active at evaluation time,
 	// proving which policy version authorized this decision.
 	PolicyDigest string `json:"policy_digest,omitempty"`
+	// ExternalEvidenceRef and ExternalEvidenceReceiptDigest retain only the
+	// compact correlation fields from an optional provider-neutral external
+	// evidence signal. The complete provider response stays outside Lelu's
+	// ordinary audit record.
+	ExternalEvidenceRef           string `json:"external_evidence_ref,omitempty"`
+	ExternalEvidenceReceiptDigest string `json:"external_evidence_receipt_digest,omitempty"`
 
 	// ─── Receipt fields (AARM R5/R6) — populated only when the Writer has a
 	// signer configured via SetSigner(); zero-valued otherwise, so an
@@ -389,6 +395,8 @@ type receiptCore struct {
 	InputHash          string            `json:"input_hash"`
 	OutputHash         string            `json:"output_hash"`
 	PolicyDigest       string            `json:"policy_digest"`
+	ExternalEvidenceRef           string `json:"external_evidence_ref,omitempty"`
+	ExternalEvidenceReceiptDigest string `json:"external_evidence_receipt_digest,omitempty"`
 }
 
 func canonicalizeReceipt(e Event, prevHash string) ([]byte, error) {
@@ -411,6 +419,8 @@ func canonicalizeReceipt(e Event, prevHash string) ([]byte, error) {
 		InputHash:          e.InputHash,
 		OutputHash:         e.OutputHash,
 		PolicyDigest:       e.PolicyDigest,
+		ExternalEvidenceRef:           e.ExternalEvidenceRef,
+		ExternalEvidenceReceiptDigest: e.ExternalEvidenceReceiptDigest,
 	})
 }
 

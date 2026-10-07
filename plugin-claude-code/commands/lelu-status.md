@@ -2,7 +2,7 @@
 description: Show Lelu's current mode (shadow vs enforce) and a summary of recent decisions
 ---
 
-Read `~/.lelu/claude-plugin/mode` (if missing, the mode is `shadow` — that's the default). Then read `~/.lelu/claude-plugin/ledger.jsonl`, which is a JSON-lines audit log where each line looks like:
+Use the plugin data directory: `${LELU_DATA_DIR:-${LELU_HOME:-$HOME/.lelu/claude-plugin}}`. Read its `mode` file (if missing, the mode is `shadow` — that's the default). Then read its `ledger.jsonl`, which is a JSON-lines audit log where each line looks like:
 
 ```json
 {"ts":"...","session_id":"...","tool":"Bash","command":"...","outcome":"deny","rule":"recursive-force-delete","reason":"...","shadow":true}

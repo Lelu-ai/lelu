@@ -2,6 +2,8 @@ package evaluator_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -253,4 +255,45 @@ roles:
 	dec, err = e.Evaluate(context.Background(), evaluator.AuthRequest{Action: "approve_refunds"})
 	require.NoError(t, err)
 	assert.False(t, dec.Allowed)
+}
+
+func TestEvaluateAgent_RegoReceivesArgs(t *testing.T) {
+	dir := t.TempDir()
+	policyPath := filepath.Join(dir, "evidence.rego")
+	policy := []byte(`package testauth
+
+import rego.v1
+
+default authz := {"allowed": false, "reason": "evidence absent"}
+
+authz := {"allowed": true, "reason": "evidence present"} if {
+	input.kind == "agent"
+	input.args.external_evidence.declaration_state == "declared_permitted"
+}
+`)
+	require.NoError(t, os.WriteFile(policyPath, policy, 0o600))
+
+	e := evaluator.New()
+	require.NoError(t, e.LoadRegoPolicy(policyPath, "data.testauth.authz"))
+
+	dec, err := e.EvaluateAgent(context.Background(), evaluator.AgentAuthRequest{
+		Actor:  "retrieval_agent",
+		Action: "fetch_url",
+		Args: map[string]interface{}{
+			"external_evidence": map[string]interface{}{
+				"declaration_state": "declared_permitted",
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.True(t, dec.Allowed)
+	assert.Equal(t, "evidence present", dec.Reason)
+
+	dec, err = e.EvaluateAgent(context.Background(), evaluator.AgentAuthRequest{
+		Actor:  "retrieval_agent",
+		Action: "fetch_url",
+	})
+	require.NoError(t, err)
+	assert.False(t, dec.Allowed)
+	assert.Equal(t, "evidence absent", dec.Reason)
 }

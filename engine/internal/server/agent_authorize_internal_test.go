@@ -371,3 +371,23 @@ func TestEvaluateAgentDecision_ProviderSignalPresent_MissingSignalIsAbsent(t *te
 	resp := decodeResp(t, rec)
 	assert.False(t, resp.ProviderSignalPresent)
 }
+
+func TestExternalEvidenceAuditRefs(t *testing.T) {
+	args := map[string]interface{}{
+		"external_evidence": map[string]interface{}{
+			"provider":          "example-provider",
+			"observed_at":       "2026-10-07T08:00:00Z",
+			"declaration_state": "license_required",
+			"evidence_ref":      "urn:evidence:sha256:abc",
+			"receipt_digest":    "sha256:def",
+			"full_response":     "must-not-be-copied-to-audit",
+		},
+	}
+	ref, digest := externalEvidenceAuditRefs(args)
+	assert.Equal(t, "urn:evidence:sha256:abc", ref)
+	assert.Equal(t, "sha256:def", digest)
+
+	ref, digest = externalEvidenceAuditRefs(map[string]interface{}{})
+	assert.Empty(t, ref)
+	assert.Empty(t, digest)
+}

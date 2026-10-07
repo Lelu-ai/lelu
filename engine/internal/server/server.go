@@ -870,6 +870,19 @@ func payloadHash(v interface{}) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// externalEvidenceAuditRefs extracts only the compact correlation fields that
+// belong in Lelu's audit record. The full provider response remains in the
+// caller's evidence store and is never copied into the audit event.
+func externalEvidenceAuditRefs(args map[string]interface{}) (string, string) {
+	raw, ok := args["external_evidence"].(map[string]interface{})
+	if !ok {
+		return "", ""
+	}
+	ref, _ := raw["evidence_ref"].(string)
+	digest, _ := raw["receipt_digest"].(string)
+	return strings.TrimSpace(ref), strings.TrimSpace(digest)
+}
+
 // effectFingerprint hashes only the fields that determine what an action
 // actually *does* — deliberately narrower than the inputHash covering the
 // whole request.
@@ -1391,7 +1404,9 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		Reason   string `json:"reason"`
 	}{traceID, decisionStringFull(allowed, requiresReview, isCompute), finalReason})
 
-	// Audit log with full forensic fields.
+	// Audit log with full forensic fields. External evidence is represented
+	// only by its reference and digest, never by the complete provider payload.
+	evidenceRef, evidenceReceiptDigest := externalEvidenceAuditRefs(req.Args)
 	h.audit.Log(audit.Event{
 		TenantID:              req.TenantID,
 		TraceID:               traceID,
@@ -1407,7 +1422,9 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		LatencyMS:             totalLatency,
 		InputHash:             inputHash,
 		OutputHash:            resp.OutputHash,
-		PolicyDigest:          evalDec.PolicyDigest,
+		PolicyDigest:                   evalDec.PolicyDigest,
+		ExternalEvidenceRef:           evidenceRef,
+		ExternalEvidenceReceiptDigest: evidenceReceiptDigest,
 	})
 	h.notifyIncident(r.Context(), incident.Event{
 		Type:                eventTypeFrom(resp.Allowed, resp.RequiresHumanReview),

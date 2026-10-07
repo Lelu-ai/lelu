@@ -1,0 +1,17 @@
+{
+  "kind": "agent",
+  "actor": "retrieval_agent",
+  "action": "fetch_url",
+  "resource": {
+    "url": "https://example.com/article"
+  },
+  "args": {
+    "external_evidence": {
+      "provider": "example-provider",
+      "observed_at": "2026-10-07T08:00:00Z",
+      "declaration_state": "declared_permitted",
+      "evidence_ref": "urn:evidence:sha256:example",
+      "receipt_digest": "sha256:example"
+    }
+  }
+}

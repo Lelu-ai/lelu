@@ -179,3 +179,39 @@ func TestDeriveKeyID_DeterministicAndDistinct(t *testing.T) {
 		t.Fatalf("DeriveKeyID produced the same kid for two different keys")
 	}
 }
+
+func TestCanonicalReceiptBindsExternalEvidenceRefs(t *testing.T) {
+	event := Event{
+		Seq:       1,
+		TraceID:   "trace-1",
+		Timestamp: time.Unix(1, 0).UTC(),
+		Actor:     "agent",
+		Action:    "fetch_url",
+		Decision:  "allowed",
+	}
+	withoutEvidence, err := canonicalizeReceipt(event, "")
+	if err != nil {
+		t.Fatalf("canonicalize without evidence: %v", err)
+	}
+
+	event.ExternalEvidenceRef = "urn:evidence:sha256:abc"
+	event.ExternalEvidenceReceiptDigest = "sha256:def"
+	withEvidence, err := canonicalizeReceipt(event, "")
+	if err != nil {
+		t.Fatalf("canonicalize with evidence: %v", err)
+	}
+	if bytes.Equal(withoutEvidence, withEvidence) {
+		t.Fatal("external evidence correlation fields must be covered by the receipt signature")
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(withEvidence, &decoded); err != nil {
+		t.Fatalf("decode receipt core: %v", err)
+	}
+	if decoded["external_evidence_ref"] != "urn:evidence:sha256:abc" {
+		t.Fatalf("unexpected evidence ref: %v", decoded["external_evidence_ref"])
+	}
+	if decoded["external_evidence_receipt_digest"] != "sha256:def" {
+		t.Fatalf("unexpected evidence digest: %v", decoded["external_evidence_receipt_digest"])
+	}
+}

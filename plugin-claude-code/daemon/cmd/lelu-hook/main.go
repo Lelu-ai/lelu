@@ -253,6 +253,9 @@ func dataDir() string {
 	if d := os.Getenv("LELU_DATA_DIR"); d != "" {
 		return d
 	}
+	if d := os.Getenv("LELU_HOME"); d != "" {
+		return d
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ".lelu-claude-plugin"

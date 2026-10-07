@@ -17,8 +17,8 @@ passes only the normalized signal in `args.external_evidence`:
 ```
 
 Lelu treats these fields as policy input. They are not legal clearance and do
-not authorize an action by themselves. A Rego or YAML policy must opt in to
-using the signal.
+not authorize an action by themselves. A Rego policy must opt in to using the
+signal.
 
 The Go SDK helper `WithVerifiedEvidence` validates the neutral envelope and
 adds it to a copy of the existing args map:

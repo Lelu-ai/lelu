@@ -59,7 +59,7 @@ func main() {
 
 	listener, err := net.Listen("unix", sockPath)
 	if err != nil {
-		log.Fatalf("lelu-daemon: listening on %s: %v", sockPath, err)
+		log.Fatalf("lelu-daemon: failed to listen on %s: %v", sockPath, err)
 	}
 	defer listener.Close()
 

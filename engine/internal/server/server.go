@@ -1719,10 +1719,40 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 	var requiresReview bool
 	var downgradedScope string
 
-	const missingSignalHint = " — pass a confidence_signal derived from your LLM provider's response, or set CONFIDENCE_MISSING_MODE=review on the engine during development"
+	// The policy is consulted before the missing-signal fallback. Confidence
+	// can only ever loosen a decision the policy would otherwise make, so if
+	// the policy denies this action even at full confidence, a request that
+	// omits confidence is a deny too. Routing it to review instead turned
+	// every hard deny into an approvable item just by leaving out an
+	// optional field.
+	policyDenied, policyReview, policyReason := h.policyVerdictAtFullConfidence(ctx, req)
+	if policyDenied {
+		h.audit.LogDecision(ctx, req.TenantID, req.Actor, req.Action, req.Resource, false, policyReason, 0, ms(start))
+		authDecisionsTotal.WithLabelValues("agent", "false").Inc()
+		return agentAuthorizeResponse{
+			Allowed:               false,
+			Reason:                policyReason,
+			TraceID:               traceID,
+			ConfidenceUsed:        0,
+			ProviderSignalPresent: false,
+		}
+	}
+
+	// Only point at CONFIDENCE_MISSING_MODE=review when it isn't already the
+	// mode — telling a user to set what lelu-mcp already set is confusing.
+	missingSignalHint := " — pass a confidence_signal derived from your LLM provider's response"
+	if h.confCfg.MissingSignalMode != MissingConfidenceReview {
+		missingSignalHint += ", or set CONFIDENCE_MISSING_MODE=review on the engine during development"
+	}
 	switch h.confCfg.MissingSignalMode {
 	case MissingConfidenceReview:
 		reason = "no confidence signal detected; routed to human review" + missingSignalHint
+		if policyReview {
+			// The policy would have asked for a human anyway; say why, so a
+			// reviewer sees the policy's reason rather than only the
+			// missing-signal one.
+			reason = policyReason + " (no confidence signal was supplied)"
+		}
 		requiresReview = true
 	case MissingConfidenceReadOnly:
 		reason = "no confidence signal detected; scope downgraded to read_only" + missingSignalHint
@@ -1756,6 +1786,37 @@ func (h *Handler) decisionForMissingSignal(ctx context.Context, req agentAuthori
 		ConfidenceUsed:        0,
 		ProviderSignalPresent: false,
 	}
+}
+
+// policyVerdictAtFullConfidence evaluates the policy as if the caller had
+// supplied maximum confidence. It reports whether the policy denies the
+// action regardless of confidence (a rule-level or default deny), whether it
+// routes the action to human review, and the policy's reason. Evaluation
+// errors report neither, leaving the missing-signal mode to decide.
+func (h *Handler) policyVerdictAtFullConfidence(ctx context.Context, req agentAuthorizeRequest) (denied, review bool, reason string) {
+	if h.eval == nil {
+		return false, false, ""
+	}
+	dec, err := h.eval.EvaluateAgent(ctx, evaluator.AgentAuthRequest{
+		TenantID:   req.TenantID,
+		Actor:      req.Actor,
+		Action:     req.Action,
+		Resource:   req.Resource,
+		Confidence: 1.0,
+		ActingFor:  req.ActingFor,
+		Scope:      req.Scope,
+		Args:       req.Args,
+	})
+	if err != nil || dec == nil {
+		return false, false, ""
+	}
+	if dec.RequiresHumanReview {
+		return false, true, dec.Reason
+	}
+	if !dec.Allowed {
+		return true, false, dec.Reason
+	}
+	return false, false, ""
 }
 
 func (h *Handler) applyShadowMode(resp agentAuthorizeResponse) agentAuthorizeResponse {
@@ -2479,6 +2540,24 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 	}
 
 	h.confCalibrator.RecordReview(rawConfidence, approve)
+
+	// The resolution is a decision in its own right and goes in the signed
+	// audit log, naming the resolver. Previously only the later redeem was
+	// logged, attributed to the agent, so nothing in the trail said who
+	// approved — or that the approver and the agent were the same key.
+	verb, past := "deny", "denied"
+	if approve {
+		verb, past = "approve", "approved"
+	}
+	h.audit.LogDecision(r.Context(), item.TenantID, "reviewer:"+resolvedBy, "review:"+verb,
+		map[string]string{
+			"review_id":              id,
+			"reviewed_actor":         item.Actor,
+			"reviewed_action":        item.Action,
+			"reviewer_authenticated": strconv.FormatBool(reviewerAuthenticated),
+		},
+		approve, fmt.Sprintf("human_review %s %s by %s: %s", id, past, resolvedBy, req.Note), rawConfidence, 0)
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":                true,
 		"resolved_by":            resolvedBy,
@@ -2852,6 +2931,7 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	payload := map[string]any{
 		"status":  "ok",
 		"service": "lelu-engine",
+		"version": Version,
 	}
 	if len(deps) > 0 {
 		payload["dependencies"] = deps
@@ -2862,6 +2942,11 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 	writeJSON(w, status, payload)
 }
+
+// Version is the engine release, injected at build time with
+// -ldflags "-X github.com/lelu-ai/lelu/engine/internal/server.Version=0.2.1".
+// Reported by /healthz (unauthenticated) and `lelu-engine --version`.
+var Version = "dev"
 
 // ─── HTTP Server constructor ─────────────────────────────────────────────────
 

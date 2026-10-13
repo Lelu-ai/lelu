@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Security Fixes
+
+* **Omitting `confidence` no longer turns a policy deny into an approvable review.** With `CONFIDENCE_MISSING_MODE=review` (the lelu-mcp default), a request with no confidence signal was routed to `human_review` before the policy was consulted, so `delete_table` — denied by policy — became a pending review the caller could get approved and redeem. The policy is now evaluated first: if it denies the action even at full confidence, the request is denied. When the policy itself asks for review, the review now carries the policy's reason.
+* **Human-review approvals and denials are written to the signed audit log**, as `review:approve` / `review:deny` by `reviewer:<name>` with the review id, the reviewed actor and action, and whether the reviewer was authenticated. Previously only the later redeem was logged, attributed to the agent.
+
+### Features
+
+* **The review queue persists to the local SQLite database when Redis is not configured** (`DATABASE_PATH`, on by default). Pending reviews, resolutions with their notes, and spent redemptions survive an engine restart, so a later `GET /v1/queue/{id}` works in the zero-config lelu-mcp setup. Single-instance only; set `REDIS_ADDR` to share across replicas. Resolved items are pruned after 30 days.
+* **`lelu-engine --version`** prints the version and exits (it used to start a second engine with an empty policy), and `/healthz` now reports `version`. Release builds inject it via `-ldflags`.
+
+### Fixes
+
+* The in-memory-queue startup warning no longer says "when LELU_MODE=enforce" — it applies in every mode — and is not shown when the SQLite queue is in use.
+* The missing-confidence reason no longer tells the user to set `CONFIDENCE_MISSING_MODE=review` when that is already the active mode.
+
 ## [0.2.0] (2026-09-03)
 
 _Continues from the `engine-v0.1.0` tag (2026-07-04). The entries below (0.1.6 and earlier) predate the Lelu rename and the versioning restart that came with it — kept for history, but not a continuous sequence with this one._

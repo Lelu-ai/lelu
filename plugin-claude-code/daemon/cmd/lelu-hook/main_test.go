@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net"
 	"os"
@@ -177,5 +178,47 @@ func killDaemonListeningOn(t *testing.T, sockPath string) {
 		if pid, err := strconv.Atoi(f); err == nil {
 			_ = syscall.Kill(pid, syscall.SIGTERM)
 		}
+	}
+}
+
+// An explicit "allow" skips Claude Code's own permission prompt and auto-mode
+// classifier, so the hook must never emit one — not for an unmatched call,
+// not in shadow mode, and not when the daemon is unreachable.
+func TestDecisionFor_NeverEmitsAllow(t *testing.T) {
+	cases := map[string]lelu.Response{
+		"no rule matched": {Outcome: lelu.OutcomeAllow},
+		"shadow override": {Outcome: lelu.OutcomeAllow, Shadow: true, Reason: "[shadow mode] would have been deny: x"},
+	}
+	for name, resp := range cases {
+		out := decisionFor(resp)
+		if out.HookSpecificOutput.PermissionDecision != "" {
+			t.Errorf("%s: PermissionDecision = %q, want empty (defer to Claude Code)", name, out.HookSpecificOutput.PermissionDecision)
+		}
+		raw, _ := json.Marshal(out)
+		if strings.Contains(string(raw), "permissionDecision") {
+			t.Errorf("%s: output must not contain permissionDecision at all, got %s", name, raw)
+		}
+	}
+	if got := decisionFor(lelu.Response{Outcome: lelu.OutcomeAllow, Shadow: true, Reason: "r"}).HookSpecificOutput.AdditionalContext; got != "r" {
+		t.Errorf("shadow reason should still reach the model, got %q", got)
+	}
+}
+
+func TestDecisionFor_DenyAndAskStayExplicit(t *testing.T) {
+	if got := decisionFor(lelu.Response{Outcome: lelu.OutcomeDeny, Reason: "x"}).HookSpecificOutput.PermissionDecision; got != "deny" {
+		t.Errorf("deny: got %q", got)
+	}
+	if got := decisionFor(lelu.Response{Outcome: lelu.OutcomeAsk, Reason: "x"}).HookSpecificOutput.PermissionDecision; got != "ask" {
+		t.Errorf("ask: got %q", got)
+	}
+}
+
+func TestWarningOutput_FailOpenIsVisibleAndNotAnAllow(t *testing.T) {
+	out := warningOutput("Lelu daemon unreachable")
+	if out.HookSpecificOutput.PermissionDecision != "" {
+		t.Errorf("fail-open must not emit a permission decision, got %q", out.HookSpecificOutput.PermissionDecision)
+	}
+	if !strings.Contains(out.SystemMessage, "daemon unreachable") {
+		t.Errorf("fail-open warning must be shown to the user via systemMessage, got %q", out.SystemMessage)
 	}
 }

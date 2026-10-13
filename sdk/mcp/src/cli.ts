@@ -15,6 +15,7 @@
  *   --api-key     <key>   Lelu Engine API key  (or set LELU_API_KEY env var)
  *   --timeout     <ms>    Request timeout in ms  (default: 10000)
  *   --no-local            Never spawn a local engine; use http://localhost:8082
+ *   --preset      <name>  Starter policy preset: general | coding-agent (default: general)
  *
  * Environment variables:
  *   LELU_ENGINE_URL      Lelu Engine base URL (disables local mode)
@@ -23,6 +24,7 @@
  *   LELU_ENGINE_BINARY   Use a locally built engine binary (skips download)
  *   LELU_ENGINE_VERSION  Pin an engine release version (default: latest)
  *   LELU_POLICY_PATH     Policy file for the local engine (default ~/.lelu/policy.yaml)
+ *   LELU_POLICY_PRESET   Starter policy preset: general | coding-agent
  */
 
 import { runStdio, runHttp } from "./server.js";
@@ -67,6 +69,9 @@ Options:
   --transport  <mode>   Transport mode: stdio | http  (default: stdio)
   --port       <port>   HTTP port when --transport=http  (default: 3001)
   --no-local            Never spawn a local engine; expect one on localhost:8082
+  --preset     <name>   Starter policy preset: general | coding-agent  (default: general)
+                        coding-agent allows edit/test/build, sends installs, pushes
+                        and deploys to human review; written to ~/.lelu/policy.coding-agent.yaml
 
 Add command options:
   --cursor             Print Cursor MCP config snippet
@@ -82,6 +87,7 @@ Tools exposed to the AI agent:
   lelu_authorize         Authorize a human user action
   lelu_mint_token        Mint a short-lived scoped JWT
   lelu_revoke_token      Revoke a JIT token immediately
+  lelu_get_review        Read a human-review item's status by review_id
   lelu_health            Check Engine health
 
 Examples:
@@ -164,7 +170,9 @@ async function runAdd(flags: Record<string, string>): Promise<void> {
   if (target === "claude") {
     const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
     if (mode === "stdio") {
-      console.log("claude mcp add lelu -- npx -y lelu-mcp start --transport stdio");
+      // Claude Code is a coding agent: the coding-agent preset allows the
+      // edit/test loop and sends installs, pushes and deploys to a human.
+      console.log("claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent");
       return;
     }
     // The HTTP transport requires MCP_AUTH_TOKEN on the server side, so the
@@ -239,7 +247,7 @@ async function main() {
   // engine with the starter policy. Everything stays on this machine.
   if (!explicitUrl && flags["no-local"] !== "true") {
     try {
-      const local = await startLocalEngine();
+      const local = await startLocalEngine({ preset: flags["preset"] });
       engineUrl = local.url;
       // The launcher starts the engine with a generated per-install key —
       // use it unless the user supplied their own.

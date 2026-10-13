@@ -4,29 +4,141 @@
     {
       "name": "recursive-force-delete",
       "command": "rm",
-      "require_flags": ["r", "f"],
-      "long_flags": ["recursive", "force"],
+      "require_flags": [
+        "r",
+        "f"
+      ],
+      "long_flags": [
+        "recursive",
+        "force"
+      ],
       "severity": "deny_if_protected"
     },
     {
       "name": "force-push",
       "command": "git",
       "subcommand": "push",
-      "require_any_flag": ["f"],
-      "long_flags": ["force"],
+      "require_any_flag": [
+        "f"
+      ],
+      "long_flags": [
+        "force"
+      ],
+      "severity": "ask"
+    },
+    {
+      "name": "force-push-with-lease",
+      "command": "git",
+      "subcommand": "push",
+      "long_flags": [
+        "force-with-lease"
+      ],
       "severity": "ask"
     }
   ],
   "protected_paths": [
-    { "exact": "$HOME" },
-    { "exact": "/" },
-    { "contains": ".env" },
-    { "contains": ".git/" },
-    { "contains": ".ssh" },
-    { "contains": "id_rsa" },
-    { "contains": "id_ed25519" },
-    { "contains": ".aws/credentials" }
+    {
+      "exact": "$HOME"
+    },
+    {
+      "exact": "/"
+    },
+    {
+      "contains": ".env",
+      "except": [
+        ".env.example",
+        ".env.sample",
+        ".env.template",
+        ".env.dist"
+      ]
+    },
+    {
+      "contains": ".git/"
+    },
+    {
+      "suffix": "/.git"
+    },
+    {
+      "contains": ".ssh"
+    },
+    {
+      "contains": "id_rsa"
+    },
+    {
+      "contains": "id_ed25519"
+    },
+    {
+      "contains": ".aws/credentials"
+    }
   ],
+  "sensitive_paths": [
+    {
+      "contains": ".ssh/"
+    },
+    {
+      "suffix": "/.ssh"
+    },
+    {
+      "contains": "id_rsa"
+    },
+    {
+      "contains": "id_ed25519"
+    },
+    {
+      "contains": "id_ecdsa"
+    },
+    {
+      "contains": ".aws/credentials"
+    },
+    {
+      "contains": ".aws/config"
+    },
+    {
+      "contains": ".netrc"
+    },
+    {
+      "contains": ".git-credentials"
+    },
+    {
+      "contains": ".docker/config.json"
+    },
+    {
+      "contains": ".kube/config"
+    },
+    {
+      "contains": ".gnupg"
+    },
+    {
+      "contains": "/.env",
+      "except": [
+        ".env.example",
+        ".env.sample",
+        ".env.template",
+        ".env.dist"
+      ]
+    }
+  ],
+  "remote_script_pipe": {
+    "enabled": true,
+    "downloaders": [
+      "curl",
+      "wget",
+      "fetch"
+    ],
+    "interpreters": [
+      "sh",
+      "bash",
+      "zsh",
+      "dash",
+      "ksh",
+      "fish",
+      "python",
+      "python3",
+      "perl",
+      "ruby",
+      "node"
+    ]
+  },
   "loop_detection": {
     "enabled": true,
     "repeat_threshold": 5,

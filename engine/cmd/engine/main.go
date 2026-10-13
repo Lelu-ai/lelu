@@ -40,6 +40,17 @@ import (
 )
 
 func main() {
+	// --version / -v must answer without starting anything. Previously any
+	// argument was ignored, so `lelu-engine --version` silently started a
+	// second engine with an empty policy.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--version", "-version", "-v", "version":
+			fmt.Printf("lelu-engine %s\n", server.Version)
+			return
+		}
+	}
+
 	// ── Config from environment ──────────────────────────────────────────────
 	addr := envOr("LISTEN_ADDR", ":8080")
 	policyPath := envOr("POLICY_PATH", "/etc/lelu/auth.yaml")
@@ -226,18 +237,30 @@ func main() {
 	} else {
 		reviewQueue = queue.NewInMemory()
 	}
+	// Without Redis, keep the queue in the engine's local SQLite file so
+	// pending approvals and resolved reviews (with their notes) survive a
+	// restart. lelu-mcp restarts the engine with every MCP host session, so
+	// a purely in-memory queue lost reviews within minutes in the zero-config
+	// setup. This is durable for a single engine process, not shared across
+	// replicas — that still needs Redis.
+	queueLocal := false
+	if !queueDurable && db != nil {
+		if sq, err := queue.NewSQLite(db); err != nil {
+			log.Printf("warning: could not persist review queue to SQLite (%s): %v", dbPath, err)
+		} else {
+			reviewQueue = sq
+			queueLocal = true
+			log.Printf("human review queue ready (SQLite %s; single instance — set REDIS_ADDR to share across replicas)", dbPath)
+		}
+	}
 	// Gate on whether the queue actually ended up durable, not on whether the
 	// URL parsed. Parsing succeeds and connecting fails is the common case —
 	// a wrong host, a down Redis, an image that predates the URL format — and
 	// that was exactly the case the old redisOpts == nil condition could not
 	// see, so the one warning written to tell an operator their approvals are
 	// volatile stayed silent precisely when it mattered.
-	if !queueDurable {
-		if enforcementMode == server.EnforcementModeEnforce {
-			log.Printf("WARNING: human review queue is in-memory — pending approvals WILL be lost on restart. Set REDIS_ADDR to a reachable Redis for durable storage when LELU_MODE=enforce")
-		} else {
-			log.Printf("human review queue is in-memory (no reachable Redis) — pending approvals will be lost on restart")
-		}
+	if !queueDurable && !queueLocal {
+		log.Printf("WARNING: human review queue is in-memory — pending and resolved reviews WILL be lost on restart. Set REDIS_ADDR to a reachable Redis, or DATABASE_PATH with BEHAVIORAL_ANALYTICS_ENABLED=true, for durable storage")
 	}
 
 	// ── Tenant rate limiter (Phase 2) ────────────────────────────────────────

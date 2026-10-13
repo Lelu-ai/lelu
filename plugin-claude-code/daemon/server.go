@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -167,7 +166,10 @@ func (e *Engine) effectiveHome(req Request) string {
 // expansion involved — an exact "$HOME" rule wouldn't be meaningful here.
 func (ps *PolicySet) pathIsProtectedContains(path string) bool {
 	for _, rule := range ps.ProtectedPaths {
-		if rule.Contains != "" && strings.Contains(path, rule.Contains) {
+		if rule.Exact != "" {
+			continue
+		}
+		if rule.matches(path, "") {
 			return true
 		}
 	}

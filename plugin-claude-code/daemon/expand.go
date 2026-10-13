@@ -28,6 +28,7 @@ type CommandCall struct {
 	RawArgs        []string // pre-expansion source text, for display/audit
 	Dynamic        bool     // true if any arg contains unresolvable dynamic content
 	ResolvedPaths  []string // Args that look like filesystem paths, made absolute against cwd
+	RedirectPaths  []string // redirection targets (> >> <), made absolute against cwd
 }
 
 // Analysis is the result of expansion-aware analysis of a full command line,
@@ -55,12 +56,41 @@ func AnalyzeCommand(command string, cwd string, env map[string]string) Analysis 
 
 	cfg := buildExpandConfig(cwd, env)
 
+	// Redirections hang off the statement, not the call, so a statement's
+	// call is resolved here together with its redirect targets — otherwise
+	// `echo x >> ~/.aws/credentials` never shows the credentials path.
+	seen := map[*syntax.CallExpr]bool{}
 	syntax.Walk(file, func(node syntax.Node) bool {
-		call, ok := node.(*syntax.CallExpr)
-		if !ok || len(call.Args) == 0 {
-			return true
+		switch n := node.(type) {
+		case *syntax.Stmt:
+			call, ok := n.Cmd.(*syntax.CallExpr)
+			if !ok || len(call.Args) == 0 {
+				return true
+			}
+			cc := resolveCall(cfg, cwd, call)
+			for _, r := range n.Redirs {
+				if r.Word == nil {
+					continue
+				}
+				fields, err := expand.Fields(cfg, r.Word)
+				if err != nil {
+					cc.Dynamic = true
+					continue
+				}
+				for _, f := range fields {
+					if looksLikePath(f) {
+						cc.RedirectPaths = append(cc.RedirectPaths, absPath(cwd, f))
+					}
+				}
+			}
+			seen[call] = true
+			result.Calls = append(result.Calls, cc)
+		case *syntax.CallExpr:
+			if len(n.Args) > 0 && !seen[n] {
+				seen[n] = true
+				result.Calls = append(result.Calls, resolveCall(cfg, cwd, n))
+			}
 		}
-		result.Calls = append(result.Calls, resolveCall(cfg, cwd, call))
 		return true
 	})
 

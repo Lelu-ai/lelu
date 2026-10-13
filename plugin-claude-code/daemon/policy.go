@@ -19,6 +19,42 @@ type destructiveRule struct {
 type protectedPathRule struct {
 	Exact    string `json:"exact,omitempty"`
 	Contains string `json:"contains,omitempty"`
+	// Suffix matches the end of the path, e.g. "/.git" for the directory
+	// itself, which "contains: .git/" does not cover.
+	Suffix string `json:"suffix,omitempty"`
+	// Except lists substrings that exempt an otherwise-matching path, e.g.
+	// ".env.example" — a template that is usually committed on purpose.
+	Except []string `json:"except,omitempty"`
+}
+
+// matches reports whether path p hits this rule. home resolves "$HOME".
+func (r protectedPathRule) matches(p, home string) bool {
+	for _, ex := range r.Except {
+		if ex != "" && strings.Contains(p, ex) {
+			return false
+		}
+	}
+	if r.Exact != "" {
+		want := r.Exact
+		if want == "$HOME" {
+			want = home
+		}
+		if want != "" && p == want {
+			return true
+		}
+	}
+	if r.Contains != "" && strings.Contains(p, r.Contains) {
+		return true
+	}
+	return r.Suffix != "" && strings.HasSuffix(p, r.Suffix)
+}
+
+// remoteScriptRule flags a download piped straight into an interpreter
+// (`curl … | sh`): the code that runs is whatever the server sends.
+type remoteScriptRule struct {
+	Enabled      bool     `json:"enabled"`
+	Downloaders  []string `json:"downloaders"`
+	Interpreters []string `json:"interpreters"`
 }
 
 // PolicySet is the loaded Tier-1 deterministic rule set, plus the Tier-2
@@ -28,7 +64,12 @@ type PolicySet struct {
 	Version             string              `json:"version"`
 	DestructiveCommands []destructiveRule   `json:"destructive_commands"`
 	ProtectedPaths      []protectedPathRule `json:"protected_paths"`
-	LoopDetection       LoopConfig          `json:"loop_detection"`
+	// SensitivePaths are credential, key and env-file locations. Any Bash
+	// command naming one as an argument or redirect target — reading,
+	// copying, appending — is routed to human review.
+	SensitivePaths   []protectedPathRule `json:"sensitive_paths,omitempty"`
+	RemoteScriptPipe remoteScriptRule    `json:"remote_script_pipe"`
+	LoopDetection      LoopConfig          `json:"loop_detection"`
 	SessionBudget       SessionBudgetConfig `json:"session_budget"`
 }
 
@@ -76,15 +117,67 @@ func (ps *PolicySet) Evaluate(a Analysis, home string) Decision {
 		return Decision{Outcome: OutcomeAsk, Reason: "could not parse this command's shell syntax; routing to human review"}
 	}
 
-	for _, call := range a.Calls {
-		if d, matched := ps.evaluateCall(call, home); matched {
-			if d.Outcome != OutcomeAllow {
-				return d
-			}
+	// The strictest outcome across every call and check wins, so an "ask"
+	// earlier in a line can't mask a "deny" later in it.
+	best := Decision{Outcome: OutcomeAllow}
+	consider := func(d Decision) {
+		if severityRank(d.Outcome) > severityRank(best.Outcome) {
+			best = d
 		}
 	}
 
-	return Decision{Outcome: OutcomeAllow}
+	for _, call := range a.Calls {
+		if d, matched := ps.evaluateCall(call, home); matched {
+			consider(d)
+		}
+		if p, ok := ps.sensitivePathIn(call, home); ok {
+			consider(Decision{Outcome: OutcomeAsk, Rule: "sensitive-path",
+				Reason: "this command touches a credential, key or env file (" + p + ") — routed to human review"})
+		}
+	}
+	if ps.pipesRemoteScript(a) {
+		consider(Decision{Outcome: OutcomeAsk, Rule: "remote-script-pipe",
+			Reason: "this command pipes a download straight into an interpreter, so the code that runs is whatever the server sends — routed to human review"})
+	}
+
+	return best
+}
+
+func (ps *PolicySet) sensitivePathIn(call CommandCall, home string) (string, bool) {
+	for _, list := range [][]string{call.ResolvedPaths, call.RedirectPaths} {
+		for _, p := range list {
+			for _, rule := range ps.SensitivePaths {
+				if rule.matches(p, home) {
+					return p, true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+// pipesRemoteScript reports a downloader and an interpreter reading its
+// program from stdin (no script argument, or -s, or -c with unresolvable
+// content) in the same command line.
+func (ps *PolicySet) pipesRemoteScript(a Analysis) bool {
+	r := ps.RemoteScriptPipe
+	if !r.Enabled {
+		return false
+	}
+	downloader, stdinInterpreter := false, false
+	for _, call := range a.Calls {
+		name, args := effectiveCommand(call)
+		if containsString(r.Downloaders, name) {
+			downloader = true
+		}
+		if containsString(r.Interpreters, name) {
+			short, _, positional := splitArgs(args)
+			if len(positional) == 0 || short['s'] || (short['c'] && call.Dynamic) {
+				stdinInterpreter = true
+			}
+		}
+	}
+	return downloader && stdinInterpreter
 }
 
 func (ps *PolicySet) evaluateCall(call CommandCall, home string) (Decision, bool) {
@@ -156,7 +249,12 @@ func splitArgs(args []string) (shortFlags map[byte]bool, longFlags map[string]bo
 	for _, a := range args {
 		switch {
 		case strings.HasPrefix(a, "--"):
-			longFlags[strings.TrimPrefix(a, "--")] = true
+			// --force-with-lease=main is the flag "force-with-lease".
+			name := strings.TrimPrefix(a, "--")
+			if i := strings.IndexByte(name, '='); i >= 0 {
+				name = name[:i]
+			}
+			longFlags[name] = true
 		case strings.HasPrefix(a, "-") && len(a) > 1:
 			for i := 1; i < len(a); i++ {
 				shortFlags[a[i]] = true
@@ -214,16 +312,7 @@ func containsString(list []string, s string) bool {
 func (ps *PolicySet) anyPathProtected(paths []string, home string) bool {
 	for _, p := range paths {
 		for _, rule := range ps.ProtectedPaths {
-			if rule.Exact != "" {
-				want := rule.Exact
-				if want == "$HOME" {
-					want = home
-				}
-				if want != "" && p == want {
-					return true
-				}
-			}
-			if rule.Contains != "" && strings.Contains(p, rule.Contains) {
+			if rule.matches(p, home) {
 				return true
 			}
 		}

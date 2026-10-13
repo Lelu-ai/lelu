@@ -7,6 +7,7 @@ package queue
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -137,19 +138,87 @@ func (r *ReviewRequest) expiredIfStale() Status {
 
 // inMemoryStore is a thread-safe map-backed store used when Redis is not
 // available. It preserves full ReviewRequest lifecycle (pending → approved/denied).
+//
+// When db is set, every mutation is written through to SQLite and the map is
+// loaded from it at startup, so reviews survive an engine restart without
+// Redis. The map stays the read path; SQLite is the system of record.
 type inMemoryStore struct {
 	mu    sync.Mutex
 	items map[string]*ReviewRequest
+	db    *sql.DB
 }
 
 func newInMemoryStore() *inMemoryStore {
 	return &inMemoryStore{items: make(map[string]*ReviewRequest)}
 }
 
-func (s *inMemoryStore) set(req *ReviewRequest) {
+// sqliteSchema holds one row per review, the full ReviewRequest as JSON.
+const sqliteSchema = `CREATE TABLE IF NOT EXISTS review_queue (
+	id          TEXT PRIMARY KEY,
+	payload     TEXT NOT NULL,
+	enqueued_at TEXT NOT NULL
+)`
+
+// persist writes req through to SQLite. Called with s.mu held.
+func (s *inMemoryStore) persist(req *ReviewRequest) error {
+	if s.db == nil {
+		return nil
+	}
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("queue: marshal: %w", err)
+	}
+	_, err = s.db.Exec(`INSERT INTO review_queue (id, payload, enqueued_at) VALUES (?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
+		req.ID, string(payload), req.EnqueuedAt.Format(time.RFC3339Nano))
+	if err != nil {
+		return fmt.Errorf("queue: persist %q: %w", req.ID, err)
+	}
+	return nil
+}
+
+// load reads persisted reviews into the map, dropping resolved items past
+// ResolvedRetention so the table does not grow without bound.
+func (s *inMemoryStore) load() error {
+	rows, err := s.db.Query(`SELECT id, payload FROM review_queue`)
+	if err != nil {
+		return fmt.Errorf("queue: load: %w", err)
+	}
+	defer rows.Close()
+	var expired []string
+	for rows.Next() {
+		var id, payload string
+		if err := rows.Scan(&id, &payload); err != nil {
+			return fmt.Errorf("queue: load: %w", err)
+		}
+		var req ReviewRequest
+		if err := json.Unmarshal([]byte(payload), &req); err != nil {
+			expired = append(expired, id) // unreadable: cannot be served
+			continue
+		}
+		if req.ResolvedAt != nil && time.Since(*req.ResolvedAt) > ResolvedRetention {
+			expired = append(expired, id)
+			continue
+		}
+		s.items[req.ID] = &req
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("queue: load: %w", err)
+	}
+	for _, id := range expired {
+		_, _ = s.db.Exec(`DELETE FROM review_queue WHERE id = ?`, id)
+	}
+	return nil
+}
+
+func (s *inMemoryStore) set(req *ReviewRequest) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.persist(req); err != nil {
+		return err
+	}
 	s.items[req.ID] = req
-	s.mu.Unlock()
+	return nil
 }
 
 func (s *inMemoryStore) get(id string) (*ReviewRequest, bool) {
@@ -216,11 +285,17 @@ func (s *inMemoryStore) resolveIfPending(id string, status Status, resolvedBy, n
 		}
 		return nil, fmt.Errorf("%w: %q is %s", ErrAlreadyResolved, id, r.Status)
 	}
+	prev := *r
 	now := time.Now().UTC()
 	r.Status = status
 	r.ResolvedAt = &now
 	r.ResolvedBy = resolvedBy
 	r.ResolutionNote = note
+	if err := s.persist(r); err != nil {
+		// Not stored, so the resolution did not happen.
+		*r = prev
+		return nil, err
+	}
 	return r, nil
 }
 
@@ -237,6 +312,12 @@ func (s *inMemoryStore) markRedeemed(id string) error {
 	}
 	now := time.Now().UTC()
 	r.RedeemedAt = &now
+	if err := s.persist(r); err != nil {
+		// An unrecorded redemption could be replayed after a restart, so
+		// refuse it rather than allow an execution nothing remembers.
+		r.RedeemedAt = nil
+		return err
+	}
 	return nil
 }
 
@@ -267,6 +348,24 @@ func NewInMemory() *Queue {
 	return &Queue{inmem: newInMemoryStore()}
 }
 
+// NewSQLite returns a Queue that keeps items in memory and writes every change
+// through to the given SQLite database, loading existing items on start.
+// Pending and resolved reviews survive an engine restart without Redis.
+func NewSQLite(db *sql.DB) (*Queue, error) {
+	if db == nil {
+		return nil, errors.New("queue: nil database")
+	}
+	if _, err := db.Exec(sqliteSchema); err != nil {
+		return nil, fmt.Errorf("queue: create table: %w", err)
+	}
+	store := newInMemoryStore()
+	store.db = db
+	if err := store.load(); err != nil {
+		return nil, err
+	}
+	return &Queue{inmem: store}, nil
+}
+
 // ─── Enqueue ──────────────────────────────────────────────────────────────────
 
 // Enqueue adds a new ReviewRequest to the stream and writes the full payload.
@@ -289,7 +388,9 @@ func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, res
 	}
 
 	if q.rdb == nil {
-		q.inmem.set(&req)
+		if err := q.inmem.set(&req); err != nil {
+			return "", err
+		}
 		return id, nil
 	}
 

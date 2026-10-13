@@ -16,7 +16,9 @@
  *   LELU_HOME            data dir (default ~/.lelu)
  *   LELU_ENGINE_BINARY   path to a locally built engine (skips download)
  *   LELU_ENGINE_VERSION  pin a release version, e.g. "0.1.0" (default: latest)
- *   LELU_POLICY_PATH     policy file to load (default ~/.lelu/policy.yaml)
+ *   LELU_POLICY_PATH     policy file to load (default ~/.lelu/policy.yaml, or
+ *                        ~/.lelu/policy.<preset>.yaml for a non-general preset)
+ *   LELU_POLICY_PRESET   starter policy preset: general | coding-agent
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -54,59 +56,86 @@ async function ensureLocalApiKey(): Promise<string> {
   return key;
 }
 
-// Starter policy written to ~/.lelu/policy.yaml on first run. Uses top-level
-// pattern rules (actor-independent) so it works with any agent name, and ends
-// default-deny so unlisted actions are blocked rather than silently allowed.
-const DEFAULT_POLICY = `version: "1.0"
+// ─── Starter policies ─────────────────────────────────────────────────────────
+//
+// Written on first run. Uses top-level pattern rules (actor-independent) so
+// they work with any agent name, and end default-deny so unlisted actions are
+// blocked rather than silently allowed.
+//
+// Rules match the action *name* the caller chooses, first match wins, so the
+// order below is the security property: deny and review rules for
+// destructive, execution and secret-touching names come before any allow
+// prefix. Otherwise "read_secrets" is allowed by "read_*" and
+// "search_and_destroy" by "search_*", and synonyms ("rm_file", "run_sql")
+// only stay blocked by default-deny until someone adds an allow rule.
+
+export type PolicyPreset = "general" | "coding-agent";
+
+export const POLICY_PRESETS: readonly PolicyPreset[] = ["general", "coding-agent"];
+
+const POLICY_HEADER = (preset: PolicyPreset) => `version: "1.0"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Lelu starter policy — created by lelu-mcp on first run.
+# Lelu starter policy (preset: ${preset}) — created by lelu-mcp on first run.
 #
 # Edit this file, then restart lelu-mcp to apply changes.
-# Rules are evaluated top to bottom; the first match on the action wins.
+# Rules are evaluated top to bottom; the first match on the action wins, so
+# keep deny/review rules above allow rules. Matching is on the action name the
+# agent supplies — list the synonyms you care about.
 # Globs: "read_*" (prefix), "*_prod" (suffix), "*delete*" (contains), "*" (all)
 # Decisions: allow | deny | human_review | compute
+#
+# Omitting the confidence value never loosens a deny: an action this policy
+# denies stays denied. Other actions without confidence go to human review.
 # ─────────────────────────────────────────────────────────────────────────────
 
 rules:
-  # ── Destructive operations are always denied ──────────────────────────────
-  - id: deny-delete
-    match: "*delete*"
-    decision: deny
-    reason: "Destructive operations are blocked by the starter policy."
-  - id: deny-drop
-    match: "*drop*"
-    decision: deny
-    reason: "Destructive operations are blocked by the starter policy."
-  - id: deny-wipe
-    match: "*wipe*"
-    decision: deny
-    reason: "Destructive operations are blocked by the starter policy."
+`;
 
-  # ── Shell / code execution is denied by default ───────────────────────────
-  - id: deny-exec
-    match: "*exec*"
-    decision: deny
-    reason: "Code execution requires an explicit allow rule."
-  - id: deny-shell
-    match: "*shell*"
-    decision: deny
-    reason: "Shell access requires an explicit allow rule."
+function rule(id: string, match: string, decision: string, reason?: string): string {
+  return `  - id: ${id}
+    match: "${match}"
+    decision: ${decision}
+` + (reason ? `    reason: "${reason}"
+` : "");
+}
 
+const DESTRUCTIVE = "Destructive operations are blocked by the starter policy.";
+const DESTRUCTIVE_RULES =
+  `  # ── Destructive operations are always denied (synonyms included) ────────\n` +
+  [
+    ["deny-delete", "*delete*"], ["deny-drop", "*drop*"], ["deny-wipe", "*wipe*"],
+    ["deny-destroy", "*destroy*"], ["deny-truncate", "*truncate*"], ["deny-purge", "*purge*"],
+    ["deny-erase", "*erase*"], ["deny-remove", "remove_*"], ["deny-rm", "rm_*"],
+    ["deny-unlink", "unlink_*"],
+  ].map(([id, m]) => rule(id!, m!, "deny", DESTRUCTIVE)).join("");
+
+const EXEC = "Code execution requires an explicit allow rule.";
+const EXEC_RULES =
+  `\n  # ── Shell / code / SQL execution is denied by default ───────────────────\n` +
+  [
+    ["deny-exec", "*exec*"], ["deny-shell", "*shell*"], ["deny-bash", "bash*"],
+    ["deny-command", "*command*"], ["deny-eval", "eval*"], ["deny-sql", "*sql*"],
+  ].map(([id, m]) => rule(id!, m!, "deny", EXEC)).join("");
+
+const SECRETS = "Actions that touch secrets, credentials or env files need human sign-off.";
+const SECRET_RULES =
+  `\n  # ── Secrets: checked before the allow prefixes, so "read_secrets" and ───\n` +
+  `  #    "get_aws_credentials" are not allowed by "read_*" / "get_*" ──────────\n` +
+  [
+    ["review-secret", "*secret*"], ["review-credential", "*credential*"],
+    ["review-password", "*password*"], ["review-env-file", "*env_file*"],
+    ["review-dotenv", "*dotenv*"], ["review-private-key", "*private_key*"],
+    ["review-api-key", "*api_key*"], ["review-ssh-key", "*ssh_key*"],
+  ].map(([id, m]) => rule(id!, m!, "human_review", SECRETS)).join("");
+
+const OUTBOUND_RULES = `
   # ── Money and outbound communication need a human ─────────────────────────
-  - id: review-payments
-    match: "*payment*"
-    decision: human_review
-    reason: "Financial operations require human approval."
-  - id: review-transfers
-    match: "*transfer*"
-    decision: human_review
-    reason: "Financial operations require human approval."
-  - id: review-email
-    match: "send_*"
-    decision: human_review
-    reason: "Outbound communication requires human sign-off."
+` + rule("review-payments", "*payment*", "human_review", "Financial operations require human approval.")
+  + rule("review-transfers", "*transfer*", "human_review", "Financial operations require human approval.")
+  + rule("review-email", "send_*", "human_review", "Outbound communication requires human sign-off.");
 
+const COMPUTE_RULES = `
   # ── Risky writes are redirected to a sandbox instead of blocked ───────────
   - id: compute-prod-writes
     match: "write_*_prod"
@@ -116,33 +145,62 @@ rules:
       path: "/tmp/lelu-sandbox/{original}"
       sandboxed: true
     reason: "Production writes are redirected to a sandbox path."
-
-  # ── Read-only and low-risk operations are allowed ─────────────────────────
-  - id: allow-read
-    match: "read_*"
-    decision: allow
-  - id: allow-get
-    match: "get_*"
-    decision: allow
-  - id: allow-list
-    match: "list_*"
-    decision: allow
-  - id: allow-search
-    match: "search_*"
-    decision: allow
-  - id: allow-view
-    match: "view_*"
-    decision: allow
-  - id: allow-create
-    match: "create_*"
-    decision: allow
-
-  # ── Everything else: default deny ──────────────────────────────────────────
-  - id: default-deny
-    match: "*"
-    decision: deny
-    reason: "Default-deny: no rule allows this action. Add one to ~/.lelu/policy.yaml and restart."
 `;
+
+const READ_ALLOW_RULES = `
+  # ── Read-only and low-risk operations are allowed ─────────────────────────
+` + [
+  ["allow-read", "read_*"], ["allow-get", "get_*"], ["allow-list", "list_*"],
+  ["allow-search", "search_*"], ["allow-view", "view_*"], ["allow-create", "create_*"],
+].map(([id, m]) => rule(id!, m!, "allow")).join("");
+
+const DEFAULT_DENY = (file: string) => `
+  # ── Everything else: default deny ──────────────────────────────────────────
+` + rule("default-deny", "*", "deny", `Default-deny: no rule allows this action. Add one to ${file} and restart.`);
+
+// The coding-agent preset is for Claude Code and similar: the everyday loop
+// (edit, test, build, local git) is allowed, anything that leaves the
+// machine or changes dependencies goes to a human, and the destructive,
+// execution and secret rules above still apply first.
+const CODING_REVIEW_RULES = `
+  # ── Leaves the machine or changes dependencies: a human decides ───────────
+` + rule("deny-force", "*force*", "deny", "Force operations rewrite shared history and are blocked by the starter policy.")
+  + [
+    ["review-install", "*install*", "Package installs run third-party code; a human approves them."],
+    ["review-push", "*push*", "Pushing changes leaves this machine; a human approves it."],
+    ["review-merge", "*merge*", "Merges change shared branches; a human approves them."],
+    ["review-deploy", "*deploy*", "Deploys need human sign-off."],
+    ["review-publish", "*publish*", "Publishing needs human sign-off."],
+    ["review-release", "*release*", "Releases need human sign-off."],
+  ].map(([id, m, r]) => rule(id!, m!, "human_review", r)).join("");
+
+const CODING_ALLOW_RULES = `
+  # ── The everyday coding loop is allowed ───────────────────────────────────
+` + [
+  ["allow-edit", "edit_*"], ["allow-write", "write_*"], ["allow-run-tests", "run_*test*"],
+  ["allow-test", "test_*"], ["allow-tests-suffix", "*_test"], ["allow-tests-suffix2", "*_tests"],
+  ["allow-lint", "lint*"], ["allow-format", "format*"], ["allow-build", "build*"],
+  ["allow-run-build", "run_build*"], ["allow-typecheck", "typecheck*"],
+  ["allow-git-status", "git_status"], ["allow-git-diff", "git_diff"], ["allow-git-log", "git_log"],
+  ["allow-git-add", "git_add"], ["allow-git-commit", "git_commit"], ["allow-git-branch", "git_branch"],
+  ["allow-git-checkout", "git_checkout"],
+].map(([id, m]) => rule(id!, m!, "allow")).join("");
+
+/** Returns the starter policy YAML for a preset. `file` is named in the default-deny reason. */
+export function starterPolicy(preset: PolicyPreset, file: string): string {
+  const head = POLICY_HEADER(preset) + DESTRUCTIVE_RULES + EXEC_RULES + SECRET_RULES + OUTBOUND_RULES;
+  if (preset === "coding-agent") {
+    return head + CODING_REVIEW_RULES + COMPUTE_RULES + CODING_ALLOW_RULES + READ_ALLOW_RULES + DEFAULT_DENY(file);
+  }
+  return head + COMPUTE_RULES + READ_ALLOW_RULES + DEFAULT_DENY(file);
+}
+
+/** Resolves the preset from an explicit value or LELU_POLICY_PRESET (default: general). */
+export function resolvePreset(explicit?: string): PolicyPreset {
+  const raw = (explicit ?? process.env["LELU_POLICY_PRESET"] ?? "general").trim();
+  if ((POLICY_PRESETS as readonly string[]).includes(raw)) return raw as PolicyPreset;
+  throw new Error(`Unknown policy preset "${raw}". Use one of: ${POLICY_PRESETS.join(", ")}.`);
+}
 
 function leluHome(): string {
   return process.env["LELU_HOME"] ?? path.join(os.homedir(), ".lelu");
@@ -281,14 +339,25 @@ async function resolveBinary(): Promise<string> {
   return cached;
 }
 
-async function ensurePolicy(): Promise<string> {
-  const policyPath = process.env["LELU_POLICY_PATH"] ?? path.join(leluHome(), "policy.yaml");
+// Each preset gets its own default file, so switching presets never silently
+// keeps running the previous preset's rules.
+export function defaultPolicyPath(preset: PolicyPreset): string {
+  return path.join(leluHome(), preset === "general" ? "policy.yaml" : `policy.${preset}.yaml`);
+}
+
+async function ensurePolicy(preset: PolicyPreset): Promise<string> {
+  const policyPath = process.env["LELU_POLICY_PATH"] ?? defaultPolicyPath(preset);
   if (!fs.existsSync(policyPath)) {
     await fsp.mkdir(path.dirname(policyPath), { recursive: true });
-    await fsp.writeFile(policyPath, DEFAULT_POLICY, "utf8");
-    console.error(`[lelu-mcp] Starter policy written to ${policyPath} — edit it to change the rules`);
+    await fsp.writeFile(policyPath, starterPolicy(preset, displayPath(policyPath)), "utf8");
+    console.error(`[lelu-mcp] Starter policy (${preset}) written to ${policyPath} — edit it to change the rules`);
   }
   return policyPath;
+}
+
+function displayPath(p: string): string {
+  const home = os.homedir();
+  return p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p;
 }
 
 function freePort(): Promise<number> {
@@ -329,10 +398,11 @@ async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000)
  * Downloads (if needed) and starts a local Lelu engine, returning its URL.
  * The child is killed when the MCP process exits.
  */
-export async function startLocalEngine(): Promise<LocalEngine> {
+export async function startLocalEngine(opts: { preset?: string } = {}): Promise<LocalEngine> {
+  const preset = resolvePreset(opts.preset);
   const [bin, policyPath, apiKey] = await Promise.all([
     resolveBinary(),
-    ensurePolicy(),
+    ensurePolicy(preset),
     ensureLocalApiKey(),
   ]);
   const home = leluHome();

@@ -3,13 +3,17 @@
 // decision over a unix socket, and prints Claude Code's expected
 // hookSpecificOutput JSON to stdout.
 //
+// The hook only ever *adds* friction. It emits an explicit permissionDecision
+// for deny and ask, and nothing at all otherwise. An explicit "allow" is not
+// neutral in Claude Code: it skips the user's permission prompt and auto
+// mode's safety classifier, so emitting it for "no rule matched" (or in
+// shadow mode, or when the daemon is down) left a user with the plugin
+// installed less protected than without it.
+//
 // Failure mode, deliberately: if the daemon can't be reached or times out,
-// this fails OPEN (allow) rather than blocking every tool call in Claude Code
-// over an infra hiccup — but it says so loudly via additionalContext rather
-// than silently dropping protection. Claude Code's own permission system and
-// sandboxing remain the backstop underneath; Lelu is a supplement, not a
-// replacement, so failing open here does not leave the user unprotected in
-// the way it would for Lelu's own core engine.
+// this fails open to Claude Code's own permission flow rather than blocking
+// every tool call over an infra hiccup, and tells the user via systemMessage
+// (shown in the UI) as well as the model via additionalContext.
 package main
 
 import (
@@ -38,7 +42,7 @@ type hookInput struct {
 	Cwd            string `json:"cwd"`
 	TranscriptPath string `json:"transcript_path"`
 	ToolName       string `json:"tool_name"`
-	ToolInput struct {
+	ToolInput      struct {
 		Command   string `json:"command"`
 		FilePath  string `json:"file_path"`
 		NewString string `json:"new_string"`
@@ -48,13 +52,18 @@ type hookInput struct {
 }
 
 type hookSpecificOutput struct {
-	HookEventName            string `json:"hookEventName"`
-	PermissionDecision       string `json:"permissionDecision"`
+	HookEventName string `json:"hookEventName"`
+	// PermissionDecision is only ever "deny" or "ask". Empty means "no
+	// opinion", which leaves Claude Code's normal permission flow in charge.
+	PermissionDecision       string `json:"permissionDecision,omitempty"`
 	PermissionDecisionReason string `json:"permissionDecisionReason,omitempty"`
 	AdditionalContext        string `json:"additionalContext,omitempty"`
 }
 
 type hookOutput struct {
+	// SystemMessage is shown to the user, unlike additionalContext which only
+	// reaches the model.
+	SystemMessage      string             `json:"systemMessage,omitempty"`
 	HookSpecificOutput hookSpecificOutput `json:"hookSpecificOutput"`
 }
 
@@ -117,8 +126,10 @@ func decisionFor(resp daemon.Response) hookOutput {
 	case daemon.OutcomeAsk:
 		out.PermissionDecision = "ask"
 		out.PermissionDecisionReason = resp.Reason
-	default: // allow, including shadow-mode overrides
-		out.PermissionDecision = "allow"
+	default:
+		// No rule fired (or shadow mode reported what it would have done).
+		// Leave PermissionDecision empty so Claude Code's own prompt,
+		// permission rules and auto-mode classifier still apply.
 		if resp.Shadow && resp.Reason != "" {
 			out.AdditionalContext = resp.Reason
 		}
@@ -127,12 +138,21 @@ func decisionFor(resp daemon.Response) hookOutput {
 	return hookOutput{HookSpecificOutput: out}
 }
 
+// allowWithWarning reports a hook failure without taking a permission
+// decision: Lelu could not check the action, so Claude Code's own permission
+// flow decides, and the user is told.
 func allowWithWarning(msg string) {
-	print_(hookOutput{HookSpecificOutput: hookSpecificOutput{
-		HookEventName:      "PreToolUse",
-		PermissionDecision: "allow",
-		AdditionalContext:  "⚠️ " + msg,
-	}})
+	print_(warningOutput(msg))
+}
+
+func warningOutput(msg string) hookOutput {
+	return hookOutput{
+		SystemMessage: "⚠️ Lelu: " + msg,
+		HookSpecificOutput: hookSpecificOutput{
+			HookEventName:     "PreToolUse",
+			AdditionalContext: "⚠️ " + msg,
+		},
+	}
 }
 
 func print_(out hookOutput) {

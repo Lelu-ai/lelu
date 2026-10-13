@@ -30,7 +30,7 @@ Also:
 
 ## Shadow mode by default
 
-Nothing is blocked on install. Every decision is still logged to the configured data directory's `ledger.jsonl` regardless of mode. Run `/lelu:lelu-status` inside Claude Code to see what it would have done, and `/lelu:lelu-enforce` when you're ready to turn on real blocking. `/lelu:lelu-shadow` reverts anytime.
+Nothing is blocked by Lelu on install, and Claude Code's own permission prompts, permission rules and auto-mode classifier keep working exactly as before: the hook only ever adds `deny` or `ask`, and never answers `allow` (an explicit `allow` would skip Claude Code's prompt). Every decision is still logged to the configured data directory's `ledger.jsonl` regardless of mode. Run `/lelu:lelu-status` inside Claude Code to see what it would have done, and `/lelu:lelu-enforce` when you're ready to turn on real blocking. `/lelu:lelu-shadow` reverts anytime.
 
 ## Commands
 
@@ -43,6 +43,6 @@ Nothing is blocked on install. Every decision is still logged to the configured 
 
 ## How it's built
 
-A Go daemon (`daemon/`) behind a local unix socket — no CGO, no database server, an append-only JSONL ledger instead. `hooks/lelu-hook` is the thin adapter Claude Code actually invokes on every tool call; it fails open rather than ever blocking Claude Code over its own infra hiccups, says so loudly when it does, and tries to self-start the daemon first if it's down.
+A Go daemon (`daemon/`) behind a local unix socket — no CGO, no database server, an append-only JSONL ledger instead. `hooks/lelu-hook` is the thin adapter Claude Code actually invokes on every tool call; if the daemon is down it takes no decision — Claude Code's normal permission flow handles the call — shows you a warning (`systemMessage`) and tells the model too, and tries to self-start the daemon first. `install.sh` verifies downloaded binaries against the release's `SHA256SUMS.txt` and only reports success once the daemon's socket is up.
 
 MIT, same license as the rest of this repo.

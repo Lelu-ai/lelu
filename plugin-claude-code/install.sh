@@ -132,7 +132,7 @@ fi
 mkdir -p "$DATA_DIR"
 if [ ! -f "$DATA_DIR/mode" ]; then
   echo "shadow" > "$DATA_DIR/mode"
-  echo "==> First install: starting in shadow mode (nothing is blocked yet). Run /lelu:lelu-enforce inside Claude Code when you're ready."
+  echo "==> First install: starting in shadow mode (Lelu blocks nothing yet; Claude Code's own permission prompts still apply). Run /lelu:lelu-enforce inside Claude Code when you're ready."
 fi
 
 PID_FILE="$DATA_DIR/daemon.pid"

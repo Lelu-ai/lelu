@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findChecksum, sha256Hex } from "./local-engine.js";
+import { findChecksum, sha256Hex, starterPolicy, resolvePreset, POLICY_PRESETS } from "./local-engine.js";
 
 describe("sha256Hex", () => {
   it("matches a known SHA-256 digest", () => {
@@ -55,5 +55,55 @@ describe("findChecksum", () => {
     expect(findChecksum(withBlanks, "lelu-engine-linux-arm64")).toBe(
       "b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c"
     );
+  });
+});
+
+describe("starterPolicy", () => {
+  // First match wins, so ordering is the security property: every deny and
+  // review rule for risky names must come before the first allow prefix.
+  const ruleIds = (yaml: string) => [...yaml.matchAll(/- id: (\S+)/g)].map((m) => m[1]!);
+
+  for (const preset of POLICY_PRESETS) {
+    it(`${preset}: secret, destructive and exec rules precede every allow rule`, () => {
+      const ids = ruleIds(starterPolicy(preset, "~/.lelu/policy.yaml"));
+      const firstAllow = ids.findIndex((id) => id.startsWith("allow-"));
+      expect(firstAllow).toBeGreaterThan(0);
+      for (const id of ["review-secret", "review-credential", "review-env-file", "deny-destroy", "deny-rm", "deny-remove", "deny-sql", "deny-command"]) {
+        const idx = ids.indexOf(id);
+        expect(idx, id).toBeGreaterThanOrEqual(0);
+        expect(idx, id).toBeLessThan(firstAllow);
+      }
+      expect(ids.at(-1)).toBe("default-deny");
+    });
+  }
+
+  it("coding-agent allows the edit/test loop and reviews installs and pushes", () => {
+    const ids = ruleIds(starterPolicy("coding-agent", "x"));
+    expect(ids).toEqual(expect.arrayContaining(["allow-edit", "allow-run-tests", "review-install", "review-push", "review-deploy"]));
+    expect(ids.indexOf("review-push")).toBeLessThan(ids.indexOf("allow-edit"));
+  });
+
+  it("general does not allow edits or tests", () => {
+    const ids = ruleIds(starterPolicy("general", "x"));
+    expect(ids).not.toContain("allow-edit");
+    expect(ids).not.toContain("allow-run-tests");
+  });
+
+  it("names the policy file in the default-deny reason", () => {
+    expect(starterPolicy("general", "/custom/p.yaml")).toContain("Add one to /custom/p.yaml and restart.");
+  });
+});
+
+describe("resolvePreset", () => {
+  it("defaults to general and rejects unknown presets", () => {
+    const prev = process.env["LELU_POLICY_PRESET"];
+    delete process.env["LELU_POLICY_PRESET"];
+    try {
+      expect(resolvePreset()).toBe("general");
+      expect(resolvePreset("coding-agent")).toBe("coding-agent");
+      expect(() => resolvePreset("nope")).toThrow(/Unknown policy preset/);
+    } finally {
+      if (prev !== undefined) process.env["LELU_POLICY_PRESET"] = prev;
+    }
   });
 });

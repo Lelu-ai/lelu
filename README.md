@@ -82,10 +82,10 @@ npx -y lelu-mcp start
 Give **Claude Code** guardrails right now:
 
 ```bash
-claude mcp add lelu -- npx -y lelu-mcp start --transport stdio
+claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent
 ```
 
-Your agent gets a `lelu_agent_authorize` tool: destructive actions denied, payments and outbound email routed to human review, production writes redirected to a sandbox, everything else default-denied. Rules live in `~/.lelu/policy.yaml`. Cursor / Claude Desktop setup and full docs → [sdk/mcp](sdk/mcp)
+Your agent gets a `lelu_agent_authorize` tool using the **coding-agent** preset: editing files, running tests and local git are allowed; package installs, pushes, deploys and anything touching secrets or env files go to human review; destructive actions are denied; everything else is default-denied. Rules live in `~/.lelu/policy.coding-agent.yaml` (omit `--preset` for the general starter policy in `~/.lelu/policy.yaml`). Cursor / Claude Desktop setup and full docs → [sdk/mcp](sdk/mcp)
 
 ### Claude Code plugin — no tool-calling required
 

@@ -49,6 +49,58 @@ async function call<T>(
   }
 }
 
+// ─── Agent decision formatting ────────────────────────────────────────────────
+
+/** Subset of the engine's /v1/agent/authorize response that the tool surfaces. */
+export interface EngineAgentDecision {
+  allowed: boolean;
+  reason: string;
+  trace_id: string;
+  requires_human_review: boolean;
+  confidence_used: number;
+  provider_signal_present?: boolean;
+  downgraded_scope?: string;
+  review_id?: string;
+  compute?: boolean;
+  safe_tool?: string;
+  safe_args?: Record<string, unknown>;
+}
+
+export type AgentDecisionStatus = "ALLOWED" | "DENIED" | "REQUIRES_HUMAN_REVIEW" | "COMPUTE";
+
+export function agentDecisionStatus(d: EngineAgentDecision): AgentDecisionStatus {
+  if (d.requires_human_review) return "REQUIRES_HUMAN_REVIEW";
+  // Checked before `allowed`: the engine reports a compute redirect as
+  // allowed=true, and an agent that only reads the status must not run the
+  // original action when policy asked for the safe alternative.
+  if (d.compute) return "COMPUTE";
+  return d.allowed ? "ALLOWED" : "DENIED";
+}
+
+/** Shapes the engine response for the agent, keeping every field it can act on. */
+export function formatAgentDecision(d: EngineAgentDecision): Record<string, unknown> {
+  return {
+    status:                agentDecisionStatus(d),
+    allowed:               d.allowed,
+    requires_human_review: d.requires_human_review,
+    reason:                d.reason,
+    // Handle for lelu_get_review. trace_id identifies the audit record only.
+    ...(d.review_id ? { review_id: d.review_id } : {}),
+    ...(d.compute
+      ? { compute: true, safe_tool: d.safe_tool, safe_args: d.safe_args ?? {} }
+      : {}),
+    trace_id:              d.trace_id,
+    confidence_used:       d.confidence_used,
+    // false whenever this decision relied on a self-reported confidence
+    // number (or none at all) rather than a submitted provider signal — see
+    // the `confidence` param description. Not a claim the signal was
+    // confirmed against the provider itself, only that one was submitted and
+    // well-formed.
+    provider_signal_present: d.provider_signal_present ?? false,
+    ...(d.downgraded_scope ? { downgraded_scope: d.downgraded_scope } : {}),
+  };
+}
+
 // ─── Server factory ───────────────────────────────────────────────────────────
 
 export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
@@ -78,7 +130,9 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
     "Ask the Lelu Engine whether an AI agent is allowed to perform an action. " +
     "Lelu evaluates the action against your policy using behavioral signals. " +
     "In production, confidence comes from a submitted provider signal (logprobs/entropy), never agent self-reports. " +
-    "Returns allowed/denied/requires_human_review along with a request ID for HITL polling.",
+    "Returns status ALLOWED | DENIED | REQUIRES_HUMAN_REVIEW | COMPUTE. On REQUIRES_HUMAN_REVIEW the result " +
+    "carries review_id, which lelu_get_review accepts. On COMPUTE, do not run the original action: run safe_tool " +
+    "with safe_args instead (a sandboxed alternative chosen by policy).",
     {
       actor:     z.string().describe("The agent or bot performing the action, e.g. 'invoice_bot'"),
       action:    z.string().describe("The action being requested, e.g. 'delete_records'"),
@@ -93,15 +147,7 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
       ),
     },
     async ({ actor, action, resource, actingFor, scope, confidence }) => {
-      const data = await post<{
-        allowed: boolean;
-        reason: string;
-        trace_id: string;
-        requires_human_review: boolean;
-        confidence_used: number;
-        provider_signal_present: boolean;
-        downgraded_scope?: string;
-      }>("/v1/agent/authorize", {
+      const data = await post<EngineAgentDecision>("/v1/agent/authorize", {
         actor,
         action,
         // Engine expects resource as a string map, not a bare string.
@@ -111,11 +157,37 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
         ...(confidence !== undefined ? { confidence } : {}),
       });
 
-      const status = data.requires_human_review
-        ? "REQUIRES_HUMAN_REVIEW"
-        : data.allowed
-        ? "ALLOWED"
-        : "DENIED";
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify(formatAgentDecision(data), null, 2) },
+        ],
+      };
+    }
+  );
+
+  // ── Tool: get_review ───────────────────────────────────────────────────────
+  // Read-only on purpose: an agent may check whether a human has decided, but
+  // must never be able to resolve its own review from the same MCP session.
+  server.tool(
+    "lelu_get_review",
+    "Look up a human-review item by the review_id returned from lelu_agent_authorize. " +
+    "Returns its status (pending | approved | denied | expired) and, once resolved, who resolved it and their note. " +
+    "Read-only: reviews are resolved by a human, not by the agent.",
+    {
+      reviewId: z.string().describe("The review_id returned by lelu_agent_authorize"),
+    },
+    async ({ reviewId }) => {
+      const item = await get<{
+        id: string;
+        actor: string;
+        action: string;
+        status: string;
+        reason?: string;
+        enqueued_at?: string;
+        resolved_at?: string;
+        resolved_by?: string;
+        resolution_note?: string;
+      }>(`/v1/queue/${encodeURIComponent(reviewId)}`);
 
       return {
         content: [
@@ -123,19 +195,15 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
             type: "text" as const,
             text: JSON.stringify(
               {
-                status,
-                allowed:              data.allowed,
-                requires_human_review: data.requires_human_review,
-                reason:               data.reason,
-                trace_id:             data.trace_id,
-                confidence_used:      data.confidence_used,
-                // false whenever this decision relied on a self-reported
-                // confidence number (or none at all) rather than a submitted
-                // provider signal — see the `confidence` param description.
-                // Not a claim the signal was confirmed against the provider
-                // itself, only that one was submitted and well-formed.
-                provider_signal_present: data.provider_signal_present,
-                ...(data.downgraded_scope ? { downgraded_scope: data.downgraded_scope } : {}),
+                review_id:       item.id,
+                status:          item.status,
+                actor:           item.actor,
+                action:          item.action,
+                reason:          item.reason,
+                enqueued_at:     item.enqueued_at,
+                ...(item.resolved_at     ? { resolved_at: item.resolved_at } : {}),
+                ...(item.resolved_by     ? { resolved_by: item.resolved_by } : {}),
+                ...(item.resolution_note ? { resolution_note: item.resolution_note } : {}),
               },
               null,
               2

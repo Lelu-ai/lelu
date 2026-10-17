@@ -43,7 +43,6 @@ lelu/
 │   ├── auth.rego                   Example OPA/Rego policy
 │   └── skills/                     Skill-specific Rego policies
 ├── helm/prism/                     Kubernetes Helm chart
-├── tests/integration/              Integration tests (shadow detection)
 └── docs/                           This directory
 ```
 

@@ -81,6 +81,20 @@ func serve(listener net.Listener, engine *daemon.Engine) {
 func handleConn(conn net.Conn, engine *daemon.Engine) {
 	defer conn.Close()
 
+	// A panic in one request must not take the daemon down: the hook reads a
+	// dead daemon as "unreachable" and lets the call through unchecked, and the
+	// next call too if the respawn isn't up yet. Answer "ask" instead.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("lelu-daemon: recovered panic while handling request: %v", r)
+			resp := daemon.Response{Outcome: daemon.OutcomeAsk, Reason: "internal error while checking this action; routing to human review"}
+			if engine.ShadowMode != nil && engine.ShadowMode() {
+				resp = daemon.Response{Outcome: daemon.OutcomeAllow, Shadow: true, Reason: "[shadow mode] would have been ask: " + resp.Reason}
+			}
+			writeResponse(conn, resp)
+		}
+	}()
+
 	scanner := bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	if !scanner.Scan() {

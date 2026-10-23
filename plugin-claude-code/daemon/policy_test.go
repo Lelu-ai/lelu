@@ -96,3 +96,29 @@ func TestEvaluate_BenignCommandAllowed(t *testing.T) {
 		t.Errorf("outcome = %q, want allow; decision=%+v", d.Outcome, d)
 	}
 }
+
+func TestEvaluate_ProcessSubstitution(t *testing.T) {
+	ps := loadTestPolicy(t)
+	cases := []struct {
+		name string
+		cmd  string
+		want Outcome
+	}{
+		// Nothing destructive for the unresolved part to hide in: stays allowed,
+		// same as `echo $(date)`.
+		{"benign diff", "diff <(sort a.txt) <(sort b.txt)", OutcomeAllow},
+		// Destructive command with an unresolvable target: human review.
+		{"rm of substituted path", "rm -rf <(echo ~/)", OutcomeAsk},
+		// A destructive command inside the substitution is still caught.
+		{"home wipe inside substitution", "cat <(rm -rf ~/)", OutcomeDeny},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := AnalyzeCommand(tc.cmd, "/home/testuser/project", testEnv("/home/testuser"))
+			d := ps.Evaluate(a, "/home/testuser")
+			if d.Outcome != tc.want {
+				t.Errorf("cmd %q: outcome = %q, want %q; decision=%+v", tc.cmd, d.Outcome, tc.want, d)
+			}
+		})
+	}
+}

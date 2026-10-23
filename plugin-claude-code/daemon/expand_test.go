@@ -150,3 +150,36 @@ func TestAnalyzeCommand_UnparseableSyntaxMarked(t *testing.T) {
 		t.Errorf("expected ParseErr for malformed shell syntax")
 	}
 }
+
+// TestAnalyzeCommand_ProcessSubstitutionIsDynamicNotPanic: expand calls
+// Config.ProcSubst without a nil check, so before a handler was set this
+// panicked and took the whole daemon down. It must be refused like $(...) —
+// classified Dynamic, never executed.
+func TestAnalyzeCommand_ProcessSubstitutionIsDynamicNotPanic(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "PWNED")
+	cmd := `diff <(touch ` + marker + `) <(ls)`
+
+	a := AnalyzeCommand(cmd, dir, testEnv("/home/testuser"))
+
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatalf("SAFETY VIOLATION: process substitution was executed, marker file created at %s", marker)
+	}
+	if a.ParseErr {
+		t.Fatalf("process substitution should be analyzed, not treated as a parse failure")
+	}
+	if !a.Dynamic {
+		t.Errorf("expected command with <(...) to be classified Dynamic, got Dynamic=false")
+	}
+}
+
+func TestAnalyzeCommand_ProcessSubstitutionInnerCommandsStillAnalyzed(t *testing.T) {
+	a := AnalyzeCommand("cat <(rm -rf ~/)", "/home/testuser", testEnv("/home/testuser"))
+	var names []string
+	for _, c := range a.Calls {
+		names = append(names, c.Name)
+	}
+	if !slices.Contains(names, "rm") {
+		t.Errorf("calls = %v, want the rm inside <(...) to be analyzed too", names)
+	}
+}

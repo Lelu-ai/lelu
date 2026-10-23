@@ -44,8 +44,18 @@ type Analysis struct {
 // parameter (environment variable) expansion, and filesystem globs against
 // env and cwd, WITHOUT executing anything — including command substitutions,
 // which are refused and marked Dynamic rather than run.
-func AnalyzeCommand(command string, cwd string, env map[string]string) Analysis {
-	result := Analysis{Raw: command}
+func AnalyzeCommand(command string, cwd string, env map[string]string) (result Analysis) {
+	result = Analysis{Raw: command}
+
+	// The shell library panics on constructs it doesn't expect a caller to
+	// leave unhandled. A command we can't analyze is a command we can't vouch
+	// for, so treat a panic like a parse failure: Evaluate fails it closed to
+	// "ask" instead of the daemon crashing and the hook letting it through.
+	defer func() {
+		if r := recover(); r != nil {
+			result = Analysis{Raw: command, ParseErr: true}
+		}
+	}()
 
 	parser := syntax.NewParser(syntax.Variant(syntax.LangBash))
 	file, err := parser.Parse(strings.NewReader(command), "")
@@ -126,6 +136,11 @@ func buildExpandConfig(cwd string, env map[string]string) *expand.Config {
 		},
 		CmdSubst: func(w io.Writer, cs *syntax.CmdSubst) error {
 			return errDynamicContent
+		},
+		// expand calls ProcSubst without a nil check, so leaving it unset made
+		// `diff <(a) <(b)` panic and take the whole daemon down with it.
+		ProcSubst: func(ps *syntax.ProcSubst) (string, error) {
+			return "", errDynamicContent
 		},
 	}
 }

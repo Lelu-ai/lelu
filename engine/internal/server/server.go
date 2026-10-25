@@ -1044,8 +1044,10 @@ func (h *Handler) checkPromptInjection(w http.ResponseWriter, r *http.Request, r
 // recordAsyncAnalytics fires the post-decision observability work that must not
 // block the response: external confidence auditing and Phase-2 behavioral
 // analytics (reputation, baseline, anomaly, drift). Each runs in its own
-// goroutine and only when its dependencies are configured.
-func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, confidenceScore float64, allowed, requiresReview bool, outcome string, totalLatency float64) {
+// goroutine and only when its dependencies are configured. Reputation is only
+// recorded for a verified actor; see the reliability lookup in
+// evaluateAgentDecision.
+func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, actorVerified bool, confidenceScore float64, allowed, requiresReview bool, outcome string, totalLatency float64) {
 	// ── External confidence audit (async — does not block response) ──────────
 	if h.extAuditor != nil {
 		auditActor := req.Actor
@@ -1081,9 +1083,11 @@ func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, confidenceScor
 			ctx := context.Background()
 
 			// 1. Record decision for reputation tracking
-			wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
-			if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
-				log.Printf("Failed to record decision for reputation: %v", err)
+			if actorVerified {
+				wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
+				if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
+					log.Printf("Failed to record decision for reputation: %v", err)
+				}
 			}
 
 			// 2. Update behavioral baseline
@@ -1103,9 +1107,11 @@ func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, confidenceScor
 			}
 
 			// 5. Check reputation-based alerts
-			if reputation, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil {
-				if err := h.alertMgr.CheckReputationAlert(ctx, req.Actor, reputation); err != nil {
-					log.Printf("Failed to check reputation alert: %v", err)
+			if actorVerified {
+				if reputation, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil {
+					if err := h.alertMgr.CheckReputationAlert(ctx, req.Actor, reputation); err != nil {
+						log.Printf("Failed to check reputation alert: %v", err)
+					}
 				}
 			}
 
@@ -1122,7 +1128,13 @@ func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, confidenceScor
 // agentDecisionResult carries the outcome of evaluateAgentDecision back to the
 // handler: the response to write plus the values the async analytics needs.
 type agentDecisionResult struct {
-	resp            agentAuthorizeResponse
+	resp agentAuthorizeResponse
+	// actor is the identity the decision was made for: the verified agent ID
+	// when a workload token was presented, otherwise the self-reported name.
+	// The handler's own request still carries the self-reported name, so the
+	// async analytics must take the actor from here.
+	actor           string
+	actorVerified   bool
 	confidenceScore float64
 	allowed         bool
 	requiresReview  bool
@@ -1248,20 +1260,28 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 
 	// 3. Risk model with timing
 	riskStart := time.Now()
-	// actorStat is the always-on, in-memory fallback: correct with zero setup,
-	// but reliability resets to the new-actor default on every restart and
-	// isn't shared across replicas. When persistence is configured (db != nil,
-	// see New()), prefer the SQLite-backed reputation history instead — it
-	// survives restarts on this host. Still fall back to actorStat for actors
-	// reputationMgr hasn't seen yet (DecisionCount == 0) so a brand-new actor
-	// keeps the same "trusted until proven otherwise" default either way;
-	// reputationMgr's own zero-history default (0.5) is calibrated for its
-	// separate calibration-score use, not for this risk formula's reliability
-	// term, so it must not leak in here.
-	reliability := h.actorStat.reliability(req.Actor)
-	if h.reputationMgr != nil {
-		if rep, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil && rep.DecisionCount > 0 {
-			reliability = rep.AccuracyRate
+	// Per-actor reputation only applies to a verified identity. An unverified
+	// actor is a name the caller chose, so keying reputation on it let a
+	// caller reset a bad score by renaming (#18). Unverified requests get the
+	// configured default and are not recorded below.
+	//
+	// For verified actors, actorStat is the always-on, in-memory fallback:
+	// correct with zero setup, but reliability resets to the new-actor default
+	// on every restart and isn't shared across replicas. When persistence is
+	// configured (db != nil, see New()), prefer the SQLite-backed reputation
+	// history instead — it survives restarts on this host. Still fall back to
+	// actorStat for actors reputationMgr hasn't seen yet (DecisionCount == 0)
+	// so a brand-new actor keeps the same "trusted until proven otherwise"
+	// default either way; reputationMgr's own zero-history default (0.5) is
+	// calibrated for its separate calibration-score use, not for this risk
+	// formula's reliability term, so it must not leak in here.
+	reliability := h.riskModel.cfg.UnverifiedActorReliability
+	if actorVerified {
+		reliability = h.actorStat.reliability(req.Actor)
+		if h.reputationMgr != nil {
+			if rep, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil && rep.DecisionCount > 0 {
+				reliability = rep.AccuracyRate
+			}
 		}
 	}
 	anomalyCount := h.anomaly.currentCount(req.Actor)
@@ -1320,7 +1340,9 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 		// defaults are already deny.
 	}
 
-	h.actorStat.record(req.Actor, finalOutcome)
+	if actorVerified {
+		h.actorStat.record(req.Actor, finalOutcome)
+	}
 
 	// Record enhanced metrics and latency
 	totalLatency := ms(start)
@@ -1465,6 +1487,8 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 
 	return agentDecisionResult{
 		resp:            resp,
+		actor:           req.Actor,
+		actorVerified:   actorVerified,
 		confidenceScore: confidenceScore,
 		allowed:         allowed,
 		requiresReview:  requiresReview,
@@ -1547,7 +1571,10 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.recordAsyncAnalytics(req, res.confidenceScore, res.allowed, res.requiresReview, res.outcome, res.totalLatency)
+	// Analytics must be keyed on the identity the decision was made for, not
+	// the name in the request body.
+	req.Actor = res.actor
+	h.recordAsyncAnalytics(req, res.actorVerified, res.confidenceScore, res.allowed, res.requiresReview, res.outcome, res.totalLatency)
 
 	writeJSON(w, http.StatusOK, h.applyShadowMode(res.resp))
 }

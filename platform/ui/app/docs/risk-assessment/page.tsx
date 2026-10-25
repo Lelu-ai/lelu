@@ -180,7 +180,12 @@ export default function DocsRiskAssessment() {
             <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
               <li>
                 <strong className="text-zinc-900 dark:text-white">reliability</strong> — tracked
-                per actor. With no database configured, it lives in memory only: it resets to the
+                per verified agent. Only requests that present a workload token (
+                <code>X-Lelu-Agent-Token</code>) read or build reputation, keyed on the agent ID the
+                token proves. Requests without one carry a self-reported <code>actor</code> name, so
+                they get a fixed default instead, set by <code>RISK_UNVERIFIED_ACTOR_RELIABILITY</code>{' '}
+                (1.0 by default; 0.5 for stricter deployments), and renaming an actor does not change
+                it. For verified agents with no database configured, it lives in memory only: it resets to the
                 new-actor default (fully trusted) on every engine restart, and isn&apos;t shared
                 across replicas if you run more than one. When a database is configured, the engine
                 also persists actor decision history to SQLite and uses that instead once an actor
@@ -414,7 +419,10 @@ RISK_CRITICALITY_MID_MIN=0.50
 # Least restrictive outcome at or above RISK_CRITICALITY_HIGH_MIN:
 # review (default) | read_only | off — under review, the HIGH allow and
 # read_only thresholds above cannot change a verdict
-RISK_HIGH_CRITICALITY_FLOOR=review`}</code>
+RISK_HIGH_CRITICALITY_FLOOR=review
+
+# Reliability for requests without a verified workload identity (0-1)
+RISK_UNVERIFIED_ACTOR_RELIABILITY=1.0`}</code>
               </pre>
             </div>
           </div>

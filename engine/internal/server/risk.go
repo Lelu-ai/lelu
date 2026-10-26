@@ -109,6 +109,15 @@ type RiskConfig struct {
 	// say so at startup instead of silently ignoring them. See
 	// https://github.com/Lelu-ai/lelu/issues/54.
 	HighCriticalityFloor decisionOutcome
+
+	// UnverifiedActorReliability is the reliability every request without a
+	// verified workload identity receives. An unverified actor is a
+	// self-asserted name, so it neither reads nor writes per-actor
+	// reputation: renaming used to reset a bad score, and a stable name
+	// could build up or lose trust it had not proven. 1.0 keeps the
+	// existing new-actor behaviour; stricter deployments can set 0.5.
+	// See https://github.com/Lelu-ai/lelu/issues/18.
+	UnverifiedActorReliability float64
 }
 
 func DefaultRiskConfig() RiskConfig {
@@ -121,6 +130,8 @@ func DefaultRiskConfig() RiskConfig {
 		MidCriticalityMin:  0.50,
 
 		HighCriticalityFloor: outcomeReview,
+
+		UnverifiedActorReliability: 1.0,
 	}
 }
 
@@ -188,6 +199,7 @@ func NewRiskConfigFromEnv() (RiskConfig, error) {
 
 	cfg.HighCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_HIGH_MIN", cfg.HighCriticalityMin, 0, 1)
 	cfg.MidCriticalityMin = getEnvFloatInRange("RISK_CRITICALITY_MID_MIN", cfg.MidCriticalityMin, 0, 1)
+	cfg.UnverifiedActorReliability = getEnvFloatInRange("RISK_UNVERIFIED_ACTOR_RELIABILITY", cfg.UnverifiedActorReliability, 0, 1)
 
 	// An unknown floor is an error, not a fallback: a typo here would
 	// silently keep the default floor and leave the operator believing the
@@ -277,7 +289,9 @@ func getEnvFloatInRange(key string, fallback float64, minVal float64, maxVal flo
 	if err != nil {
 		return fallback
 	}
-	if f < minVal || f > maxVal {
+	// NaN fails every comparison, so it would pass the range check below and
+	// then poison the risk score (an empty 200 once JSON encoding fails).
+	if math.IsNaN(f) || f < minVal || f > maxVal {
 		return fallback
 	}
 	return f

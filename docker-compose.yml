@@ -52,6 +52,10 @@ services:
       # and RISK_READONLY_THRESHOLD_HIGH cannot change any verdict (the engine says so at
       # startup if they are tuned). See https://github.com/Lelu-ai/lelu/issues/54.
       RISK_HIGH_CRITICALITY_FLOOR: "${RISK_HIGH_CRITICALITY_FLOOR:-review}"
+      # Reliability for requests without a verified workload identity (X-Lelu-Agent-Token).
+      # They do not build per-actor reputation. 1.0 keeps the new-actor default; 0.5 is stricter.
+      # See https://github.com/Lelu-ai/lelu/issues/18.
+      RISK_UNVERIFIED_ACTOR_RELIABILITY: "${RISK_UNVERIFIED_ACTOR_RELIABILITY:-1.0}"
     volumes:
       - ./config:/etc/lelu:ro
     depends_on:

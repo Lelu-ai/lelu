@@ -119,6 +119,13 @@ func NewReputationManager(db *sql.DB, config ReputationConfig) *ReputationManage
 	return rm
 }
 
+// HasHistory reports whether rep holds enough recorded outcomes for its
+// AccuracyRate to stand in for the agent's reliability. Below
+// MinDecisionsForScore a single outcome would swing the rate between 0 and 1.
+func (rm *ReputationManager) HasHistory(rep *AgentReputation) bool {
+	return rep.DecisionCount >= rm.config.MinDecisionsForScore
+}
+
 // RecordDecision records a decision outcome for reputation calculation
 func (rm *ReputationManager) RecordDecision(ctx context.Context, agentID, agentType string,
 	confidence float64, wasCorrect bool, _ string) error {
@@ -134,7 +141,7 @@ func (rm *ReputationManager) RecordDecision(ctx context.Context, agentID, agentT
 
 	// Update reputation in database
 	query := `
-		INSERT INTO agent_reputation (
+		INSERT INTO agent_review_reputation (
 			agent_id, reputation_score, decision_count, accuracy_rate, 
 			calibration_score, last_updated, confidence_sum, correct_decisions,
 			high_conf_errors, low_conf_correct
@@ -201,7 +208,7 @@ func (rm *ReputationManager) GetReputation(ctx context.Context, agentID string) 
 		SELECT agent_id, reputation_score, decision_count, accuracy_rate,
 			   calibration_score, last_updated, confidence_sum, correct_decisions,
 			   high_conf_errors, low_conf_correct
-		FROM agent_reputation 
+		FROM agent_review_reputation 
 		WHERE agent_id = ?
 	`
 
@@ -305,7 +312,7 @@ func (rm *ReputationManager) UpdateAllReputations(ctx context.Context) error {
 		SELECT agent_id, reputation_score, decision_count, accuracy_rate,
 			   calibration_score, last_updated, confidence_sum, correct_decisions,
 			   high_conf_errors, low_conf_correct
-		FROM agent_reputation
+		FROM agent_review_reputation
 	`
 
 	rows, err := rm.db.QueryContext(ctx, query)
@@ -330,7 +337,7 @@ func (rm *ReputationManager) UpdateAllReputations(ctx context.Context) error {
 	rows.Close()
 
 	updateQuery := `
-		UPDATE agent_reputation
+		UPDATE agent_review_reputation
 		SET reputation_score = ?, accuracy_rate = ?, calibration_score = ?, last_updated = ?
 		WHERE agent_id = ?
 	`
@@ -447,7 +454,7 @@ func (rm *ReputationManager) GetTopAgents(ctx context.Context, limit int) ([]*Ag
 		SELECT agent_id, reputation_score, decision_count, accuracy_rate,
 			   calibration_score, last_updated, confidence_sum, correct_decisions,
 			   high_conf_errors, low_conf_correct
-		FROM agent_reputation 
+		FROM agent_review_reputation 
 		WHERE decision_count >= ?
 		ORDER BY reputation_score DESC 
 		LIMIT ?
@@ -482,7 +489,7 @@ func (rm *ReputationManager) GetProblematicAgents(ctx context.Context, threshold
 		SELECT agent_id, reputation_score, decision_count, accuracy_rate,
 			   calibration_score, last_updated, confidence_sum, correct_decisions,
 			   high_conf_errors, low_conf_correct
-		FROM agent_reputation 
+		FROM agent_review_reputation 
 		WHERE reputation_score < ? AND decision_count >= ?
 		ORDER BY reputation_score ASC
 	`

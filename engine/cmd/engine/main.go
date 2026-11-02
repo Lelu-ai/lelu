@@ -454,8 +454,12 @@ func initDatabase(db *sql.DB) error {
 	}
 
 	// Create basic tables (simplified version of migration)
+	//
+	// agent_review_reputation counts human review verdicts (#74). It replaces
+	// agent_reputation, which counted the engine's own allow/deny decisions;
+	// an existing agent_reputation table is left in place but no longer read.
 	schema := `
-	CREATE TABLE IF NOT EXISTS agent_reputation (
+	CREATE TABLE IF NOT EXISTS agent_review_reputation (
 		agent_id TEXT PRIMARY KEY,
 		reputation_score REAL NOT NULL DEFAULT 0.5,
 		decision_count INTEGER NOT NULL DEFAULT 0,

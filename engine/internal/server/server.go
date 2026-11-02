@@ -2425,7 +2425,22 @@ func (h *Handler) handleQueueList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	page, err := h.queue.ListPendingPage(r.Context(), limit, offset)
+	// An account-bound key sees only its own account's reviews. Every item's
+	// TenantID was set from the verified principal at enqueue time, so it is
+	// safe to filter on; only the static admin credential sees the whole
+	// queue.
+	principal, ok := principalFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusForbidden, "unauthorized")
+		return
+	}
+	var page queue.PendingPage
+	var err error
+	if principal.IsStaticAdminKey {
+		page, err = h.queue.ListPendingPage(r.Context(), limit, offset)
+	} else {
+		page, err = h.queue.ListPendingPageForTenant(r.Context(), principal.UserID, limit, offset)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -2439,15 +2454,30 @@ func (h *Handler) handleQueueList(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// queueItemForCaller loads a review item and checks that the caller's
+// account owns it, writing the error response itself when either fails. An
+// item belonging to another account is reported exactly like a missing one,
+// so review IDs can't be probed across accounts.
+func (h *Handler) queueItemForCaller(w http.ResponseWriter, r *http.Request, id string) (*queue.ReviewRequest, bool) {
+	item, err := h.queue.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return nil, false
+	}
+	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, item.TenantID) {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("queue: item %q not found", id))
+		return nil, false
+	}
+	return item, true
+}
+
 func (h *Handler) handleQueueGet(w http.ResponseWriter, r *http.Request) {
 	if h.queue == nil {
 		writeError(w, http.StatusServiceUnavailable, "queue not configured")
 		return
 	}
-	id := r.PathValue("id")
-	item, err := h.queue.Get(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
+	item, ok := h.queueItemForCaller(w, r, r.PathValue("id"))
+	if !ok {
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
@@ -2492,9 +2522,8 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 		return
 	}
 
-	item, gerr := h.queue.Get(r.Context(), id)
-	if gerr != nil {
-		writeError(w, http.StatusNotFound, gerr.Error())
+	item, ok := h.queueItemForCaller(w, r, id)
+	if !ok {
 		return
 	}
 
@@ -2620,6 +2649,20 @@ func (h *Handler) handleQueueRedeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Another account could otherwise spend this approval: the payload it
+	// needs to match is readable from the item, and a redemption consumes
+	// the approval the owning agent was waiting for.
+	item, ok := h.queueItemForCaller(w, r, id)
+	if !ok {
+		return
+	}
+	// The fingerprint taken at enqueue covered tenant_id after authorize had
+	// replaced it with the verified account, so the same must happen here or
+	// an account-bound agent's redemption never matches its own approval.
+	if principal, ok := principalFromContext(r.Context()); ok && !principal.IsStaticAdminKey && principal.UserID != "" {
+		req.TenantID = principal.UserID
+	}
+
 	res, err := h.queue.Redeem(r.Context(), id, effectFingerprint(req), queue.DefaultApprovalTTL)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("review %q not found", id))
@@ -2636,7 +2679,7 @@ func (h *Handler) handleQueueRedeem(w http.ResponseWriter, r *http.Request) {
 	// refused redemption is the interesting record, and it would otherwise
 	// leave no trace at all.
 	h.audit.Log(audit.Event{
-		TenantID:  req.TenantID,
+		TenantID:  item.TenantID,
 		TraceID:   traceID,
 		Actor:     req.Actor,
 		Action:    req.Action,
@@ -2683,9 +2726,8 @@ func (h *Handler) handleQueueWait(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 
 	for {
-		item, err := h.queue.Get(r.Context(), id)
-		if err != nil {
-			writeError(w, http.StatusNotFound, err.Error())
+		item, ok := h.queueItemForCaller(w, r, id)
+		if !ok {
 			return
 		}
 		if item.Status != queue.StatusPending {

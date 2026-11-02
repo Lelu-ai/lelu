@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Security Fixes
+
+* **The review queue is scoped to the caller's account in `PLATFORM_URL` mode.** Every queued item carried the account that triggered it, but no queue handler compared it with the caller, so any `lelu_sk_` key could list every account's pending reviews (actor, action, resource, reason), fetch or wait on any item by ID, and — without `LELU_REVIEWER_KEYS` — approve or deny another account's item, which that account's agent could then redeem. `GET /v1/queue/pending` now returns only the caller's items, with `total` counting only those; `GET /v1/queue/{id}`, `/wait`, `/approve`, `/deny` and `/redeem` answer 404 for another account's item, the same as for an unknown ID. The static `API_KEY` still sees and resolves the whole queue. Reported by Thomas.
+
+### Fixes
+
+* **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
+
 ## [0.2.1] (2026-10-15)
 
 ### Security Fixes

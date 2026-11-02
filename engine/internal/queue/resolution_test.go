@@ -135,3 +135,42 @@ func TestListPending_ExcludesResolved(t *testing.T) {
 	require.Len(t, page.Items, 1)
 	assert.Equal(t, victim, page.Items[0].ID, "a genuinely pending item must not be buried by resolved ones")
 }
+
+// The per-tenant listing backs GET /v1/queue/pending for account-bound keys:
+// it must return only that tenant's items, and its total and pagination must
+// count only them too.
+func TestListPendingPageForTenant_OnlyThatTenant(t *testing.T) {
+	ctx := context.Background()
+	q := queue.NewInMemory()
+
+	var mine []string
+	for i := 0; i < 3; i++ {
+		id, err := q.Enqueue(ctx, "acct-a", "bot", "action", nil, 0.5, "reason", "", "fp")
+		require.NoError(t, err)
+		mine = append(mine, id)
+		_, err = q.Enqueue(ctx, "acct-b", "bot", "action", nil, 0.5, "reason", "", "fp")
+		require.NoError(t, err)
+	}
+	require.NoError(t, q.Approve(ctx, mine[0], "human", ""))
+
+	page, err := q.ListPendingPageForTenant(ctx, "acct-a", 1, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), page.Total, "total counts only this tenant's pending items")
+	require.Len(t, page.Items, 1)
+
+	next, err := q.ListPendingPageForTenant(ctx, "acct-a", 1, 1)
+	require.NoError(t, err)
+	require.Len(t, next.Items, 1)
+
+	got := []string{page.Items[0].ID, next.Items[0].ID}
+	assert.ElementsMatch(t, mine[1:], got)
+
+	none, err := q.ListPendingPageForTenant(ctx, "acct-c", 50, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), none.Total)
+	assert.Empty(t, none.Items)
+
+	all, err := q.ListPendingPage(ctx, 50, 0)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), all.Total, "the unscoped listing still covers every tenant")
+}

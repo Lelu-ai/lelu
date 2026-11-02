@@ -19,6 +19,7 @@ import (
 	"github.com/lelu-ai/lelu/engine/internal/confidence"
 	"github.com/lelu-ai/lelu/engine/internal/evaluator"
 	"github.com/lelu-ai/lelu/engine/internal/identity"
+	"github.com/lelu-ai/lelu/engine/internal/observability"
 	"github.com/lelu-ai/lelu/engine/internal/queue"
 	"github.com/lelu-ai/lelu/engine/internal/tokens"
 )
@@ -78,7 +79,7 @@ func newReputationHandler(t *testing.T, db *sql.DB) *Handler {
 // The tables the async analytics writes, copied from initDatabase in
 // cmd/engine/main.go, which this package cannot import.
 const analyticsTestSchema = `
-CREATE TABLE IF NOT EXISTS agent_reputation (
+CREATE TABLE IF NOT EXISTS agent_review_reputation (
 	agent_id TEXT PRIMARY KEY,
 	reputation_score REAL NOT NULL DEFAULT 0.5,
 	decision_count INTEGER NOT NULL DEFAULT 0,
@@ -248,59 +249,170 @@ func TestVerifiedReputationFollowsAgentIDNotClaimedName(t *testing.T) {
 	assert.Empty(t, unverified.DowngradedScope)
 }
 
-// With a database configured (the lelu-mcp default), reputation is persisted
-// asynchronously from handleAgentAuthorize. It must be written under the
-// verified agent ID, and not at all for an unverified request.
-func TestPersistedReputationKeyedOnVerifiedAgentID(t *testing.T) {
+// Regression tests for https://github.com/Lelu-ai/lelu/issues/74: persisted
+// reputation records human review verdicts, not the engine's own decisions.
+//
+// One database-backed Handler serves every subtest, since a second can't be
+// built in one process (its metrics register globally). Each subtest
+// registers its own agent, so their reputation rows don't overlap.
+func TestReviewVerdictReputation(t *testing.T) {
 	db := openReputationDB(t)
 	_, err := db.Exec(analyticsTestSchema)
 	require.NoError(t, err)
 	h := newReputationHandler(t, db)
-	agentID, token := registerAgent(t, h, db)
+	authenticated := &reviewerRegistry{secrets: []reviewerCredential{{name: "alice", secret: reviewerTestSecret}}}
+	h.reviewers = authenticated
 	ctx := context.Background()
 
-	authorize := func(token, actor string) {
-		body, err := json.Marshal(agentAuthorizeRequest{Actor: actor, Action: "git_push", Confidence: f64(0.9)})
+	newAgent := func(t *testing.T) (string, string) { return registerAgent(t, h, db) }
+
+	// create_* is allowed by policy; "payment" makes it high-criticality, so
+	// the risk gate — not the policy — routes it to a human.
+	riskReview := func(t *testing.T, token, actor string) *queue.ReviewRequest {
+		t.Helper()
+		resp := authorizeHTTP(t, h, token, agentAuthorizeRequest{Actor: actor, Action: "create_payment", Confidence: f64(0.9)})
+		require.True(t, resp.RequiresHumanReview, resp.Reason)
+		require.NotEmpty(t, resp.ReviewID)
+		item, err := h.queue.Get(ctx, resp.ReviewID)
 		require.NoError(t, err)
-		r := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", bytes.NewReader(body))
-		if token != "" {
-			r.Header.Set("X-Lelu-Agent-Token", token)
+		return item
+	}
+
+	t.Run("decisions are not recorded", func(t *testing.T) {
+		agentID, token := newAgent(t)
+		decisionRows := func() int {
+			var n int
+			require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM agent_decisions WHERE agent_id = ?`, agentID).Scan(&n))
+			return n
 		}
-		rec := httptest.NewRecorder()
-		h.handleAgentAuthorize(rec, r)
-		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
-	}
-	decisionRows := func(actor string) int {
-		var n int
-		require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM agent_decisions WHERE agent_id = ?`, actor).Scan(&n))
-		return n
-	}
-	reputationCount := func(actor string) int {
-		rep, err := h.reputationMgr.GetReputation(ctx, actor)
+		// A policy denial for a verified agent used to be recorded as an
+		// incorrect decision, so one denial set its persisted accuracy to 0.
+		resp := authorizeHTTP(t, h, token, agentAuthorizeRequest{Actor: "claimed_name", Action: "git_push", Confidence: f64(0.9)})
+		require.False(t, resp.Allowed)
+		// The analytics goroutine has run once it writes the decision row.
+		require.Eventually(t, func() bool { return decisionRows() == 1 }, 5*time.Second, 10*time.Millisecond)
+		count, _ := reputationOf(t, h, agentID)
+		assert.Equal(t, int64(0), count, "the engine's own decision is not a reputation outcome")
+	})
+
+	t.Run("verdicts are recorded against the verified agent", func(t *testing.T) {
+		agentID, token := newAgent(t)
+
+		item := riskReview(t, token, "claimed_name")
+		require.Equal(t, agentID, item.ReputationActor, "the verdict counts toward the verified agent ID, not the claimed name")
+		resolveAs(t, h, item.ID, true, reviewerTestSecret)
+		count, correct := reputationOf(t, h, agentID)
+		assert.Equal(t, int64(1), count)
+		assert.Equal(t, int64(1), correct, "an approval counts as correct")
+
+		resolveAs(t, h, riskReview(t, token, "claimed_name").ID, false, reviewerTestSecret)
+		count, correct = reputationOf(t, h, agentID)
+		assert.Equal(t, int64(2), count)
+		assert.Equal(t, int64(1), correct, "a denial counts as incorrect")
+
+		claimed, _ := reputationOf(t, h, "claimed_name")
+		assert.Equal(t, int64(0), claimed)
+	})
+
+	t.Run("self-asserted reviewer is not counted", func(t *testing.T) {
+		agentID, token := newAgent(t)
+		h.reviewers = nil // LELU_REVIEWER_KEYS unset: resolved_by is a claim
+		defer func() { h.reviewers = authenticated }()
+		resolveAs(t, h, riskReview(t, token, "a").ID, true, "")
+		count, _ := reputationOf(t, h, agentID)
+		assert.Equal(t, int64(0), count, "an agent could approve its own item under another name")
+	})
+
+	t.Run("unverified actor is not counted", func(t *testing.T) {
+		item := riskReview(t, "", "unverified_bot")
+		assert.Empty(t, item.ReputationActor)
+		resolveAs(t, h, item.ID, false, reviewerTestSecret)
+		count, _ := reputationOf(t, h, "unverified_bot")
+		assert.Equal(t, int64(0), count)
+	})
+
+	t.Run("policy review is not counted", func(t *testing.T) {
+		agentID, token := newAgent(t)
+		// send_* is a human_review rule: the verdict is about the action.
+		resp := authorizeHTTP(t, h, token, agentAuthorizeRequest{Actor: "a", Action: "send_email", Confidence: f64(0.9)})
+		require.True(t, resp.RequiresHumanReview)
+		item, err := h.queue.Get(ctx, resp.ReviewID)
 		require.NoError(t, err)
-		return int(rep.DecisionCount)
+		assert.Empty(t, item.ReputationActor)
+		resolveAs(t, h, item.ID, false, reviewerTestSecret)
+		count, _ := reputationOf(t, h, agentID)
+		assert.Equal(t, int64(0), count)
+	})
+
+	// Persisted reputation only replaces the in-memory reliability once
+	// there are MinDecisionsForScore verdicts: one denied review must not
+	// set it to 0.
+	t.Run("reliability needs the minimum number of verdicts", func(t *testing.T) {
+		agentID, token := newAgent(t)
+		minVerdicts := int(observability.DefaultReputationConfig().MinDecisionsForScore)
+
+		for i := 0; i < minVerdicts-1; i++ {
+			require.NoError(t, h.reputationMgr.RecordDecision(ctx, agentID, "autonomous", 0.9, false, "review:deny"))
+		}
+		// Empty the in-memory stats, as a restart would.
+		h.actorStat = newActorStats()
+		assert.Equal(t, 1.0, createPR(t, h, token, "claimed_name").RiskReliability,
+			"below the minimum, reliability stays at the in-memory value")
+
+		require.NoError(t, h.reputationMgr.RecordDecision(ctx, agentID, "autonomous", 0.9, false, "review:deny"))
+		h.actorStat = newActorStats()
+		assert.Equal(t, 0.0, createPR(t, h, token, "claimed_name").RiskReliability,
+			"at the minimum, the verdict history is the reliability")
+
+		// A self-reported name equal to that agent ID does not read its history.
+		assert.Equal(t, 1.0, createPR(t, h, "", agentID).RiskReliability)
+	})
+}
+
+const reviewerTestSecret = "alice-reviewer-secret-0123456789"
+
+// authorizeHTTP runs a request through handleAgentAuthorize, which is the
+// path that enqueues reviews and fires the async analytics.
+func authorizeHTTP(t *testing.T, h *Handler, token string, req agentAuthorizeRequest) agentAuthorizeResponse {
+	t.Helper()
+	body, err := json.Marshal(req)
+	require.NoError(t, err)
+	r := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", bytes.NewReader(body))
+	if token != "" {
+		r.Header.Set("X-Lelu-Agent-Token", token)
 	}
+	rec := httptest.NewRecorder()
+	h.handleAgentAuthorize(rec, r)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var resp agentAuthorizeResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	return resp
+}
 
-	authorize(token, "claimed_name")
-	require.Eventually(t, func() bool { return reputationCount(agentID) == 1 }, 5*time.Second, 10*time.Millisecond,
-		"the denial is recorded under the verified agent ID")
-	assert.Equal(t, 0, reputationCount("claimed_name"), "nothing is recorded under the claimed name")
+// resolveAs approves or denies a review as the operator, presenting the
+// reviewer secret when it is non-empty.
+func resolveAs(t *testing.T, h *Handler, id string, approve bool, reviewerSecret string) {
+	t.Helper()
+	path := "/v1/queue/" + id + "/deny"
+	if approve {
+		path = "/v1/queue/" + id + "/approve"
+	}
+	r := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"resolved_by":"human","note":"test"}`))
+	r.SetPathValue("id", id)
+	if reviewerSecret != "" {
+		r.Header.Set(reviewerHeader, reviewerSecret)
+	}
+	r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true}))
+	rec := httptest.NewRecorder()
+	h.handleQueueResolve(rec, r, approve)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+}
 
-	authorize("", "unverified_name")
-	// The baseline row is written after the reputation step in the same
-	// goroutine, so once it exists the reputation step has already run.
-	require.Eventually(t, func() bool { return decisionRows("unverified_name") == 1 }, 5*time.Second, 10*time.Millisecond)
-	assert.Equal(t, 0, reputationCount("unverified_name"), "an unverified request does not write reputation")
-
-	// Empty the in-memory stats, as a restart would, so reliability can only
-	// come from the persisted history. (A second database-backed Handler
-	// can't be built in one process: its metrics register globally.)
-	h.actorStat = newActorStats()
-	verified := createPR(t, h, token, "claimed_name")
-	assert.Equal(t, 0.0, verified.RiskReliability, "the persisted denial is read back under the verified agent ID")
-	// A self-reported name equal to that agent ID does not read its history.
-	unverified := createPR(t, h, "", agentID)
-	assert.Equal(t, 1.0, unverified.RiskReliability, "an unverified request does not read persisted reputation")
+func reputationOf(t *testing.T, h *Handler, agentID string) (count, correct int64) {
+	t.Helper()
+	rep, err := h.reputationMgr.GetReputation(context.Background(), agentID)
+	require.NoError(t, err)
+	return rep.DecisionCount, rep.CorrectDecisions
 }
 
 func TestUnverifiedActorReliabilityFromEnv(t *testing.T) {

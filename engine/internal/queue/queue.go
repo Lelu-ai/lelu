@@ -115,6 +115,14 @@ type ReviewRequest struct {
 	// rather than silently matching anything.
 	PayloadFingerprint string `json:"payload_fingerprint,omitempty"`
 
+	// ReputationActor is the verified agent ID whose reputation a verdict on
+	// this item counts toward, or empty when it counts toward none. Set at
+	// enqueue only when the actor was proven by a workload token and the
+	// review came from the agent's own confidence or risk rather than a
+	// policy rule that reviews the action every time. Actor can't serve here:
+	// for an unverified request it is a name the caller chose.
+	ReputationActor string `json:"reputation_actor,omitempty"`
+
 	// RedeemedAt records when this approval was spent. An approval is a
 	// judgement about one intended effect, so it buys one execution:
 	// redemption that is a pure read lets a single human "yes" to a $10
@@ -366,9 +374,7 @@ func NewSQLite(db *sql.DB) (*Queue, error) {
 // Returns the assigned review ID. Falls back to the in-memory store when Redis
 // is not configured so no review requests are silently dropped.
 func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, resource map[string]string, confidence float64, reason, actingFor, payloadFingerprint string) (string, error) {
-	id := uuid.NewString()
-	req := ReviewRequest{
-		ID:                 id,
+	return q.EnqueueRequest(ctx, ReviewRequest{
 		TenantID:           tenantID,
 		Actor:              actor,
 		Action:             action,
@@ -376,10 +382,18 @@ func (q *Queue) Enqueue(ctx context.Context, tenantID, actor, action string, res
 		ConfidenceScore:    confidence,
 		Reason:             reason,
 		ActingFor:          actingFor,
-		EnqueuedAt:         time.Now().UTC(),
-		Status:             StatusPending,
 		PayloadFingerprint: payloadFingerprint,
-	}
+	})
+}
+
+// EnqueueRequest is Enqueue for a caller that sets fields beyond Enqueue's
+// parameters. ID, EnqueuedAt and Status are assigned here and any values the
+// caller put in them are ignored.
+func (q *Queue) EnqueueRequest(ctx context.Context, req ReviewRequest) (string, error) {
+	id := uuid.NewString()
+	req.ID = id
+	req.EnqueuedAt = time.Now().UTC()
+	req.Status = StatusPending
 
 	if q.rdb == nil {
 		if err := q.inmem.set(&req); err != nil {

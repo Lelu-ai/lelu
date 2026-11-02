@@ -22,7 +22,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 
 	// Initialize schema
 	schema := `
-	CREATE TABLE agent_reputation (
+	CREATE TABLE agent_review_reputation (
 		agent_id TEXT PRIMARY KEY,
 		reputation_score REAL NOT NULL DEFAULT 0.5,
 		decision_count INTEGER NOT NULL DEFAULT 0,

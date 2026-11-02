@@ -1044,10 +1044,10 @@ func (h *Handler) checkPromptInjection(w http.ResponseWriter, r *http.Request, r
 // recordAsyncAnalytics fires the post-decision observability work that must not
 // block the response: external confidence auditing and Phase-2 behavioral
 // analytics (reputation, baseline, anomaly, drift). Each runs in its own
-// goroutine and only when its dependencies are configured. Reputation is only
-// recorded for a verified actor; see the reliability lookup in
-// evaluateAgentDecision.
-func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, actorVerified bool, confidenceScore float64, allowed, requiresReview bool, outcome string, totalLatency float64) {
+// goroutine and only when its dependencies are configured. Reputation is not
+// recorded here — it comes from review verdicts, see handleQueueResolve — but
+// reputation alerts are checked for a verified actor.
+func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, actorVerified bool, confidenceScore float64, outcome string, totalLatency float64) {
 	// ── External confidence audit (async — does not block response) ──────────
 	if h.extAuditor != nil {
 		auditActor := req.Actor
@@ -1082,13 +1082,11 @@ func (h *Handler) recordAsyncAnalytics(req agentAuthorizeRequest, actorVerified 
 			// Run behavioral analytics in background to avoid blocking response
 			ctx := context.Background()
 
-			// 1. Record decision for reputation tracking
-			if actorVerified {
-				wasCorrect := allowed || requiresReview // Assume allowed/review decisions are "correct"
-				if err := h.reputationMgr.RecordDecision(ctx, req.Actor, "autonomous", confidenceScore, wasCorrect, outcome); err != nil {
-					log.Printf("Failed to record decision for reputation: %v", err)
-				}
-			}
+			// 1. Reputation is not recorded here. The engine's own decision
+			// is not an outcome: counting a denial as "incorrect" made
+			// reliability the deny rate, and a low reliability causes more
+			// denials. Reputation takes human review verdicts instead, in
+			// handleQueueResolve (#74).
 
 			// 2. Update behavioral baseline
 			if err := h.baselineMgr.UpdateBaseline(ctx, req.Actor, req.Action, outcome, confidenceScore, time.Duration(totalLatency)*time.Millisecond); err != nil {
@@ -1269,17 +1267,19 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	// correct with zero setup, but reliability resets to the new-actor default
 	// on every restart and isn't shared across replicas. When persistence is
 	// configured (db != nil, see New()), prefer the SQLite-backed reputation
-	// history instead — it survives restarts on this host. Still fall back to
-	// actorStat for actors reputationMgr hasn't seen yet (DecisionCount == 0)
-	// so a brand-new actor keeps the same "trusted until proven otherwise"
-	// default either way; reputationMgr's own zero-history default (0.5) is
-	// calibrated for its separate calibration-score use, not for this risk
-	// formula's reliability term, so it must not leak in here.
+	// history instead — human review verdicts (#74), which survive restarts
+	// on this host. Verdicts are sparse, so fall back to actorStat until the
+	// agent has MinDecisionsForScore of them: one denied review would
+	// otherwise set reliability to 0. A brand-new actor keeps the same
+	// "trusted until proven otherwise" default either way; reputationMgr's
+	// own zero-history default (0.5) is calibrated for its separate
+	// calibration-score use, not for this risk formula's reliability term,
+	// so it must not leak in here.
 	reliability := h.riskModel.cfg.UnverifiedActorReliability
 	if actorVerified {
 		reliability = h.actorStat.reliability(req.Actor)
 		if h.reputationMgr != nil {
-			if rep, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil && rep.DecisionCount > 0 {
+			if rep, err := h.reputationMgr.GetReputation(ctx, req.Actor); err == nil && h.reputationMgr.HasHistory(rep) {
 				reliability = rep.AccuracyRate
 			}
 		}
@@ -1382,7 +1382,26 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	var reviewID string
 	if requiresReview && h.queue != nil && h.mode != EnforcementModeShadow {
 		observability.RecordHumanReview(req.Actor, finalReason)
-		id, err := h.queue.Enqueue(r.Context(), req.TenantID, req.Actor, req.Action, req.Resource, confidenceScore, finalReason, req.ActingFor, effectFingerprint(req))
+		// A verdict says something about the agent only when the agent is
+		// proven and its own confidence or risk is what asked for a human.
+		// When the policy reviews this action every time, the verdict is
+		// about the action, so it doesn't count — even if a gate also
+		// flagged it.
+		reputationActor := ""
+		if actorVerified && !evalDec.RequiresHumanReview {
+			reputationActor = req.Actor
+		}
+		id, err := h.queue.EnqueueRequest(r.Context(), queue.ReviewRequest{
+			TenantID:           req.TenantID,
+			Actor:              req.Actor,
+			Action:             req.Action,
+			Resource:           req.Resource,
+			ConfidenceScore:    confidenceScore,
+			Reason:             finalReason,
+			ActingFor:          req.ActingFor,
+			PayloadFingerprint: effectFingerprint(req),
+			ReputationActor:    reputationActor,
+		})
 		if err != nil {
 			// The decision itself still stands and is audit-logged below — but
 			// without an ID there is nothing for a caller to poll or resolve,
@@ -1574,7 +1593,7 @@ func (h *Handler) handleAgentAuthorize(w http.ResponseWriter, r *http.Request) {
 	// Analytics must be keyed on the identity the decision was made for, not
 	// the name in the request body.
 	req.Actor = res.actor
-	h.recordAsyncAnalytics(req, res.actorVerified, res.confidenceScore, res.allowed, res.requiresReview, res.outcome, res.totalLatency)
+	h.recordAsyncAnalytics(req, res.actorVerified, res.confidenceScore, res.outcome, res.totalLatency)
 
 	writeJSON(w, http.StatusOK, h.applyShadowMode(res.resp))
 }
@@ -2613,6 +2632,16 @@ func (h *Handler) handleQueueResolve(w http.ResponseWriter, r *http.Request, app
 			"reviewer_authenticated": strconv.FormatBool(reviewerAuthenticated),
 		},
 		approve, fmt.Sprintf("human_review %s %s by %s: %s", id, past, resolvedBy, req.Note), rawConfidence, 0)
+
+	// The verdict is the outcome signal for the agent's reputation (#74), but
+	// only an authenticated reviewer's: a self-asserted resolved_by would let
+	// an agent approve its own items under another name and raise its own
+	// score. The calibrator above still takes claimed verdicts.
+	if item.ReputationActor != "" && reviewerAuthenticated && h.reputationMgr != nil {
+		if err := h.reputationMgr.RecordDecision(r.Context(), item.ReputationActor, "autonomous", rawConfidence, approve, "review:"+verb); err != nil {
+			log.Printf("failed to record review verdict for reputation: %v", err)
+		}
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success":                true,

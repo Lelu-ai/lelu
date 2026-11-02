@@ -188,10 +188,14 @@ export default function DocsRiskAssessment() {
                 it. For verified agents with no database configured, it lives in memory only: it resets to the
                 new-actor default (fully trusted) on every engine restart, and isn&apos;t shared
                 across replicas if you run more than one. When a database is configured, the engine
-                also persists actor decision history to SQLite and uses that instead once an actor
-                has at least one recorded decision — reliability then survives restarts on that
-                host. It still isn&apos;t shared across replicas unless they point at the same
-                database file.
+                also persists human review verdicts to SQLite — an approval counts as correct, a
+                denial as incorrect — and uses their rate instead once an agent has at least 10 of
+                them; reliability then survives restarts on that host. A verdict counts only when the
+                agent was verified, the reviewer authenticated with <code>LELU_REVIEWER_KEYS</code>,
+                and the review came from the confidence or risk gate rather than a policy rule that
+                reviews the action every time. The engine&apos;s own allow and deny decisions are not
+                persisted as reputation. It still isn&apos;t shared across replicas unless they point
+                at the same database file.
               </li>
               <li>
                 <strong className="text-zinc-900 dark:text-white">anomaly_count</strong> — the

@@ -234,39 +234,33 @@ func (s *inMemoryStore) get(id string) (*ReviewRequest, bool) {
 	return &cp, true
 }
 
-// listPending returns pending items newest-first. Ordering matters: an
-// unordered map walk means the page an operator sees changes between calls
-// for no reason, and "the 50 you happen to get" is not a work queue.
-func (s *inMemoryStore) listPending(limit int64, offset int64) []ReviewRequest {
+// listPending returns one page of pending items newest-first, plus the total
+// across all pages. Ordering matters: an unordered map walk means the page an
+// operator sees changes between calls for no reason, and "the 50 you happen
+// to get" is not a work queue. A non-nil tenantID restricts both the page and
+// the total to that tenant's items.
+func (s *inMemoryStore) listPending(tenantID *string, limit int64, offset int64) ([]ReviewRequest, int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	all := make([]ReviewRequest, 0, len(s.items))
 	for _, r := range s.items {
+		if tenantID != nil && r.TenantID != *tenantID {
+			continue
+		}
 		if r.expiredIfStale() == StatusPending {
 			all = append(all, *r)
 		}
 	}
+	total := int64(len(all))
 	sort.Slice(all, func(i, j int) bool { return all[i].EnqueuedAt.After(all[j].EnqueuedAt) })
 	if offset >= int64(len(all)) {
-		return []ReviewRequest{}
+		return []ReviewRequest{}, total
 	}
 	all = all[offset:]
 	if int64(len(all)) > limit {
 		all = all[:limit]
 	}
-	return all
-}
-
-func (s *inMemoryStore) countPending() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	n := 0
-	for _, r := range s.items {
-		if r.expiredIfStale() == StatusPending {
-			n++
-		}
-	}
-	return n
+	return all, total
 }
 
 // resolveIfPending performs the whole check-and-set under one lock. Splitting
@@ -503,8 +497,8 @@ func (q *Queue) ListPendingPage(ctx context.Context, limit, offset int64) (Pendi
 		offset = 0
 	}
 	if q.rdb == nil {
-		items := q.inmem.listPending(limit, offset)
-		return PendingPage{Items: items, Total: int64(q.inmem.countPending()), Offset: offset, Limit: limit}, nil
+		items, total := q.inmem.listPending(nil, limit, offset)
+		return PendingPage{Items: items, Total: total, Offset: offset, Limit: limit}, nil
 	}
 
 	total, err := q.rdb.ZCard(ctx, PendingIndexKey).Result()
@@ -520,13 +514,81 @@ func (q *Queue) ListPendingPage(ctx context.Context, limit, offset int64) (Pendi
 		return PendingPage{Items: []ReviewRequest{}, Total: total, Offset: offset, Limit: limit}, nil
 	}
 
+	out, stale, err := q.fetchIndexed(ctx, ids)
+	if err != nil {
+		return PendingPage{}, err
+	}
+	if len(stale) > 0 {
+		total -= int64(len(stale))
+		if total < 0 {
+			total = 0
+		}
+	}
+	return PendingPage{Items: out, Total: total, Offset: offset, Limit: limit}, nil
+}
+
+// ListPendingPageForTenant is ListPendingPage restricted to one tenant's
+// items, for a caller that is only entitled to see its own account's reviews.
+// Total counts that tenant's pending items, not the whole queue's — the size
+// of other tenants' queues is itself something one tenant should not learn.
+//
+// On Redis this walks the shared pending index rather than a per-tenant one,
+// so a call costs O(pending items across all tenants). Pending items age out
+// after PendingMaxAge, which bounds that, and it avoids a second index that
+// would need its own backfill for items enqueued before it existed.
+func (q *Queue) ListPendingPageForTenant(ctx context.Context, tenantID string, limit, offset int64) (PendingPage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if q.rdb == nil {
+		items, total := q.inmem.listPending(&tenantID, limit, offset)
+		return PendingPage{Items: items, Total: total, Offset: offset, Limit: limit}, nil
+	}
+
+	// One snapshot of the IDs, then payloads in chunks. Paging through the
+	// index by position instead would skip entries, because fetchIndexed
+	// removes stale ones and shifts every later position as it goes.
+	ids, err := q.rdb.ZRevRange(ctx, PendingIndexKey, 0, -1).Result()
+	if err != nil {
+		return PendingPage{}, fmt.Errorf("queue: index range: %w", err)
+	}
+	const chunk = 500
+	out := make([]ReviewRequest, 0, limit)
+	var matched int64
+	for start := 0; start < len(ids); start += chunk {
+		end := min(start+chunk, len(ids))
+		items, _, err := q.fetchIndexed(ctx, ids[start:end])
+		if err != nil {
+			return PendingPage{}, err
+		}
+		for _, req := range items {
+			if req.TenantID != tenantID {
+				continue
+			}
+			if matched >= offset && int64(len(out)) < limit {
+				out = append(out, req)
+			}
+			matched++
+		}
+	}
+	return PendingPage{Items: out, Total: matched, Offset: offset, Limit: limit}, nil
+}
+
+// fetchIndexed loads the payloads for ids taken from the pending index, in
+// the same order, keeping only items that are still pending. Index entries
+// that no longer point at a pending item are removed from the index and
+// returned as stale.
+func (q *Queue) fetchIndexed(ctx context.Context, ids []string) ([]ReviewRequest, []string, error) {
 	keys := make([]string, len(ids))
 	for i, id := range ids {
 		keys[i] = PendingKey + id
 	}
 	raws, err := q.rdb.MGet(ctx, keys...).Result()
 	if err != nil {
-		return PendingPage{}, fmt.Errorf("queue: mget: %w", err)
+		return nil, nil, fmt.Errorf("queue: mget: %w", err)
 	}
 
 	out := make([]ReviewRequest, 0, len(raws))
@@ -564,12 +626,8 @@ func (q *Queue) ListPendingPage(ctx context.Context, limit, offset int64) (Pendi
 		// Best effort: a failure here costs one stale listing entry, not
 		// correctness of the items actually returned.
 		_ = q.rdb.ZRem(ctx, PendingIndexKey, members...).Err()
-		total -= int64(len(stale))
-		if total < 0 {
-			total = 0
-		}
 	}
-	return PendingPage{Items: out, Total: total, Offset: offset, Limit: limit}, nil
+	return out, stale, nil
 }
 
 // ─── Resolve ──────────────────────────────────────────────────────────────────

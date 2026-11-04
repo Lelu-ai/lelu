@@ -15,6 +15,7 @@ from lelu import (
     DelegateScopeRequest,
     LeluClient,
     MintTokenRequest,
+    RegisterAgentRequest,
 )
 
 
@@ -495,3 +496,60 @@ async def test_redeem_rejects_a_decision_with_no_review_id() -> None:
             _human_review_decision(review_id=None), AuthorizeRequest(tool="x")
         )
     await client.aclose()
+
+
+def _engine_agent() -> dict:
+    """Mirrors RegisteredAgent in engine/internal/identity/registry.go."""
+    return {
+        "id": "agent-1",
+        "tenant_id": "default",
+        "name": "invoice_bot",
+        "description": "Processes invoices",
+        "agent_type": "autonomous",
+        "owner_email": "owner@example.com",
+        "status": "active",
+        "scopes": ["read:invoices"],
+        "metadata": {"team": "billing"},
+        "created_at": "2026-11-04T01:00:00Z",
+        "updated_at": "2026-11-04T02:00:00Z",
+    }
+
+
+def _assert_is_engine_agent(agent) -> None:
+    assert agent.id == "agent-1"
+    assert agent.tenant_id == "default"
+    assert agent.agent_type == "autonomous"
+    assert agent.owner_email == "owner@example.com"
+    assert agent.status == "active"
+    assert agent.scopes == ["read:invoices"]
+    assert agent.metadata == {"team": "billing"}
+    assert agent.created_at.year == 2026
+
+
+@pytest.mark.asyncio
+async def test_register_agent_parses_engine_response(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url="http://localhost:8080/v1/agents", method="POST", json=_engine_agent(), status_code=201
+    )
+    async with LeluClient(base_url="http://localhost:8080") as client:
+        agent = await client.register_agent(RegisterAgentRequest(name="invoice_bot"))
+    _assert_is_engine_agent(agent)
+
+
+@pytest.mark.asyncio
+async def test_get_agent_parses_engine_response(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(url="http://localhost:8080/v1/agents/agent-1", json=_engine_agent())
+    async with LeluClient(base_url="http://localhost:8080") as client:
+        agent = await client.get_agent("agent-1")
+    _assert_is_engine_agent(agent)
+
+
+@pytest.mark.asyncio
+async def test_list_agents_parses_engine_response(httpx_mock: HTTPXMock) -> None:
+    httpx_mock.add_response(
+        url="http://localhost:8080/v1/agents", json={"agents": [_engine_agent()], "count": 1}
+    )
+    async with LeluClient(base_url="http://localhost:8080") as client:
+        agents = await client.list_agents()
+    assert len(agents) == 1
+    _assert_is_engine_agent(agents[0])

@@ -60,6 +60,39 @@ import {
 import { agentTracer } from "./observability/tracer.js";
 import { discoverLocalEngine } from "./local.js";
 
+// ─── Engine responses ─────────────────────────────────────────────────────────
+
+/** RegisteredAgent in engine/internal/identity/registry.go, as sent over the wire. */
+interface EngineRegisteredAgent {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string;
+  agent_type: RegisteredAgent["agentType"];
+  owner_email: string;
+  status: RegisteredAgent["status"];
+  scopes: string[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+function toRegisteredAgent(d: EngineRegisteredAgent): RegisteredAgent {
+  return {
+    id: d.id,
+    tenantId: d.tenant_id,
+    name: d.name,
+    description: d.description,
+    agentType: d.agent_type,
+    ownerEmail: d.owner_email,
+    status: d.status,
+    scopes: d.scopes,
+    metadata: d.metadata,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  };
+}
+
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 /**
@@ -985,7 +1018,7 @@ export class LeluClient {
     if (req.ownerEmail !== undefined) body.owner_email = req.ownerEmail;
     if (req.scopes !== undefined) body.scopes = req.scopes;
     if (req.metadata !== undefined) body.metadata = req.metadata;
-    return this.post<RegisteredAgent>("/v1/agents", body);
+    return toRegisteredAgent(await this.post<EngineRegisteredAgent>("/v1/agents", body));
   }
 
   /** Lists all registered agents, optionally filtered by tenant. */
@@ -993,12 +1026,15 @@ export class LeluClient {
     const path = tenantId
       ? `/v1/agents?tenant_id=${encodeURIComponent(tenantId)}`
       : "/v1/agents";
-    return this.get<ListAgentsResult>(path);
+    const d = await this.get<{ agents: EngineRegisteredAgent[]; count: number }>(path);
+    return { agents: d.agents.map(toRegisteredAgent), count: d.count };
   }
 
   /** Gets a single registered agent by its stable ID. */
   async getAgent(agentId: string): Promise<RegisteredAgent> {
-    return this.get<RegisteredAgent>(`/v1/agents/${encodeURIComponent(agentId)}`);
+    return toRegisteredAgent(
+      await this.get<EngineRegisteredAgent>(`/v1/agents/${encodeURIComponent(agentId)}`)
+    );
   }
 
   /**

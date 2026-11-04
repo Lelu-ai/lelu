@@ -56,6 +56,11 @@ from .models import (
     ListAuditEventsResult,
     # Error
     AuthEngineError,
+    # Agent registry types
+    RegisterAgentRequest,
+    RegisteredAgent,
+    AgentWorkloadToken,
+    AgentStatusResult,
     # Vault types
     VaultStoreRequest,
     VaultStoreResult,
@@ -159,6 +164,11 @@ __all__ = [
     "SimulatorReplaySummary",
     "SimulatorReplayRequest",
     "SimulatorReplayResponse",
+    # Agent registry
+    "RegisterAgentRequest",
+    "RegisteredAgent",
+    "AgentWorkloadToken",
+    "AgentStatusResult",
     # Vault
     "VaultStoreRequest",
     "VaultStoreResult",

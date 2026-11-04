@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Breaking
+
+* **Agent registry responses use snake_case field names.** `RegisteredAgent` had no JSON tags, so `POST /v1/agents`, `GET /v1/agents` and `GET /v1/agents/{id}` returned `ID`, `TenantID` and so on. The Python SDK's `register_agent`, `list_agents` and `get_agent` raised a validation error on those names, and the TypeScript SDK's `agent.id` was `undefined`. The fields are now `id`, `tenant_id`, `name`, `description`, `agent_type`, `owner_email`, `status`, `scopes`, `metadata`, `created_at` and `updated_at`. Anything reading the old names from the raw API needs to switch. Published TypeScript SDK 0.0.36 gets `id` and `status` from these responses, but `tenantId`, `agentType`, `ownerEmail`, `createdAt` and `updatedAt` stay `undefined` until an SDK release that maps them.
+
 ### Security Fixes
 
 * **The review queue is scoped to the caller's account in `PLATFORM_URL` mode.** Every queued item carried the account that triggered it, but no queue handler compared it with the caller, so any `lelu_sk_` key could list every account's pending reviews (actor, action, resource, reason), fetch or wait on any item by ID, and — without `LELU_REVIEWER_KEYS` — approve or deny another account's item, which that account's agent could then redeem. `GET /v1/queue/pending` now returns only the caller's items, with `total` counting only those; `GET /v1/queue/{id}`, `/wait`, `/approve`, `/deny` and `/redeem` answer 404 for another account's item, the same as for an unknown ID. The static `API_KEY` still sees and resolves the whole queue. Reported by Thomas.

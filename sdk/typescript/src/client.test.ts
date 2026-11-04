@@ -39,6 +39,37 @@ function authorizeResponse(
   };
 }
 
+// Mirrors RegisteredAgent in engine/internal/identity/registry.go.
+function engineAgent() {
+  return {
+    id: "agent-1",
+    tenant_id: "default",
+    name: "invoice_bot",
+    description: "Processes invoices",
+    agent_type: "autonomous",
+    owner_email: "owner@example.com",
+    status: "active",
+    scopes: ["read:invoices"],
+    metadata: { team: "billing" },
+    created_at: "2026-11-04T01:00:00Z",
+    updated_at: "2026-11-04T02:00:00Z",
+  };
+}
+
+const expectedAgent = {
+  id: "agent-1",
+  tenantId: "default",
+  name: "invoice_bot",
+  description: "Processes invoices",
+  agentType: "autonomous",
+  ownerEmail: "owner@example.com",
+  status: "active",
+  scopes: ["read:invoices"],
+  metadata: { team: "billing" },
+  createdAt: "2026-11-04T01:00:00Z",
+  updatedAt: "2026-11-04T02:00:00Z",
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("LeluClient", () => {
@@ -291,6 +322,45 @@ describe("LeluClient", () => {
       await client.putEnginePolicy("rules: []");
       const [, init] = mockFetch.mock.calls[0];
       expect(init.headers["If-Match"]).toBeUndefined();
+    });
+  });
+
+  describe("agent registry", () => {
+    it("registerAgent() maps the engine response to camelCase", async () => {
+      mockOK(engineAgent());
+      await expect(client.registerAgent({ name: "invoice_bot" })).resolves.toEqual(expectedAgent);
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toContain("/v1/agents");
+      expect(JSON.parse(init.body)).toEqual({ name: "invoice_bot" });
+    });
+
+    it("getAgent() maps the engine response to camelCase", async () => {
+      mockOK(engineAgent());
+      await expect(client.getAgent("agent-1")).resolves.toEqual(expectedAgent);
+    });
+
+    it("listAgents() maps each agent and keeps the count", async () => {
+      mockOK({ agents: [engineAgent()], count: 1 });
+      await expect(client.listAgents()).resolves.toEqual({ agents: [expectedAgent], count: 1 });
+    });
+
+    it("listAgents() handles an empty list", async () => {
+      mockOK({ agents: [], count: 0 });
+      await expect(client.listAgents()).resolves.toEqual({ agents: [], count: 0 });
+    });
+
+    it("a registered agent's id can be used to issue a token", async () => {
+      mockOK(engineAgent());
+      const agent = await client.registerAgent({ name: "invoice_bot" });
+      mockOK({
+        token: "jwt",
+        agent_id: "agent-1",
+        scopes: ["read:invoices"],
+        expires_at: "2026-11-04T03:00:00Z",
+        issued_at: "2026-11-04T02:00:00Z",
+      });
+      await client.issueAgentToken(agent.id);
+      expect(mockFetch.mock.calls[1][0]).toContain("/v1/agents/agent-1/token");
     });
   });
 });

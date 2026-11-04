@@ -47,17 +47,17 @@ const (
 
 // RegisteredAgent is the domain object for a persistent agent identity.
 type RegisteredAgent struct {
-	ID          string
-	TenantID    string
-	Name        string
-	Description string
-	AgentType   AgentType
-	OwnerEmail  string
-	Status      AgentStatus
-	Scopes      []string
-	Metadata    map[string]any
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          string         `json:"id"`
+	TenantID    string         `json:"tenant_id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	AgentType   AgentType      `json:"agent_type"`
+	OwnerEmail  string         `json:"owner_email"`
+	Status      AgentStatus    `json:"status"`
+	Scopes      []string       `json:"scopes"`
+	Metadata    map[string]any `json:"metadata"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
 // RegisterRequest is the input to Register().

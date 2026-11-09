@@ -47,14 +47,19 @@ export default function DocsQuickStart() {
             <span className="text-[12px] text-[#737373] font-mono">Claude Code</span>
           </div>
           <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio`}
+{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent`}
           </pre>
         </div>
         <p className="text-[14px] text-[#737373] leading-[1.65]">
-          The starter policy lands in{" "}
+          The general starter policy lands in{" "}
           <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu/policy.yaml</code>
           {" "}— it denies destructive actions, routes payments to human review, allows reads,
-          and default-denies the rest. Edit it and restart to change the rules. When you want
+          and default-denies the rest. The Claude Code command above uses the{" "}
+          <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">coding-agent</code>{" "}
+          preset instead, written to{" "}
+          <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu/policy.coding-agent.yaml</code>:
+          editing files, running tests and local git are allowed; package installs, pushes and
+          deploys go to human review. Edit the policy file and restart to change the rules. When you want
           cloud-managed policies and audit history, continue below.
         </p>
       </section>
@@ -188,19 +193,24 @@ export default function DocsQuickStart() {
 {`import { lelu } from "lelu-agent-auth";
 
 // Zero-config: discovers the engine \`npx lelu-mcp start\` is running.
-// Point it elsewhere with lelu({ baseUrl, apiKey }) — e.g. a Docker
-// or self-hosted engine — or via LELU_BASE_URL / LELU_API_KEY.
+// For a Docker or self-hosted engine, pass its URL and API key explicitly
+// (the SDK does not pick up LELU_API_KEY on its own), e.g.:
+//   lelu({ baseUrl: "http://localhost:8083", apiKey: process.env.LELU_API_KEY })
 const auth = lelu();
 
-const result = await auth.authorize({
+const request = {
   tool: "refund_payment",
   context: { confidence: 0.85 },
-});
+};
+const result = await auth.authorize(request);
 
 if (result.decision === "allow") {
   // proceed with the action
 } else if (result.decision === "human_review") {
-  // queued — agent pauses, awaiting human approval
+  // queued — wait for a reviewer, then re-check this exact request
+  // against the approval (keyed by result.reviewId, not result.requestId)
+  const outcome = await auth.api.waitAndRedeem(result, request);
+  if (!outcome.allowed) throw new Error(\`Not approved: \${outcome.reason}\`);
 } else {
   throw new Error(\`Denied: \${result.reason}\`);
 }`}
@@ -270,7 +280,7 @@ if (result.decision === "allow") {
                 { field: 'decision: "allow"', desc: "Action is permitted — proceed immediately." },
                 {
                   field: 'decision: "human_review"',
-                  desc: "Action queued for a human. On a self-hosted engine, poll /v1/queue/pending until approved or denied.",
+                  desc: "Action queued for a human. On a self-hosted engine the SDK decision carries a reviewId — wait on it with waitAndRedeem(decision, request). requestId is only the trace ID and is not a queue key.",
                 },
                 {
                   field: 'decision: "deny"',
@@ -314,18 +324,21 @@ if (result.decision === "allow") {
                 <span className="text-[12px] text-[#737373]">Vercel AI SDK</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] leading-relaxed overflow-x-auto">
-{`import { secureTool } from "lelu-agent-auth/vercel";
+{`import { secureTool } from "lelu-agent-auth";
 import { tool } from "ai";
 import { z } from "zod";
 
-const processRefund = secureTool(lelu, "billing-agent", {
+// \`auth\` is the lelu() instance from step 3; auth.api is its LeluClient.
+const processRefund = secureTool({
+  client: auth.api,
+  actor: "billing-agent",
+  action: "refund:process",
+  confidence: 0.9,
   tool: tool({
     description: "Process a customer refund",
     parameters: z.object({ orderId: z.string(), amount: z.number() }),
     execute: async ({ orderId, amount }) => ({ success: true }),
   }),
-  action: "refund:process",
-  confidence: 0.9,
 });`}
               </pre>
             </div>

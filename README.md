@@ -129,7 +129,7 @@ const decision = await auth.authorize({
 if (decision.decision === "allow") {
   await deleteRecord(id);
 } else if (decision.decision === "human_review") {
-  await notifyReviewer(decision.requestId); // agent pauses, human approves, resumes
+  await notifyReviewer(decision.reviewId); // agent pauses, human approves, resumes (reviewId is the queue ID)
 } else if (decision.decision === "compute") {
   await saferAlternative(decision.safeTool, decision.safeArgs); // redirected to sandbox
 } else {

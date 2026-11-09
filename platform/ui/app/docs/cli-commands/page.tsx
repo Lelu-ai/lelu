@@ -33,7 +33,7 @@ npx lelu-agent-auth policies delete old-policy
 npx lelu-agent-auth help`,
     },
     Python: {
-      install: "pip install lelu-agent-auth-sdk",
+      install: "pip install lelu-agent-auth-sdk  # requires Python 3.11+",
       commands: `# Launch visual UI (Lelu Studio)
 lelu studio
 
@@ -349,7 +349,7 @@ cd sdk/go/cmd/lelu && go build -o lelu`,
                     "platform-dev-key",
                     "Platform API key for authentication",
                   ],
-                  ["LELU_API_KEY", "your_key_here", "Cloud engine API key"],
+                  ["LELU_API_KEY", "-", "Engine API key used by the SDK clients (not read by these CLI commands)"],
                   ["LELU_TENANT_ID", "default", "Tenant ID for multi-tenant setups"],
                   ["LELU_AUDIT_LIMIT", "20", "Number of audit events to fetch"],
                   ["BROWSER", "-", "Browser to open Studio in (chrome, firefox, safari)"],

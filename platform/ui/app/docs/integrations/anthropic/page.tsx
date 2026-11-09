@@ -34,7 +34,7 @@ export default function DocsAnthropic() {
           </div>
           <p className="text-zinc-600 dark:text-zinc-400 mb-4">
             Claude returns <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">tool_use</code> blocks when it wants to call a tool.
-            Pass the tool name to Lelu before dispatching.
+            Pass the tool name, with its input as <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">args</code>, to Lelu before dispatching.
           </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
@@ -56,10 +56,12 @@ const response = await claude.messages.create({
 for (const block of response.content) {
   if (block.type !== "tool_use") continue;
 
-  const decision = await lelu.authorize({
+  const request = {
     tool: block.name,
-    context: JSON.stringify(block.input),
-  });
+    // Tool arguments go in args (an object), not in context.
+    args: block.input as Record<string, unknown>,
+  };
+  const decision = await lelu.authorize(request);
 
   if (decision.decision === "deny") {
     console.error(\`Blocked: \${block.name} — \${decision.reason}\`);
@@ -67,7 +69,13 @@ for (const block of response.content) {
   }
 
   if (decision.decision === "human_review") {
-    await requestApproval(decision.requestId);
+    // Waits on decision.reviewId (not requestId, the trace ID), then
+    // re-checks this exact request against what the reviewer approved.
+    const approval = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+    if (!approval.allowed) {
+      console.error(\`Not approved: \${block.name} — \${approval.reason}\`);
+      continue;
+    }
   }
 
   await executeTool(block.name, block.input);

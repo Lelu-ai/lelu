@@ -24,6 +24,10 @@ export default function DocsPythonSDK() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">{`pip install lelu-agent-auth-sdk`}</pre>
           </div>
+          <p className="text-zinc-600 dark:text-zinc-400 mt-4">
+            Requires Python 3.11 or later. The package installs the{" "}
+            <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">lelu</code> module.
+          </p>
         </section>
 
         {/* Quick start */}
@@ -35,11 +39,21 @@ export default function DocsPythonSDK() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import asyncio
 import os
-from lelu import LeluClient, AuthorizeRequest
+from lelu import AgentContext, AuthorizeRequest, LeluClient
 
 async def main():
-    async with LeluClient(api_key=os.environ["LELU_API_KEY"]) as lelu:
-        result = await lelu.authorize(AuthorizeRequest(tool="delete_records"))
+    # Point at the engine you run and pass its key. Without base_url (or
+    # LELU_BASE_URL), an API key makes the client target https://lelu-ai.com.
+    async with LeluClient(
+        base_url="http://localhost:8083",  # e.g. the Docker Compose engine
+        api_key=os.environ["LELU_API_KEY"],
+    ) as lelu:
+        req = AuthorizeRequest(
+            tool="delete_records",
+            context=AgentContext(confidence=0.9, acting_for="user_123"),
+            args={"table": "invoices"},
+        )
+        result = await lelu.authorize(req)
 
         if result.allowed:
             print("Proceeding autonomously")
@@ -48,7 +62,15 @@ async def main():
             print(f"Using safe alternative: {result.safe_tool}")
             print(f"With args: {result.safe_args}")
         elif result.requires_human_review:
-            print(f"Queued for review — request ID: {result.request_id}")
+            # The queue key is result.review_id — request_id is only the trace ID.
+            print(f"Queued for review — review ID: {result.review_id}")
+            # Wait for the reviewer (the engine caps one wait at 60s), then
+            # re-check this exact request against the approval.
+            outcome = await lelu.wait_and_redeem(result, req, timeout_ms=60_000)
+            if outcome.allowed:
+                print("Approved — proceeding")
+            else:
+                print(f"Not approved: {outcome.reason}")
         else:
             print(f"Denied: {result.reason}")
 
@@ -63,7 +85,7 @@ asyncio.run(main())`}</pre>
             {[
               { decision: "allow", color: "emerald", desc: "Agent proceeds autonomously. result.allowed == True." },
               { decision: "compute", color: "violet", desc: "Platform returns a safe alternative. Use result.safe_tool and result.safe_args." },
-              { decision: "human_review", color: "amber", desc: "Action queued for human approval. result.requires_human_review == True." },
+              { decision: "human_review", color: "amber", desc: "Action queued for human approval. result.requires_human_review == True; pass result (or result.review_id) to wait_and_redeem()." },
               { decision: "deny", color: "red", desc: "Action blocked. Check result.reason for explanation." },
             ].map(({ decision, color, desc }) => (
               <div key={decision} className={`flex gap-3 p-4 rounded-xl border bg-${color}-50 dark:bg-${color}-900/10 border-${color}-200 dark:border-${color}-800/30`}>
@@ -88,7 +110,10 @@ asyncio.run(main())`}</pre>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`from lelu import LeluClient
 from lelu.langgraph import secure_node
 
-client = LeluClient(api_key=os.environ["LELU_API_KEY"])
+client = LeluClient(
+    base_url="http://localhost:8083",  # the engine you run
+    api_key=os.environ["LELU_API_KEY"],
+)
 
 @secure_node(
     client=client,
@@ -123,9 +148,9 @@ async def approve_invoice(state: dict) -> dict:
                   ["safe_tool", "str | None", "Safe alternative tool (compute only)"],
                   ["safe_args", "dict | None", "Replacement args (compute only)"],
                   ["reason", "str", "Human-readable explanation"],
-                  ["rule", "str", "Rule that matched"],
-                  ["request_id", "str", "Unique request identifier for audit"],
-                  ["latency_ms", "float", "Evaluation latency in milliseconds"],
+                  ["review_id", "str | None", "Review queue ID (human_review only) — pass it, or the decision itself, to wait_and_redeem() / redeem_review() / get_review()"],
+                  ["request_id", "str", "Trace ID for the audit trail — not a review queue key"],
+                  ["downgraded_scope", "str | None", "Set when the engine downgraded the requested scope"],
                 ].map(([field, type_, desc]) => (
                   <tr key={field} className="bg-white dark:bg-zinc-900/30">
                     <td className="px-4 py-3 font-mono text-xs text-zinc-900 dark:text-white">{field}</td>
@@ -147,7 +172,7 @@ async def approve_invoice(state: dict) -> dict:
               className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
               lelu-agent-auth-sdk
             </a>
-            . Current version: <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">0.3.62</code>
+            . Requires Python 3.11 or later.
           </p>
         </section>
       </div>

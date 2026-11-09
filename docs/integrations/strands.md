@@ -11,8 +11,13 @@ it has been given a task, on the assumption that any filter will eventually be
 bypassed.
 
 - Repository: https://github.com/Lelu-ai/lelu
-- Python: `pip install lelu-agent-auth-sdk`
-- TypeScript: `npm install lelu-agent-auth`
+- Python: `pip install lelu-agent-auth-sdk strands-agents`
+- TypeScript: `npm install lelu-agent-auth @strands-agents/sdk`
+
+The Python package will also offer a `strands` extra
+(`pip install "lelu-agent-auth-sdk[strands]"`) from its next release; the
+currently published package doesn't have it yet, so install `strands-agents`
+alongside it as above.
 
 ## How it maps onto Strands
 
@@ -38,6 +43,11 @@ Run the engine locally — no account or configuration needed:
 npx -y lelu-mcp start
 ```
 
+It picks a free port and records it, with its key, in `~/.lelu`. A client
+created with no URL finds it there, so the examples below don't hard-code a
+port. To target another engine, pass a base URL or set `LELU_BASE_URL` /
+`LELU_API_KEY`.
+
 ### Python
 
 ```python
@@ -48,7 +58,7 @@ from lelu.strands import LeluIntervention
 agent = Agent(
     tools=[refund, lookup_invoice],
     interventions=[
-        LeluIntervention(LeluClient(base_url="http://localhost:8080"), actor="invoice_bot"),
+        LeluIntervention(LeluClient(), actor="invoice_bot"),  # finds the local engine
     ],
 )
 ```
@@ -59,6 +69,8 @@ agent = Agent(
 import { Agent } from "@strands-agents/sdk";
 import { LeluClient } from "lelu-agent-auth";
 import { LeluIntervention } from "lelu-agent-auth/strands";
+
+const client = new LeluClient(); // finds the local engine
 
 const agent = new Agent({
   tools: [refund, lookupInvoice],
@@ -112,16 +124,24 @@ If approval happens out of band in Lelu's own review queue instead, set
 `on_review="deny"` / `onReview: "deny"`. The call is then cancelled and you
 resume it yourself:
 
-Once a human has acted, redeem the approval:
+Once a human has acted, redeem the approval. `evaluate` and `redeem` are
+async in both SDKs:
 
 ```python
-outcome = guard.evaluate(call)
+from lelu.strands import ToolCall
+
+guard = LeluIntervention(LeluClient(), actor="invoice_bot", on_review="deny")
+
+# inside async code
+outcome = await guard.evaluate(ToolCall("refund", {"invoice_id": "inv_42"}))
 if outcome.action == "review":
-    result = guard.redeem(outcome, timeout_ms=60_000)
+    result = await guard.redeem(outcome, timeout_ms=60_000)
 ```
 
 ```typescript
-const outcome = await guard.evaluate(call);
+const guard = new LeluIntervention({ client, actor: "invoice_bot", onReview: "deny" });
+
+const outcome = await guard.evaluate({ name: "refund", arguments: { invoiceId: "inv_42" }, toolUseId: "" });
 if (outcome.action === "review") {
   const result = await guard.redeem(outcome, { timeoutMs: 60_000 });
 }
@@ -135,7 +155,7 @@ matching — so there is one thing to check rather than three.
 ## Requirements
 
 - Lelu engine 0.2.0 or later for the human-review redemption endpoint
-- Python 3.10+ or Node 18+
+- Python 3.11+ or Node 18+
 
 ## Support
 

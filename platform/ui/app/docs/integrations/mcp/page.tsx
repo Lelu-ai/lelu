@@ -30,8 +30,15 @@ export default function DocsMCP() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">Claude Code</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio`}</pre>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent`}</pre>
           </div>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">--preset coding-agent</code>{" "}
+            writes <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">~/.lelu/policy.coding-agent.yaml</code>{" "}
+            instead: editing files, running tests, builds and local git are allowed; package installs,
+            pushes, merges, deploys and anything touching secrets or env files go to human review;
+            destructive and execution actions stay denied. Omit it for the general starter policy.
+          </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-4">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">claude_desktop_config.json / .cursor/mcp.json</span>
@@ -47,9 +54,35 @@ export default function DocsMCP() {
           </div>
           <p className="text-zinc-600 dark:text-zinc-400">
             Already running an engine? Point at it instead with{" "}
-            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">--engine-url http://localhost:8082 --api-key &lt;key&gt;</code>{" "}
-            — no local engine is spawned when a URL is set.
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">--engine-url http://localhost:8083 --api-key &lt;key&gt;</code>{" "}
+            (8083 is the host port Docker Compose maps the engine to) — no local engine is spawned
+            when a URL is set.
           </p>
+        </section>
+
+        <section>
+          <h2 id="http-transport" className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">HTTP transport</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            To serve MCP over HTTP/SSE instead of stdio, set{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">MCP_AUTH_TOKEN</code>{" "}
+            (at least 16 characters) — the server refuses to start without it, because it holds the
+            engine&apos;s API key. Clients must send the same token as an{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">Authorization: Bearer</code>{" "}
+            header, or the server answers 401. It listens on 127.0.0.1 unless you set{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">MCP_BIND_ADDR</code>.
+          </p>
+          <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
+            <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
+              <span className="text-xs text-zinc-500 font-mono">terminal</span>
+            </div>
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`# Start the server with a token (add --engine-url/--api-key to use an existing engine)
+export MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+npx -y lelu-mcp start --transport http --port 3001
+
+# Connect Claude Code, presenting the same token
+claude mcp add --transport sse lelu http://localhost:3001/sse \\
+  --header "Authorization: Bearer $MCP_AUTH_TOKEN"`}</pre>
+          </div>
         </section>
 
         <section>
@@ -105,7 +138,10 @@ export default function DocsMCP() {
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine, e.g. http://localhost:8083
+  apiKey: process.env.LELU_API_KEY,
+});
 const server = new McpServer({ name: "my-server", version: "1.0.0" });
 
 server.tool("delete_file", { path: z.string() }, async ({ path }) => {

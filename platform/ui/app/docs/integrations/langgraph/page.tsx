@@ -40,15 +40,18 @@ const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
 
 const State = Annotation.Root({
   tool: Annotation<string>(),
-  context: Annotation<string>(),
+  args: Annotation<Record<string, unknown>>(),
+  actingFor: Annotation<string>(),
   decision: Annotation<string>(),
+  reason: Annotation<string>(),
   result: Annotation<string>(),
 });
 
 async function leluGuard(state: typeof State.State) {
   const { decision, reason } = await lelu.authorize({
     tool: state.tool,
-    context: state.context,
+    args: state.args, // tool arguments go in args
+    context: { actingFor: state.actingFor }, // context is an object, not a string
   });
   return { decision, reason };
 }

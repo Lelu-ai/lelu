@@ -17,16 +17,16 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	serviceName    = "lelu-engine"
-	serviceVersion = "0.1.0"
-)
+const serviceName = "lelu-engine"
 
 // Config holds OpenTelemetry configuration.
 type Config struct {
 	Enabled      bool
 	OTLPEndpoint string
 	SampleRate   float64
+	// ServiceVersion is reported as service.version. The engine passes its
+	// build version (server.Version); a hard-coded value here went stale.
+	ServiceVersion string
 }
 
 // Provider wraps the OpenTelemetry tracer provider.
@@ -61,7 +61,7 @@ func InitProvider(cfg Config) (*Provider, error) {
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion(serviceVersion),
+			semconv.ServiceVersion(cfg.ServiceVersion),
 		),
 	)
 	if err != nil {

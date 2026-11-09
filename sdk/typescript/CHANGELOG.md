@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+**Requires the next engine release (after 0.2.1).** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
+
+### Breaking
+
+* **`auth.handler` requires an `authenticate` option.** It served authorize, the review queue, approve and deny to any caller, with this instance's engine credentials, and took the resolver from the request body's `resolvedBy`. Now every route except `GET /ok` answers 403 until you pass `authenticate(request)`, which returns the caller (or `null` for 401). Listing, approving and denying need `caller.reviewer`, which is recorded as the resolver; `resolvedBy` in the body is ignored. A new `reviewerKey` option sends one of the engine's `LELU_REVIEWER_KEYS` secrets when resolving. Reported in the Nauro pilot (L-2).
+
+### Fixes
+
+* **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
+* **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).
+* `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
+* `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
+
 ## [0.0.36] (2026-09-04)
 
 **Requires engine ≥ 0.2.0** for the redemption endpoint. Against an earlier engine `waitAndRedeem()` will 404.

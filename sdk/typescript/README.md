@@ -85,6 +85,28 @@ curl -X POST https://lelu-ai.com/api/v1/keys \
 
 `auth.handler` exposes authorize / review-queue / health endpoints from **your** server, so browser code (like an approval UI) never sees the engine URL or your API key.
 
+The handler calls the engine with your API key, so it only serves callers your app has authenticated. Pass `authenticate`: it gets each request and returns the caller, or `null` to refuse with 401. Without it, every route except `GET /ok` answers 403. Callers with a `reviewer` may list the queue and approve or deny, and that name is recorded as the resolver; the request body can't set it.
+
+```ts
+// lib/lelu.ts
+import { lelu } from "lelu-agent-auth";
+import { getSession } from "./session"; // your app's auth
+
+export const auth = lelu({
+  baseUrl: process.env.LELU_BASE_URL,
+  apiKey: process.env.LELU_API_KEY,
+  authenticate: async (request) => {
+    const session = await getSession(request);
+    if (!session) return null;
+    return session.user.canReviewAgents ? { reviewer: session.user.email } : {};
+  },
+  // When the engine sets LELU_REVIEWER_KEYS, one of those secrets:
+  reviewerKey: process.env.LELU_REVIEWER_KEY,
+});
+```
+
+With `LELU_REVIEWER_KEYS` set on the engine, approvals and denials need `reviewerKey`, and the engine records the reviewer that key names rather than `reviewer`. Without reviewer keys the engine takes the name the handler sends, so `authenticate` is what stands between your users and the queue.
+
 ```ts
 // app/api/lelu/[...all]/route.ts (Next.js App Router)
 import { auth } from "@/lib/lelu";
@@ -103,13 +125,13 @@ app.all("/api/lelu/*", toNodeHandler(auth));
 
 Routes served under `basePath` (default `/api/lelu`, configurable via `lelu({ basePath })`):
 
-| Route | Purpose |
-|---|---|
-| `POST /authorize` | Authorize a tool call |
-| `GET /queue` | List pending human-review items |
-| `POST /queue/:id/approve` | Approve a queued action |
-| `POST /queue/:id/deny` | Deny a queued action |
-| `GET /ok` | Engine health check |
+| Route | Purpose | Who may call it |
+|---|---|---|
+| `POST /authorize` | Authorize a tool call | Any authenticated caller |
+| `GET /queue` | List pending human-review items | A caller with `reviewer` |
+| `POST /queue/:id/approve` | Approve a queued action (body: `{ note? }`) | A caller with `reviewer` |
+| `POST /queue/:id/deny` | Deny a queued action (body: `{ note? }`) | A caller with `reviewer` |
+| `GET /ok` | Engine health check | Anyone |
 
 ## How URL resolution works
 

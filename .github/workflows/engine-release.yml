@@ -5,6 +5,9 @@
 #   2. scripts/install.sh    — curl | sh installer
 #
 # Trigger: push a tag like engine-v0.1.0 (or run manually via workflow_dispatch).
+# A tag push also builds and pushes the engine image to GHCR. That used to
+# happen only in release.yml, on plain v*.*.* tags, which engine releases
+# stopped using after v0.0.14 — so no engine release since then had an image.
 #
 # CGO note: the engine uses mattn/go-sqlite3 (CGO) for behavioral analytics.
 # Linux/macOS builds run on native runners with CGO enabled so analytics work.
@@ -21,6 +24,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build:
@@ -104,3 +108,46 @@ jobs:
           generate_release_notes: true
           # workflow_dispatch runs (no tag) publish a draft you can name yourself
           draft: ${{ github.ref_type != 'tag' }}
+
+  docker:
+    name: image
+    # Only for a real release tag: a workflow_dispatch run has no version to
+    # tag the image with.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#engine-v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/lelu-engine
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable=${{ !contains(steps.version.outputs.version, '-') }}
+
+      # The Dockerfile builds each platform natively; arm64 runs under QEMU.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: engine/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: VERSION=${{ steps.version.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

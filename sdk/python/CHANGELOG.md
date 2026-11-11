@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+* **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.
+* **`__version__` comes from the installed package metadata.** It was a hard-coded `0.4.3` while the package was `0.4.41`. Reported in the Nauro pilot.
+
 ## [0.4.41] (2026-09-04)
 
 ### Features

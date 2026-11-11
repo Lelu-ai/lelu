@@ -178,7 +178,9 @@ async function runAdd(flags: Record<string, string>): Promise<void> {
     // The HTTP transport requires MCP_AUTH_TOKEN on the server side, so the
     // client has to present it too. Without this header the server answers
     // 401 — which is the point: this port fronts the engine's API key.
-    console.log(`claude mcp add --transport http lelu ${sseUrl} --header "Authorization: Bearer $MCP_AUTH_TOKEN"`);
+    // "sse", not "http": the server speaks the legacy SSE transport
+    // (GET /sse + POST /messages), not streamable HTTP.
+    console.log(`claude mcp add --transport sse lelu ${sseUrl} --header "Authorization: Bearer $MCP_AUTH_TOKEN"`);
     return;
   }
 

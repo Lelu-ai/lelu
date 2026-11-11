@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -82,7 +83,7 @@ func main() {
 	// used when an operator sets it deliberately.
 	leluIssuer := envOr("LELU_ISSUER", envOr("LELU_ENGINE_PUBLIC_URL", ""))
 	if leluIssuer == "" {
-		leluIssuer = "http://localhost" + addr
+		leluIssuer = defaultIssuer(addr)
 		log.Printf("warning: neither LELU_ISSUER nor LELU_ENGINE_PUBLIC_URL is set — publishing discovery metadata as %s, which is almost certainly not reachable by your clients", leluIssuer)
 	}
 	rsaKeyPath := envOr("LELU_RSA_KEY_PATH", "/var/lib/lelu/signing.key.pem")
@@ -135,8 +136,9 @@ func main() {
 	// ── OpenTelemetry (Phase 2) ──────────────────────────────────────────────
 	tp, err := telemetry.InitProvider(telemetry.Config{
 		Enabled:      otelEnabled,
-		OTLPEndpoint: otelEndpoint,
-		SampleRate:   otelSampleRate,
+		OTLPEndpoint:   otelEndpoint,
+		SampleRate:     otelSampleRate,
+		ServiceVersion: server.Version,
 	})
 	if err != nil {
 		log.Fatalf("failed to initialize telemetry: %v", err)
@@ -611,6 +613,24 @@ func redactRedisErr(err error, addr string) string {
 		msg = strings.ReplaceAll(msg, addr, redactRedisAddr(addr))
 	}
 	return msg
+}
+
+// defaultIssuer is the issuer published when none is configured: the
+// engine's own listen address, as a client on this host would reach it.
+// Prefixing "http://localhost" to the address only works for the ":8080"
+// form — LISTEN_ADDR=127.0.0.1:18960 produced "http://localhost127.0.0.1:18960".
+// A wildcard host (0.0.0.0, ::) is not an address a client can dial, so it
+// becomes localhost too.
+func defaultIssuer(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://localhost" + addr
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 func envOr(key, fallback string) string {

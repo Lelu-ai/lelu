@@ -16,6 +16,9 @@
 
 ### Fixes
 
+* **The default issuer is right for an explicit listen host.** With `LISTEN_ADDR=127.0.0.1:18960` and no `LELU_ISSUER`, discovery metadata advertised `http://localhost127.0.0.1:18960`. It now uses the host given (`http://127.0.0.1:18960`), and `localhost` for `:8080`, `0.0.0.0` and `::`. Reported in the Nauro pilot.
+* **OpenTelemetry reports the engine's real version** as `service.version`, instead of a hard-coded `0.1.0`.
+* **Engine releases publish a container image again.** Images were only built on plain `v*.*.*` tags, which engine releases stopped using after `v0.0.14`, so no `engine-v*` release had one. `engine-release.yml` now pushes `ghcr.io/lelu-ai/lelu-engine:<version>` (and `latest` for non-prerelease tags) for `linux/amd64` and `linux/arm64`. The Dockerfile no longer forces `GOARCH=amd64`, which put an amd64 binary in the arm64 image, and stamps the version so `/healthz` and `--version` report it. Reported in the Nauro pilot.
 * **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
 
 ## [0.2.1] (2026-10-15)

@@ -188,4 +188,11 @@ __all__ = [
     "CrewAIPermissionDeniedError",
 ]
 
-__version__ = "0.4.3"
+# Read from the installed distribution so it can't drift from pyproject.toml
+# again (it said 0.4.3 while the package was 0.4.41).
+try:
+    from importlib.metadata import PackageNotFoundError, version as _dist_version
+
+    __version__ = _dist_version("lelu-agent-auth-sdk")
+except PackageNotFoundError:  # running from a source checkout, not installed
+    __version__ = "0.0.0+source"

@@ -29,9 +29,15 @@ COPY engine/ .
 #
 # Still statically linked, via musl, so the runtime image needs no libc
 # beyond what alpine already has.
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+#
+# No GOARCH: each platform of a multi-platform build compiles natively in its
+# own builder (QEMU for the non-native one). Forcing amd64 put an amd64 binary
+# in the arm64 image. VERSION is what /healthz and --version report; release
+# builds pass it as a build arg, like the binaries' -ldflags.
+ARG VERSION=dev
+RUN CGO_ENABLED=1 GOOS=linux \
     go build -mod=vendor -tags "sqlite_omit_load_extension" \
-    -ldflags="-s -w -extldflags '-static'" \
+    -ldflags="-s -w -extldflags '-static' -X github.com/lelu-ai/lelu/engine/internal/server.Version=${VERSION}" \
     -o /engine ./cmd/engine
 
 # ── Runtime ───────────────────────────────────────────────────────────────────

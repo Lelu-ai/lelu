@@ -89,18 +89,28 @@ describe("lelu() factory", () => {
   describe("handler()", () => {
     const base = "http://localhost:3000/api/lelu";
 
-    function post(path: string, body: unknown): Request {
+    function post(path: string, body: unknown, headers: Record<string, string> = {}): Request {
       return new Request(`${base}${path}`, {
         method: "POST",
         body: JSON.stringify(body),
+        headers,
       });
     }
 
+    // Stands in for an app's session check: the x-test-user header names the
+    // caller, and "alice" is a reviewer.
+    const authenticate = (request: Request) => {
+      const user = request.headers.get("x-test-user");
+      if (!user) return null;
+      return user === "alice" ? { reviewer: "alice" } : {};
+    };
+    const asAlice = { "x-test-user": "alice" };
+
     it("routes POST /authorize to the engine and returns the decision", async () => {
       mockOK(authorizeResponse(true, "t-handler"));
-      const auth = lelu({ baseUrl: "http://localhost:8080", actor: "billing-agent" });
+      const auth = lelu({ baseUrl: "http://localhost:8080", actor: "billing-agent", authenticate });
 
-      const res = await auth.handler(post("/authorize", { tool: "refund:process" }));
+      const res = await auth.handler(post("/authorize", { tool: "refund:process" }, { "x-test-user": "bob" }));
       const decision = await res.json();
 
       expect(res.status).toBe(200);
@@ -112,26 +122,87 @@ describe("lelu() factory", () => {
 
     it("routes GET /queue to the engine", async () => {
       mockOK({ items: [], count: 0 });
-      const auth = lelu({ baseUrl: "http://localhost:8080" });
+      const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
 
-      const res = await auth.handler(new Request(`${base}/queue`));
+      const res = await auth.handler(new Request(`${base}/queue`, { headers: asAlice }));
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ items: [], count: 0 });
     });
 
-    it("routes POST /queue/:id/approve to the engine", async () => {
+    it("routes POST /queue/:id/approve to the engine as the authenticated reviewer", async () => {
       mockOK({ success: true });
-      const auth = lelu({ baseUrl: "http://localhost:8080" });
+      const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
 
       const res = await auth.handler(
-        post("/queue/item-1/approve", { resolvedBy: "alice", note: "ok" })
+        post("/queue/item-1/approve", { resolvedBy: "mallory", note: "ok" }, asAlice)
       );
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ success: true });
       const engineUrl = mockFetch.mock.calls[0]?.[0] as string;
       expect(engineUrl).toContain("/item-1/");
+      // The body's resolvedBy is ignored; the resolver is the authenticated caller.
+      expect(sentBody()).toEqual({ resolved_by: "alice", note: "ok" });
+    });
+
+    it("sends the reviewer key when resolving", async () => {
+      mockOK({ success: true });
+      const auth = lelu({ baseUrl: "http://localhost:8080", authenticate, reviewerKey: "rk-secret-0123456789" });
+
+      await auth.handler(post("/queue/item-1/deny", {}, asAlice));
+
+      const init = mockFetch.mock.calls[0]?.[1] as { headers: Record<string, string> };
+      expect(init.headers["X-Lelu-Reviewer-Key"]).toBe("rk-secret-0123456789");
+    });
+
+    // Reported in the Nauro pilot (L-2): the handler served every route to
+    // any caller and let the body name the reviewer.
+    describe("access", () => {
+      it("refuses everything but /ok when no authenticate option is set", async () => {
+        const auth = lelu({ baseUrl: "http://localhost:8080" });
+
+        for (const req of [
+          post("/authorize", { tool: "refund:process" }),
+          new Request(`${base}/queue`),
+          post("/queue/item-1/approve", { resolvedBy: "alice" }),
+          post("/queue/item-1/deny", { resolvedBy: "alice" }),
+        ]) {
+          const res = await auth.handler(req);
+          expect(res.status).toBe(403);
+          expect((await res.json()).error).toBe("handler_not_configured");
+        }
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it("returns 401 when authenticate refuses the caller", async () => {
+        const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
+
+        const res = await auth.handler(post("/queue/item-1/approve", { resolvedBy: "alice" }));
+
+        expect(res.status).toBe(401);
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it("keeps a caller who is not a reviewer out of the queue", async () => {
+        const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
+        const bob = { "x-test-user": "bob" };
+
+        expect((await auth.handler(new Request(`${base}/queue`, { headers: bob }))).status).toBe(403);
+        expect((await auth.handler(post("/queue/item-1/approve", {}, bob))).status).toBe(403);
+        expect((await auth.handler(post("/queue/item-1/deny", {}, bob))).status).toBe(403);
+        expect(mockFetch).not.toHaveBeenCalled();
+      });
+
+      it("accepts an async authenticate", async () => {
+        mockOK({ items: [], count: 0 });
+        const auth = lelu({
+          baseUrl: "http://localhost:8080",
+          authenticate: async () => ({ reviewer: "alice" }),
+        });
+
+        expect((await auth.handler(new Request(`${base}/queue`))).status).toBe(200);
+      });
     });
 
     it("routes GET /ok to the health check", async () => {
@@ -144,9 +215,9 @@ describe("lelu() factory", () => {
     });
 
     it("returns 404 for unknown routes", async () => {
-      const auth = lelu({ baseUrl: "http://localhost:8080" });
+      const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
 
-      const res = await auth.handler(new Request(`${base}/nope`));
+      const res = await auth.handler(new Request(`${base}/nope`, { headers: asAlice }));
 
       expect(res.status).toBe(404);
       expect(mockFetch).not.toHaveBeenCalled();
@@ -174,9 +245,9 @@ describe("lelu() factory", () => {
 
     it("maps engine errors to the error status", async () => {
       mockEngineError(403, "denied by policy");
-      const auth = lelu({ baseUrl: "http://localhost:8080" });
+      const auth = lelu({ baseUrl: "http://localhost:8080", authenticate });
 
-      const res = await auth.handler(post("/authorize", { tool: "refund:process" }));
+      const res = await auth.handler(post("/authorize", { tool: "refund:process" }, asAlice));
 
       expect(res.status).toBe(403);
     });

@@ -10,10 +10,13 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "lelu-home-"));
   process.env["LELU_HOME"] = home;
   delete process.env["LELU_BASE_URL"];
+  delete process.env["LELU_API_KEY"];
 });
 
 afterEach(() => {
   delete process.env["LELU_HOME"];
+  delete process.env["LELU_BASE_URL"];
+  delete process.env["LELU_API_KEY"];
   rmSync(home, { recursive: true, force: true });
 });
 
@@ -101,4 +104,41 @@ describe("LeluClient zero-config resolution", () => {
     expect(calls[0]?.url).toContain("http://engine.example.com");
     expect(calls[0]?.auth).toBeUndefined();
   });
+
+  // Reported in the Nauro pilot (L-10): with the URL and key both in the
+  // environment, the key was never sent.
+  it("sends LELU_API_KEY to the LELU_BASE_URL engine", async () => {
+    process.env["LELU_BASE_URL"] = "http://engine.example.com";
+    process.env["LELU_API_KEY"] = "lelu_sk_from_env";
+
+    const calls = await healthCalls(new LeluClient());
+
+    expect(calls[0]?.url).toContain("http://engine.example.com");
+    expect(calls[0]?.auth).toBe("Bearer lelu_sk_from_env");
+  });
+
+  it("a discovered local engine keeps its own key over LELU_API_KEY", async () => {
+    writeRuntime({ url: "http://127.0.0.1:53421", pid: process.pid });
+    writeFileSync(join(home, "engine.key"), "lelu_local_abc123\n");
+    process.env["LELU_API_KEY"] = "lelu_sk_from_env";
+
+    const calls = await healthCalls(new LeluClient());
+
+    expect(calls[0]?.auth).toBe("Bearer lelu_local_abc123");
+  });
 });
+
+async function healthCalls(client: LeluClient) {
+  const calls: Array<{ url: string; auth: string | undefined }> = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: any, init: any) => {
+    calls.push({ url: String(url), auth: init?.headers?.["Authorization"] });
+    return { ok: true, status: 200, json: async () => ({ status: "ok" }) };
+  }) as typeof fetch;
+  try {
+    await client.isHealthy();
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  return calls;
+}

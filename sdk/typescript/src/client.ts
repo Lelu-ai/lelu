@@ -60,6 +60,11 @@ import {
 import { agentTracer } from "./observability/tracer.js";
 import { discoverLocalEngine } from "./local.js";
 
+/** The engine's reviewer credential header (see LELU_REVIEWER_KEYS). */
+function reviewerHeaders(reviewerKey: string | undefined): Record<string, string> | undefined {
+  return reviewerKey ? { "X-Lelu-Reviewer-Key": reviewerKey } : undefined;
+}
+
 // ─── Engine responses ─────────────────────────────────────────────────────────
 
 /** RegisteredAgent in engine/internal/identity/registry.go, as sent over the wire. */
@@ -266,10 +271,8 @@ export class LeluClient {
   } as const;
 
   constructor(cfg: ClientConfig = {}) {
-    const envBaseUrl =
-      typeof process !== "undefined" && process.env
-        ? process.env["LELU_BASE_URL"]
-        : undefined;
+    const env = typeof process !== "undefined" && process.env ? process.env : undefined;
+    const envBaseUrl = env?.["LELU_BASE_URL"];
 
     // Engine endpoints (/v1/*) are only served by a Lelu engine — the
     // hosted platform does not proxy them yet, so an apiKey alone must not
@@ -290,6 +293,10 @@ export class LeluClient {
       }
     }
 
+    // LELU_API_KEY, as the Python SDK reads it. After discovery, so a
+    // discovered local engine keeps its own recorded key.
+    apiKey = apiKey ?? env?.["LELU_API_KEY"];
+
     this.baseUrl = (baseUrl ?? defaultUrl).replace(/\/$/, "");
     this.timeoutMs = cfg.timeoutMs ?? 5_000;
     this.apiKey = apiKey;
@@ -302,9 +309,9 @@ export class LeluClient {
    *
    * @example
    * ```ts
-   * const { decision, reason, requestId } = await lelu.authorize({ tool: "send_email" });
+   * const { decision, reason, reviewId } = await lelu.authorize({ tool: "send_email" });
    * if (decision === "deny") return `Blocked: ${reason}`;
-   * if (decision === "human_review") return `Awaiting approval (id: ${requestId})`;
+   * if (decision === "human_review") return `Awaiting approval (review: ${reviewId})`;
    * ```
    */
   /**
@@ -617,17 +624,35 @@ export class LeluClient {
     return this.redeemReview(reviewId, req);
   }
 
-  async approveQueueItem(id: string, resolvedBy: string, note = ""): Promise<{ success: boolean }> {
+  /**
+   * Approves a human-review item. When the engine sets `LELU_REVIEWER_KEYS`,
+   * pass one of those secrets as `opts.reviewerKey`: the engine then records
+   * the reviewer named by that key and ignores `resolvedBy`.
+   */
+  async approveQueueItem(
+    id: string,
+    resolvedBy: string,
+    note = "",
+    opts?: { reviewerKey?: string | undefined }
+  ): Promise<{ success: boolean }> {
     return this.post<{ success: boolean }>(
       `/v1/queue/${encodeURIComponent(id)}/approve`,
-      { resolved_by: resolvedBy, note }
+      { resolved_by: resolvedBy, note },
+      reviewerHeaders(opts?.reviewerKey)
     );
   }
 
-  async denyQueueItem(id: string, resolvedBy: string, note = ""): Promise<{ success: boolean }> {
+  /** Denies a human-review item. See {@link approveQueueItem} for `opts.reviewerKey`. */
+  async denyQueueItem(
+    id: string,
+    resolvedBy: string,
+    note = "",
+    opts?: { reviewerKey?: string | undefined }
+  ): Promise<{ success: boolean }> {
     return this.post<{ success: boolean }>(
       `/v1/queue/${encodeURIComponent(id)}/deny`,
-      { resolved_by: resolvedBy, note }
+      { resolved_by: resolvedBy, note },
+      reviewerHeaders(opts?.reviewerKey)
     );
   }
 
@@ -641,15 +666,15 @@ export class LeluClient {
    *
    * @example
    * ```ts
-   * const { decision, requestId } = await lelu.authorize({ tool: "wire_transfer" });
-   * if (decision === "human_review") {
-   *   const item = await lelu.waitForApproval(requestId, { timeoutMs: 5 * 60_000 });
+   * const { decision, reviewId } = await lelu.authorize({ tool: "wire_transfer" });
+   * if (decision === "human_review" && reviewId) {
+   *   const item = await lelu.waitForApproval(reviewId, { timeoutMs: 5 * 60_000 });
    *   if (item.status !== "approved") throw new Error("Not approved");
    * }
    * ```
    */
   async waitForApproval(
-    requestId: string,
+    reviewId: string,
     opts?: { timeoutMs?: number; signal?: AbortSignal }
   ): Promise<ReviewQueueItem> {
     // Server caps each individual long-poll at 60 s. We loop, issuing back-to-back
@@ -669,7 +694,7 @@ export class LeluClient {
         const remaining = deadline - Date.now();
         if (remaining <= 0) {
           // Deadline passed — one quick point-in-time GET to return current state.
-          return this.get<ReviewQueueItem>(`/v1/queue/${encodeURIComponent(requestId)}`);
+          return this.get<ReviewQueueItem>(`/v1/queue/${encodeURIComponent(reviewId)}`);
         }
 
         // Add up to 2 s jitter; cap each poll at 30 s or the remaining window.
@@ -678,7 +703,7 @@ export class LeluClient {
         const params = new URLSearchParams({ timeout_ms: pollMs.toString() });
 
         const res = await fetch(
-          `${this.baseUrl}/v1/queue/${encodeURIComponent(requestId)}/wait?${params}`,
+          `${this.baseUrl}/v1/queue/${encodeURIComponent(reviewId)}/wait?${params}`,
           { method: "GET", headers: this.headers(), signal: ctrl.signal }
         );
 
@@ -1206,13 +1231,13 @@ export class LeluClient {
     return h;
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async post<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: "POST",
-        headers: this.headers(),
+        headers: { ...this.headers(), ...extraHeaders },
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });

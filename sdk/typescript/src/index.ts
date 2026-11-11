@@ -15,7 +15,7 @@ export { LocalStorage } from "./storage.js";
 
 // ─── Shared-instance factory ──────────────────────────────────────────────────
 export { lelu } from "./lelu.js";
-export type { LeluOptions, LeluInstance } from "./lelu.js";
+export type { LeluOptions, LeluInstance, HandlerCaller } from "./lelu.js";
 
 // ─── Zero-config local engine discovery ───────────────────────────────────────
 export { discoverLocalEngine } from "./local.js";

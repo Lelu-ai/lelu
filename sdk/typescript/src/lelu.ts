@@ -9,11 +9,37 @@ import { LeluClient } from "./client.js";
 import { AuthEngineError } from "./types.js";
 import type { AuthDecision, AuthorizeRequest, ClientConfig } from "./types.js";
 
+/** The caller of `auth.handler`, as your app's own authentication sees it. */
+export interface HandlerCaller {
+  /**
+   * The human this caller is, when they may review queued actions. Required
+   * to list, approve or deny, and recorded as the resolver — the request body
+   * can't choose it. Leave it unset for callers who may only authorize.
+   */
+  reviewer?: string;
+}
+
 export interface LeluOptions extends ClientConfig {
   /** Default actor applied to `auth.authorize()` calls that omit one. */
   actor?: string;
   /** Path prefix `auth.handler` is mounted under (default: "/api/lelu"). */
   basePath?: string;
+  /**
+   * Authenticates each `auth.handler` request with your app's own auth
+   * (session, JWT, …). Return the caller, or `null` to refuse with 401.
+   *
+   * Required for every route except `GET /ok`. The handler calls the engine
+   * with this instance's API key, so without a check here anyone who can
+   * reach the route could authorize as your agents or approve their actions.
+   */
+  authenticate?: (request: Request) => HandlerCaller | null | Promise<HandlerCaller | null>;
+  /**
+   * One of the engine's `LELU_REVIEWER_KEYS` secrets, sent when the handler
+   * approves or denies. Needed when the engine sets `LELU_REVIEWER_KEYS`; the
+   * engine then records the reviewer named by this key, so put the human's
+   * name in your note if the key is shared.
+   */
+  reviewerKey?: string;
 }
 
 export interface LeluInstance {
@@ -43,11 +69,11 @@ export interface LeluInstance {
 
 // ─── Handler routes ───────────────────────────────────────────────────────────
 //
-//   POST {basePath}/authorize            body: AuthorizeRequest → AuthDecision
-//   GET  {basePath}/queue                → { items, count }
-//   POST {basePath}/queue/:id/approve    body: { resolvedBy?, note? }
-//   POST {basePath}/queue/:id/deny      body: { resolvedBy?, note? }
-//   GET  {basePath}/ok                  → { ok }
+//   POST {basePath}/authorize            body: AuthorizeRequest → AuthDecision   (authenticated)
+//   GET  {basePath}/queue                → { items, count }                     (reviewer)
+//   POST {basePath}/queue/:id/approve    body: { note? }                         (reviewer)
+//   POST {basePath}/queue/:id/deny      body: { note? }                         (reviewer)
+//   GET  {basePath}/ok                  → { ok }                                (anyone)
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -59,6 +85,8 @@ function json(body: unknown, status = 200): Response {
 async function route(
   api: LeluClient,
   authorize: (req: AuthorizeRequest) => Promise<AuthDecision>,
+  authenticate: LeluOptions["authenticate"],
+  reviewerKey: string | undefined,
   basePath: string,
   request: Request
 ): Promise<Response> {
@@ -70,33 +98,54 @@ async function route(
   const segments = rest === "" ? [] : rest.split("/");
   const method = request.method.toUpperCase();
 
+  if (method === "GET" && segments.length === 1 && segments[0] === "ok") {
+    return json({ ok: await api.isHealthy() });
+  }
+
+  // Everything else acts with this instance's engine credentials, so it is
+  // only served to a caller the app has authenticated.
+  if (!authenticate) {
+    return json(
+      {
+        error: "handler_not_configured",
+        message: "auth.handler needs an `authenticate` option before it serves anything but /ok",
+      },
+      403
+    );
+  }
+  const caller = await authenticate(request);
+  if (!caller) {
+    return json({ error: "unauthenticated" }, 401);
+  }
+  const reviewer = caller.reviewer?.trim();
+
   if (method === "POST" && segments.length === 1 && segments[0] === "authorize") {
     const body = (await request.json()) as AuthorizeRequest;
     return json(await authorize(body));
   }
 
-  if (method === "GET" && segments.length === 1 && segments[0] === "queue") {
+  const isQueue = segments[0] === "queue";
+  if (isQueue && !reviewer) {
+    return json({ error: "forbidden", message: "only a reviewer may use the review queue" }, 403);
+  }
+
+  if (method === "GET" && segments.length === 1 && isQueue) {
     return json(await api.listQueue());
   }
 
-  if (method === "POST" && segments.length === 3 && segments[0] === "queue") {
+  if (method === "POST" && segments.length === 3 && isQueue) {
     const id = segments[1] as string;
     const verb = segments[2];
-    const body = (await request.json().catch(() => ({}))) as {
-      resolvedBy?: string;
-      note?: string;
-    };
-    const resolvedBy = body.resolvedBy ?? "handler";
+    // The resolver is the authenticated reviewer. A resolvedBy in the body
+    // is ignored: taking it from there let any caller name any reviewer.
+    const body = (await request.json().catch(() => ({}))) as { note?: string };
+    const opts = { reviewerKey };
     if (verb === "approve") {
-      return json(await api.approveQueueItem(id, resolvedBy, body.note ?? ""));
+      return json(await api.approveQueueItem(id, reviewer as string, body.note ?? "", opts));
     }
     if (verb === "deny") {
-      return json(await api.denyQueueItem(id, resolvedBy, body.note ?? ""));
+      return json(await api.denyQueueItem(id, reviewer as string, body.note ?? "", opts));
     }
-  }
-
-  if (method === "GET" && segments.length === 1 && segments[0] === "ok") {
-    return json({ ok: await api.isHealthy() });
   }
 
   return json({ error: "not_found" }, 404);
@@ -124,7 +173,7 @@ async function route(
  * ```
  */
 export function lelu(options: LeluOptions = {}): LeluInstance {
-  const { actor, basePath: rawBasePath, ...clientConfig } = options;
+  const { actor, basePath: rawBasePath, authenticate, reviewerKey, ...clientConfig } = options;
   const api = new LeluClient(clientConfig);
   const basePath = (rawBasePath ?? "/api/lelu").replace(/\/+$/, "");
 
@@ -136,7 +185,7 @@ export function lelu(options: LeluOptions = {}): LeluInstance {
 
   const handler = async (request: Request): Promise<Response> => {
     try {
-      return await route(api, authorize, basePath, request);
+      return await route(api, authorize, authenticate, reviewerKey, basePath, request);
     } catch (err) {
       if (err instanceof AuthEngineError) {
         return json({ error: err.message, details: err.details }, err.status ?? 502);

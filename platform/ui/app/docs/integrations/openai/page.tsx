@@ -53,17 +53,26 @@ const response = await openai.chat.completions.create({
 });
 
 for (const call of response.choices[0].message.tool_calls ?? []) {
-  const decision = await lelu.authorize({
+  if (call.type !== "function") continue;
+
+  const request = {
     tool: call.function.name,
-    context: call.function.arguments,
-  });
+    // Tool arguments go in args; OpenAI returns them as a JSON string.
+    args: JSON.parse(call.function.arguments),
+  };
+  const decision = await lelu.authorize(request);
 
   if (decision.decision === "deny") {
     throw new Error(\`Tool \${call.function.name} was denied: \${decision.reason}\`);
   }
 
   if (decision.decision === "human_review") {
-    await waitForApproval(decision.requestId); // your approval flow
+    // Waits on decision.reviewId (not requestId, the trace ID), then
+    // re-checks this exact request against what the reviewer approved.
+    const approval = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+    if (!approval.allowed) {
+      throw new Error(\`Tool \${call.function.name} was not approved: \${approval.reason}\`);
+    }
   }
 
   // safe to execute
@@ -77,25 +86,36 @@ for (const call of response.choices[0].message.tool_calls ?? []) {
             OpenAI Agents SDK
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-            Wrap each tool in a Lelu guard using the <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">withLelu</code> helper.
+            Call Lelu at the top of each tool&apos;s <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">execute</code> function,
+            before it does any work.
           </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">agent.ts</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { Agent, tool } from "@openai/agents";
-import { withLelu } from "lelu-agent-auth/openai";
+import { createClient } from "lelu-agent-auth";
+import { z } from "zod";
 
-const sendEmail = withLelu(
-  tool({
-    name: "send_email",
-    description: "Send an email to a user",
-    parameters: z.object({ to: z.string(), body: z.string() }),
-    execute: async ({ to, body }) => sendMailActual(to, body),
-  })
-);
+const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
 
-const agent = new Agent({ tools: [sendEmail] });`}</pre>
+const sendEmail = tool({
+  name: "send_email",
+  description: "Send an email to a user",
+  parameters: z.object({ to: z.string(), body: z.string() }),
+  execute: async ({ to, body }) => {
+    const decision = await lelu.authorize({ tool: "send_email", args: { to, body } });
+
+    if (decision.decision === "deny") return \`Blocked: \${decision.reason}\`;
+    if (decision.decision === "human_review") {
+      return \`Awaiting approval (review id: \${decision.reviewId})\`;
+    }
+
+    return sendMailActual(to, body);
+  },
+});
+
+const agent = new Agent({ name: "Mailer", tools: [sendEmail] });`}</pre>
           </div>
         </section>
 

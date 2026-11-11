@@ -5,6 +5,7 @@ version: "1.0"
 roles:
   refunds_agent:
     allow:
+      - read_invoices
       - approve_refunds
       - deploy_app
     deny:
@@ -17,6 +18,10 @@ agent_scopes:
     constraints:
       # Confidence-aware gating:
       #   >= 0.90 → allow · 0.70–0.89 → human review · 0.50–0.69 → read-only · < 0.50 → deny
+      # High-criticality actions (names with a word like approve, refund, delete or
+      # transfer, e.g. approve_refunds) still go to human review at >= 0.90: the
+      # engine's RISK_HIGH_CRITICALITY_FLOOR (default: review) never resolves them
+      # to allow, whatever the confidence.
       - require_human_approval_if_confidence_below: 0.90
       - downgrade_to_read_only_if_confidence_below: 0.70
       - hard_deny_if_confidence_below: 0.50

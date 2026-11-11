@@ -50,7 +50,7 @@ export default function DocsInstallation() {
           Installation
         </h1>
         <p className="text-[15px] text-[#737373] leading-relaxed">
-          Install the SDK, get an API key, and start authorizing agent actions — no Docker, no server setup.
+          Install the SDK, point it at a Lelu engine with its API key, and start authorizing agent actions.
         </p>
       </div>
 
@@ -119,18 +119,22 @@ export default function DocsInstallation() {
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-5">
-              Visit{" "}
+              The SDK talks to a Lelu engine and authenticates with that engine&apos;s API key. A
+              self-hosted engine accepts the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">API_KEY</code> it
+              was started with (Docker Compose defaults it to{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-dev-key</code>).
+              Keys created at{" "}
               <a
                 href="/api-key"
                 className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
               >
                 lelu-ai.com/api-key
               </a>{" "}
-              , create a free account, and click <strong className="text-[#0A0A0A] dark:text-white font-semibold">Create API key</strong>. The free tier has fair-use limits while Lelu is in beta.
+              are for the hosted REST API shown in the Quickstart.
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Add it to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file:
+              Add the engine URL and key to your <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">.env</code> file:
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
@@ -138,9 +142,11 @@ export default function DocsInstallation() {
                 <span className="text-[12px] text-[#737373] font-mono">.env</span>
               </div>
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
-                LELU_API_KEY=your_key_here
+{`# The engine you are running — 8083 is the Docker Compose host port
+LELU_BASE_URL=http://localhost:8083
+LELU_API_KEY=your_key_here`}
               </pre>
-              <CopyBtn text="LELU_API_KEY=your_key_here" id="env" />
+              <CopyBtn text={`# The engine you are running — 8083 is the Docker Compose host port\nLELU_BASE_URL=http://localhost:8083\nLELU_API_KEY=your_key_here`} id="env" />
             </div>
 
             <div className="flex gap-3 p-4 rounded-md bg-amber-50 dark:bg-amber-900/10 border-l-[3px] border-amber-500">
@@ -182,14 +188,19 @@ export default function DocsInstallation() {
 {`import { createClient } from "lelu-agent-auth";
 
 export const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // e.g. http://localhost:8083
   apiKey: process.env.LELU_API_KEY,
 });`}
               </pre>
-              <CopyBtn text={`import { createClient } from "lelu-agent-auth";\n\nexport const lelu = createClient({\n  apiKey: process.env.LELU_API_KEY,\n});`} id="client" />
+              <CopyBtn text={`import { createClient } from "lelu-agent-auth";\n\nexport const lelu = createClient({\n  baseUrl: process.env.LELU_BASE_URL, // e.g. http://localhost:8083\n  apiKey: process.env.LELU_API_KEY,\n});`} id="client" />
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              That&apos;s all the configuration needed. The SDK routes to the live cloud engine automatically when an API key is present.
+              Pass both values explicitly. The TypeScript client does not read{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>{" "}
+              on its own, and an API key does not select a cloud URL — without a base URL it
+              connects to the engine <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx lelu-mcp start</code> is
+              running, or <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">http://localhost:8080</code>.
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
@@ -243,7 +254,7 @@ if (decision.allowed) {
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
               <p className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-                Your agent is connected to the Lelu cloud engine. No Docker, no local server, no infrastructure to manage.
+                Your agent is connected to your Lelu engine. Every tool call it authorizes is checked against that engine&apos;s policy.
               </p>
             </div>
 
@@ -305,7 +316,11 @@ if (decision.allowed) {
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Or without any code change:
+              Or set them in the environment. The TypeScript client reads{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL</code>{" "}
+              itself, but the key still has to be passed as{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">apiKey: process.env.LELU_API_KEY</code>{" "}
+              (as in step 3):
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">
@@ -359,10 +374,25 @@ LELU_API_KEY=your_key_here`}
               <pre className="p-4 bg-white dark:bg-[#0A0B10] font-mono text-[13px] text-[#0A0A0A] dark:text-[#E4E4E7] overflow-x-auto">
 {`git clone https://github.com/lelu-ai/lelu.git
 cd lelu
-docker-compose up -d`}
+docker-compose up -d engine`}
               </pre>
-              <CopyBtn text={`git clone https://github.com/lelu-ai/lelu.git\ncd lelu\ndocker-compose up -d`} id="docker" />
+              <CopyBtn text={`git clone https://github.com/lelu-ai/lelu.git\ncd lelu\ndocker-compose up -d engine`} id="docker" />
             </div>
+
+            <p className="text-[15px] text-[#737373] leading-[1.65] mt-4">
+              Compose maps the engine to host port <strong className="text-[#0A0A0A] dark:text-white font-semibold">8083</strong>, so
+              use <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL=http://localhost:8083</code>{" "}
+              with the <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">API_KEY</code> you
+              started it with (<code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">lelu-dev-key</code> unless you set one).
+              To put an MCP server over HTTP in front of it, see the{" "}
+              <a
+                href="/docs/integrations/mcp#http-transport"
+                className="text-[#0A0A0A] dark:text-white underline underline-offset-2 hover:opacity-70 transition-opacity"
+              >
+                MCP guide
+              </a>{" "}
+              — that transport requires <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">MCP_AUTH_TOKEN</code>.
+            </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mt-4">
               See the{" "}
@@ -396,7 +426,8 @@ docker-compose up -d`}
           </div>
           <div className="ml-[52px]">
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              The SDK picks the engine URL automatically:
+              The TypeScript SDK resolves the engine URL in this order. An API key never selects
+              the URL:
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-[13px]">
               <table className="w-full">
@@ -408,10 +439,10 @@ docker-compose up -d`}
                 </thead>
                 <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#20222B]">
                   {[
-                    { sit: "apiKey provided, no baseUrl", eng: "Lelu cloud (GCP)" },
-                    { sit: "LELU_BASE_URL env var set", eng: "That URL" },
                     { sit: "baseUrl passed to createClient", eng: "That URL" },
-                    { sit: "No apiKey, no env var, no baseUrl", eng: "http://localhost:8080 (self-hosted dev)" },
+                    { sit: "LELU_BASE_URL env var set", eng: "That URL" },
+                    { sit: "Neither, `npx lelu-mcp start` running", eng: "The engine recorded in ~/.lelu (and its key, if no apiKey is passed)" },
+                    { sit: "None of the above", eng: "http://localhost:8080" },
                   ].map((row) => (
                     <tr key={row.sit} className="bg-white dark:bg-[#0A0B10]">
                       <td className="px-4 py-2.5 font-mono text-[12px] text-[#0A0A0A] dark:text-[#E4E4E7]">{row.sit}</td>
@@ -421,6 +452,13 @@ docker-compose up -d`}
                 </tbody>
               </table>
             </div>
+            <p className="text-[14px] text-[#737373] leading-[1.65] mt-4">
+              The Python SDK resolves differently: it reads both{" "}
+              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL</code> and{" "}
+              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>, and a key with no base URL
+              targets <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">https://lelu-ai.com</code>.
+              In either SDK, set the base URL and key of the engine you run explicitly.
+            </p>
           </div>
         </section>
       </div>

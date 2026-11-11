@@ -185,6 +185,14 @@ services:
       MCP_PORT:            "3001"
       LELU_ENGINE_URL:     "http://engine:8080"
       LELU_API_KEY:        "${API_KEY:-lelu-dev-key}"
+      # Required by the HTTP transport (16+ chars) — there is deliberately no dev
+      # default, because this port fronts the engine's API key. Unset, the mcp
+      # container exits at startup with an error saying so (docker compose logs mcp);
+      # the other services are unaffected. Clients send "Authorization: Bearer <token>".
+      MCP_AUTH_TOKEN:      "${MCP_AUTH_TOKEN:-}"
+      # The server binds to 127.0.0.1 by default; inside the container that would
+      # leave the published port unreachable from the host.
+      MCP_BIND_ADDR:       "0.0.0.0"
     depends_on:
       engine:
         condition: service_healthy

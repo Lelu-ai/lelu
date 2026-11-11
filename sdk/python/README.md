@@ -11,6 +11,8 @@ Python client for [Lelu](https://github.com/lelu-ai/lelu) — the confidence-awa
 pip install lelu-agent-auth-sdk
 ```
 
+Requires Python 3.11+.
+
 ## Quick start
 
 ### Option 1: Zero-config local (recommended)
@@ -72,8 +74,9 @@ is that same client.
 
 | Method | Description |
 |---|---|
-| `agent_authorize(req)` | Confidence-aware agent authorization |
-| `authorize(req)` | Human RBAC authorization |
+| `authorize(req)` | Confidence-aware agent authorization (`allow` / `deny` / `human_review` / `compute`) |
+| `agent_authorize(req)` | Deprecated — backward-compatible wrapper around `authorize()` |
+| `wait_and_redeem(review, req)` | After `human_review`: wait for the reviewer, then redeem the approval against the same request (pass the decision or its `review_id`, not `request_id`) |
 | `mint_token(req)` | Mint a JIT-scoped JWT |
 | `revoke_token(token_id)` | Revoke a token immediately |
 | `is_healthy()` | Health-check the engine |

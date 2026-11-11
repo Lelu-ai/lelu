@@ -25,7 +25,7 @@ export default function DocsLangChain() {
 npm install lelu-agent-auth langchain @langchain/openai
 
 # Python
-pip install lelu-agent-auth langchain langchain-openai`}</pre>
+pip install lelu-agent-auth-sdk langchain langchain-openai`}</pre>
           </div>
         </section>
 
@@ -53,7 +53,8 @@ export const deleteRecord = new DynamicTool({
       return \`Blocked: \${decision.reason}\`;
     }
     if (decision.decision === "human_review") {
-      return \`Awaiting approval (id: \${decision.requestId})\`;
+      // Give reviewers the review ID; requestId is only the trace ID.
+      return \`Awaiting approval (review id: \${decision.reviewId})\`;
     }
 
     return await actualDeleteRecord(input);
@@ -75,8 +76,8 @@ from lelu import LeluClient, AuthorizeRequest
 lelu = LeluClient(api_key=os.environ["LELU_API_KEY"])
 
 class DeleteRecordTool(BaseTool):
-    name = "delete_record"
-    description = "Permanently deletes a record"
+    name: str = "delete_record"
+    description: str = "Permanently deletes a record"
 
     def _run(self, input: str) -> str:
         # The SDK is async; bridge it from LangChain's sync _run.
@@ -85,7 +86,8 @@ class DeleteRecordTool(BaseTool):
         if decision.decision == "deny":
             return f"Blocked: {decision.reason}"
         if decision.decision == "human_review":
-            return f"Pending approval: {decision.request_id}"
+            # review_id is the queue key; request_id is only the trace ID.
+            return f"Pending approval: {decision.review_id}"
 
         return actual_delete(input)`}</pre>
           </div>

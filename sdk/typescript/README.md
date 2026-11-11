@@ -40,10 +40,14 @@ const decision = await auth.authorize({
   context: { confidence: 0.85 },
 });
 
-if (decision.allowed) {
+if (decision.decision === "allow") {
   // proceed
 } else if (decision.decision === "human_review") {
-  // agent pauses — action queued for human approval
+  // agent pauses — action queued for human approval. The queue item is
+  // decision.reviewId (decision.requestId is the trace ID and won't resolve).
+  // See auth.api.waitAndRedeem below to resume once approved.
+} else if (decision.decision === "compute") {
+  // run decision.safeTool with decision.safeArgs instead (allowed is true here)
 } else {
   // blocked by policy
   console.error(decision.reason);
@@ -127,12 +131,16 @@ The third row is the zero-config path: run `npx -y lelu-mcp start` once and ever
 ### Vercel AI SDK
 
 ```ts
-import { secureTool } from "lelu-agent-auth/vercel";
+import { secureTool } from "lelu-agent-auth";
 import { tool } from "ai";
 import { z } from "zod";
 import { auth } from "./lib/lelu";
 
-const processRefund = secureTool(auth.api, "billing-agent", {
+const processRefund = secureTool({
+  client: auth.api,
+  actor: "billing-agent",
+  action: "refund:process",
+  confidence: 0.9,
   tool: tool({
     description: "Process a customer refund",
     parameters: z.object({ orderId: z.string(), amount: z.number() }),
@@ -141,8 +149,6 @@ const processRefund = secureTool(auth.api, "billing-agent", {
       return { success: true };
     },
   }),
-  action: "refund:process",
-  confidence: 0.9,
 });
 ```
 
@@ -162,12 +168,17 @@ app.post(
 ### LangChain
 
 ```ts
-import { secureTool } from "lelu-agent-auth/langchain";
+import { SecureTool } from "lelu-agent-auth/langchain";
 import { auth } from "./lib/lelu";
 
-const safeTool = secureTool(auth.api, "research-agent", myLangChainTool, {
-  action: "web:search",
+const safeTool = new SecureTool({
+  name: "web_search",
+  description: "Search the web",
+  actor: "research-agent",
+  requiredPermission: "web:search",
+  client: auth.api,
   confidence: 0.8,
+  func: async (query) => myLangChainTool.invoke(query), // only runs when Lelu allows it
 });
 ```
 
@@ -201,7 +212,9 @@ auth.api.revokeToken(tokenId)
 // Multi-agent delegation
 auth.api.delegateScope({ delegator, delegatee, scopedTo?, ttlSeconds?, confidence? })
 
-// Human review queue
+// Human review queue — ids are decision.reviewId, not decision.requestId (the trace ID)
+auth.api.waitAndRedeem(decision, req, { timeoutMs? })  // wait, then redeem against the same request (actor included)
+auth.api.getQueueItem(reviewId)
 auth.api.listQueue()
 auth.api.approveQueueItem(id, resolvedBy, note?)
 auth.api.denyQueueItem(id, resolvedBy, note?)

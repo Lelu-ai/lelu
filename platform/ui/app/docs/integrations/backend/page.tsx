@@ -57,18 +57,25 @@ const lelu = createClient({
 
 export function leluGate(action: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const decision = await lelu.authorize({
+    const request = {
       tool: action,
       ...(req.body.confidence !== undefined
         ? { context: { confidence: req.body.confidence } }
         : {}),
-    });
+    };
+    const decision = await lelu.authorize(request);
 
     if (decision.requiresHumanReview) {
-      await lelu.waitForApproval(decision.requestId); // long-poll for approval
+      // Waits on decision.reviewId (not requestId, which is only the trace
+      // id), then checks the approval was for this exact request.
+      const redeemed = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+      if (!redeemed.allowed) {
+        return res.status(403).json({ error: redeemed.reason });
+      }
+      return next();
     }
 
-    if (!decision.allowed) {
+    if (decision.decision !== "allow") {
       return res.status(403).json({ error: "Action not authorized by Lelu" });
     }
 

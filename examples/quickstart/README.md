@@ -24,7 +24,7 @@ Each call goes to `POST /v1/agent/authorize`. The engine returns boolean flags
 (`allowed`, `requires_human_review`, `compute`) — your SDK turns those into one of
 four decisions. This is **actual output** from the run:
 
-**1. ALLOW** — a permitted action with high confidence:
+**1. ALLOW** — a permitted low-risk action (`read_invoices`) with high confidence:
 ```json
 { "allowed": true, "requires_human_review": false, "reason": "action authorized" }
 ```
@@ -61,8 +61,13 @@ four decisions. This is **actual output** from the run:
 ## The policy behind it
 
 All four behaviours come from one small file, [`policy.yaml`](./policy.yaml):
-- `invoice_bot` may `approve_refunds` and `deploy_app`, never `delete_invoices`.
+- `invoice_bot` may `read_invoices`, `approve_refunds` and `deploy_app`, never `delete_invoices`.
 - Confidence gating: `>= 0.90` allow · `0.70–0.89` review · `0.50–0.69` read-only · `< 0.50` deny.
+- High-criticality actions such as `approve_refunds` are never auto-allowed, even
+  at `>= 0.90`: the engine's risk model floors them at human review
+  (`RISK_HIGH_CRITICALITY_FLOOR`, default `review`). That's why the ALLOW case
+  is a read and `approve_refunds` at 0.95 would come back with
+  `"requires_human_review": true`.
 - A compute rule rewrites any `deploy_*` into a sandboxed staging deploy.
 
 Edit `policy.yaml`, re-run `./demo.sh`, and watch the decisions change.
@@ -72,4 +77,6 @@ Edit `policy.yaml`, re-run `./demo.sh`, and watch the decisions change.
 - Call it from your app with the [TypeScript](../../sdk/typescript) or
   [Python](../../sdk/python) SDK.
 - Run the full stack (dashboard, Postgres, Redis) with `docker compose up` from
-  the repo root.
+  the repo root. The engine is published on host port `8083`; the MCP service
+  (port `3003`) needs `MCP_AUTH_TOKEN` set first — see the
+  [MCP server README](../../sdk/mcp#http-transport-docker-compose).

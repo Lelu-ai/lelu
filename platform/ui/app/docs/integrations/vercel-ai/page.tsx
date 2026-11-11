@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         execute: async ({ id }) => {
           const { decision, reason } = await lelu.authorize({
             tool: "delete_record",
-            context: id,
+            args: { id }, // tool arguments go in args; context is an object
           });
 
           if (decision === "deny") return { error: reason };
@@ -111,8 +111,8 @@ OPENAI_API_KEY=sk-...`}</pre>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
           Previous: Claude Code Plugin
         </a>
-        <a href="/docs/integrations/go" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-          Next: Go SDK
+        <a href="/docs/integrations/typescript" className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          Next: TypeScript SDK
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
         </a>
       </div>

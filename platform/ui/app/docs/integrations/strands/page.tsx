@@ -57,12 +57,18 @@ export default function DocsStrands() {
 
         <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Installation</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            The Python SDK requires Python 3.11 or later. Install{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">strands-agents</code> alongside it: the{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">[strands]</code> extra that pulls it in automatically ships in
+            the next Python SDK release, and the current release (0.4.41) does not have it.
+          </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">terminal</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">{`# Python
-pip install "lelu-agent-auth-sdk[strands]"
+pip install lelu-agent-auth-sdk strands-agents
 
 # TypeScript
 npm install lelu-agent-auth @strands-agents/sdk`}</pre>
@@ -76,6 +82,14 @@ npm install lelu-agent-auth @strands-agents/sdk`}</pre>
             evaluates handlers in order and recommends putting cheap authorization checks first,
             so it belongs at the front of the list.
           </p>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            These examples connect to the engine{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">npx -y lelu-mcp start</code> is running on this machine. That engine
+            listens on a random port, so don&apos;t hard-code one: a client created without a base
+            URL reads it from <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">~/.lelu/engine.json</code>. In Python, discovery only
+            runs when <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">LELU_API_KEY</code> is also unset. To use a different engine,
+            set <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">LELU_BASE_URL</code> or pass the URL to the client.
+          </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">agent.py</span>
@@ -85,7 +99,7 @@ from lelu import LeluClient
 from lelu.strands import LeluIntervention
 
 guard = LeluIntervention(
-    LeluClient(base_url="http://localhost:8080"),
+    LeluClient(),  # no base_url: discovers the local engine and its port
     actor="invoice_bot",
 )
 
@@ -102,6 +116,9 @@ agent = Agent(tools=[refund, lookup_invoice], interventions=[guard])`}</pre>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { Agent } from "@strands-agents/sdk";
 import { LeluClient } from "lelu-agent-auth";
 import { LeluIntervention } from "lelu-agent-auth/strands";
+
+// No baseUrl: discovers the local engine and its port.
+const client = new LeluClient();
 
 const agent = new Agent({
   tools: [refund, lookupInvoice],

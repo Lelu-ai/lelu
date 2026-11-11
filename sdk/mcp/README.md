@@ -73,6 +73,23 @@ If you already run the engine (Docker, Kubernetes, or a remote host), point at i
 npx lelu-mcp start --engine-url http://lelu.internal:8082 --api-key <key>
 ```
 
+For the engine started by the repo's `docker compose up`, that's `--engine-url http://localhost:8083 --api-key lelu-dev-key` (Compose publishes the engine on host port `8083`; use your `API_KEY` if you set one).
+
+## HTTP transport (Docker Compose)
+
+`--transport http` serves MCP over HTTP/SSE (`GET /sse`, `POST /messages`). Because that port fronts the engine's API key, it refuses to start without `MCP_AUTH_TOKEN` (16+ characters), and every request except `GET /healthz` must carry `Authorization: Bearer <MCP_AUTH_TOKEN>`.
+
+The repo's `docker-compose.yml` runs this as the `mcp` service on host port `3003`:
+
+```bash
+export MCP_AUTH_TOKEN="$(openssl rand -hex 24)"
+docker compose up -d
+claude mcp add --transport sse lelu http://localhost:3003/sse \
+  --header "Authorization: Bearer $MCP_AUTH_TOKEN"
+```
+
+Without `MCP_AUTH_TOKEN` the `mcp` container exits at startup and says why (`docker compose logs mcp`); the other services still start.
+
 ## Configuration
 
 | Env var | Meaning | Default |
@@ -84,6 +101,8 @@ npx lelu-mcp start --engine-url http://lelu.internal:8082 --api-key <key>
 | `LELU_POLICY_PRESET` | Starter policy written on first run: `general` or `coding-agent` | `general` |
 | `LELU_ENGINE_BINARY` | Use a locally built engine binary (skips download) | *(download)* |
 | `LELU_ENGINE_VERSION` | Pin an engine release, e.g. `0.1.0` | latest |
+| `MCP_AUTH_TOKEN` | Bearer token HTTP clients must send; required for `--transport http` (16+ chars) | *(none — HTTP won't start)* |
+| `MCP_BIND_ADDR` | Address the HTTP transport listens on | `127.0.0.1` |
 
 Flags: `--engine-url`, `--api-key`, `--timeout <ms>`, `--transport stdio|http`, `--port`, `--no-local`, `--preset general|coding-agent`. Run `npx lelu-mcp --help` for everything.
 

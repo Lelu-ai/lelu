@@ -35,9 +35,19 @@ export default function DocsTypeScriptSDK() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+// Point at the engine you run and pass its key explicitly — an API key
+// alone does not select a URL, and LELU_API_KEY is not read automatically.
+const lelu = createClient({
+  baseUrl: "http://localhost:8083", // e.g. the Docker Compose engine
+  apiKey: process.env.LELU_API_KEY,
+});
 
-const result = await lelu.authorize({ tool: "delete_records" });
+const request = {
+  tool: "delete_records",
+  context: { confidence: 0.9, actingFor: "user_123" },
+  args: { table: "invoices" },
+};
+const result = await lelu.authorize(request);
 
 if (result.allowed) {
   console.log("Proceeding autonomously");
@@ -46,7 +56,12 @@ if (result.allowed) {
   console.log("Safe alternative:", result.safeTool);
   console.log("With args:", result.safeArgs);
 } else if (result.decision === "human_review") {
-  console.log("Queued for review — ID:", result.requestId);
+  // The queue key is result.reviewId — result.requestId is only the trace ID.
+  console.log("Queued for review — review ID:", result.reviewId);
+  // Wait for the reviewer, then re-check this exact request against the approval.
+  const outcome = await lelu.waitAndRedeem(result, request, { timeoutMs: 5 * 60_000 });
+  if (outcome.allowed) console.log("Approved — proceeding");
+  else console.log("Not approved:", outcome.reason);
 } else {
   console.log("Denied:", result.reason);
 }`}</pre>
@@ -60,7 +75,7 @@ if (result.allowed) {
             {[
               { decision: "allow", color: "emerald", desc: "Agent proceeds autonomously. result.allowed === true." },
               { decision: "compute", color: "violet", desc: "Platform returns a safe alternative. Use result.safeTool and result.safeArgs." },
-              { decision: "human_review", color: "amber", desc: "Action queued for human approval. result.decision === \"human_review\"." },
+              { decision: "human_review", color: "amber", desc: "Action queued for human approval. result.decision === \"human_review\"; pass result (or result.reviewId) to waitAndRedeem()." },
               { decision: "deny", color: "red", desc: "Action blocked. Check result.reason for explanation." },
             ].map(({ decision, color, desc }) => (
               <div key={decision} className={`flex gap-3 p-4 rounded-xl border bg-${color}-50 dark:bg-${color}-900/10 border-${color}-200 dark:border-${color}-800/30`}>
@@ -84,7 +99,9 @@ if (result.allowed) {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { secureTool } from "lelu-agent-auth";
 import { tool } from "ai";
+import { z } from "zod";
 
+// \`lelu\` is the client from the quick start above.
 const deleteRecords = secureTool({
   client: lelu,
   actor: "billing_agent",
@@ -119,9 +136,12 @@ const deleteRecords = secureTool({
                   ["safeTool", "string?", "Safe alternative tool (compute only)"],
                   ["safeArgs", "Record<string, unknown>?", "Replacement args (compute only)"],
                   ["reason", "string", "Human-readable explanation"],
-                  ["rule", "string", "Rule that matched"],
-                  ["requestId", "string", "Unique request ID for audit trail"],
-                  ["latencyMs", "number", "Evaluation latency in milliseconds"],
+                  ["reviewId", "string?", "Review queue ID (human_review only) — pass it, or the decision itself, to waitAndRedeem() / redeemReview() / getQueueItem()"],
+                  ["requestId", "string", "Trace ID for the audit trail — not a review queue key"],
+                  ["downgradedScope", "string?", "Set when the engine downgraded the requested scope; allowed is still true, so check it before acting at full scope"],
+                  ["effectiveScope", "string?", "Scope the engine actually granted, when different from the request"],
+                  ["tool", "string", "Tool that was evaluated"],
+                  ["timestamp", "string", "ISO 8601 time of the decision"],
                 ].map(([field, type_, desc]) => (
                   <tr key={field} className="bg-white dark:bg-zinc-900/30">
                     <td className="px-4 py-3 font-mono text-xs text-zinc-900 dark:text-white">{field}</td>
@@ -132,6 +152,13 @@ const deleteRecords = secureTool({
               </tbody>
             </table>
           </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-4">
+            The type also declares <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">rule</code> and{" "}
+            <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">latencyMs</code>, but{" "}
+            <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">authorize()</code> leaves them empty
+            (<code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">&quot;&quot;</code> and{" "}
+            <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">0</code>) — don&apos;t rely on them.
+          </p>
         </section>
 
         {/* npm */}
@@ -143,7 +170,7 @@ const deleteRecords = secureTool({
               className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm">
               lelu-agent-auth
             </a>
-            . Current version: <code className="font-mono text-sm bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">0.0.17</code>
+            . Requires Node.js 18 or later.
           </p>
         </section>
       </div>

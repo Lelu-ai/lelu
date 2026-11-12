@@ -37,6 +37,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -306,16 +307,49 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectURL := effectiveRedirect
-	sep := "?"
-	if strings.Contains(redirectURL, "?") {
-		sep = "&"
-	}
-	redirectURL += sep + "code=" + code
+	// Build the redirect from url.Values rather than by concatenation. `state` is
+	// the caller's own opaque value, and it is the only part of this URL that
+	// comes straight from the request: appending it raw let a value such as
+	// `x&code=attackercode&foo=` add parameters of its choosing to the redirect,
+	// and a `#` silently cut the real `code` off the query string by starting a
+	// fragment instead.
+	params := url.Values{}
+	params.Set("code", code)
 	if state != "" {
-		redirectURL += "&state=" + state
+		params.Set("state", state)
+	}
+	redirectURL, err := withQuery(effectiveRedirect, params)
+	if err != nil {
+		// The redirect_uri is registered, so this can only happen if it is not a
+		// parseable absolute URL. Refusing beats redirecting somewhere unintended.
+		writeError(w, http.StatusInternalServerError, "server_error", "redirect_uri is not a valid URL")
+		return
 	}
 	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// withQuery returns target with params merged into its query string. An existing
+// query is kept and a fragment is preserved (the query goes before it), because
+// either may already carry what the client needs to correlate the response. A
+// key the params set replaces any value the registered URL already carried, so
+// the response holds one `code` and one `state`, not two.
+func withQuery(target string, params url.Values) (string, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	for k, vs := range params {
+		if len(vs) == 0 {
+			continue
+		}
+		q.Set(k, vs[0])
+		for _, v := range vs[1:] {
+			q.Add(k, v)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 // ── Token Endpoint ────────────────────────────────────────────────────────────

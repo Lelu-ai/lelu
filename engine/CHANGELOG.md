@@ -21,6 +21,36 @@
 * **Engine releases publish a container image again.** Images were only built on plain `v*.*.*` tags, which engine releases stopped using after `v0.0.14`, so no `engine-v*` release had one. `engine-release.yml` now pushes `ghcr.io/lelu-ai/lelu-engine:<version>` (and `latest` for non-prerelease tags) for `linux/amd64` and `linux/arm64`. The Dockerfile no longer forces `GOARCH=amd64`, which put an amd64 binary in the arm64 image, and stamps the version so `/healthz` and `--version` report it. Reported in the Nauro pilot.
 * **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
 
+## [0.3.0](https://github.com/Lelu-ai/lelu/compare/engine-v0.2.1...engine-v0.3.0) (2026-11-12)
+
+
+### Features
+
+* **engine:** use human review verdicts as the reputation outcome signal ([b241085](https://github.com/Lelu-ai/lelu/commit/b241085737d840da607da029684cb35a969622f9))
+* **engine:** use human review verdicts as the reputation outcome signal ([c1bf0e2](https://github.com/Lelu-ai/lelu/commit/c1bf0e2cb35060ce9595609d07203e5614b8f4ff))
+
+
+### Bug Fixes
+
+* act on round-1 security audit findings ([29b2431](https://github.com/Lelu-ai/lelu/commit/29b2431f38b461749fa6e9b92a264b29234558a9))
+* act on round-1 security audit findings ([5f680c7](https://github.com/Lelu-ai/lelu/commit/5f680c76c7407bd98f8b0abcc822c022a88529b1))
+* **engine:** correct default issuer for an explicit listen host ([a83c442](https://github.com/Lelu-ai/lelu/commit/a83c442748f77b11e4a4ec3ac1d6f8f9e02859df))
+* **engine:** key reputation on verified agent identity ([f7168e7](https://github.com/Lelu-ai/lelu/commit/f7168e754606b7a102825129174b531e00a943e7))
+* **engine:** key reputation on verified agent identity ([cd49051](https://github.com/Lelu-ai/lelu/commit/cd4905151ed2db995f5fcf830e1abbf980b026fd))
+* **engine:** publish a container image for every engine release ([c91ca22](https://github.com/Lelu-ai/lelu/commit/c91ca2238a5be1a1f78d3613a87123842654e115))
+* **engine:** scope the review queue to the caller's account ([85f95a1](https://github.com/Lelu-ai/lelu/commit/85f95a15f582757ba89f1e81c0ac5acd3aa746ce))
+* **engine:** scope the review queue to the caller's account ([e61be0e](https://github.com/Lelu-ai/lelu/commit/e61be0e0ff5e2067fcebdc06e5c042ab66697f86))
+* make agent registry responses match the SDKs ([a75d52e](https://github.com/Lelu-ai/lelu/commit/a75d52ec51277319b4fb206412c4c774e2718757))
+* make agent registry responses match the SDKs ([6431bec](https://github.com/Lelu-ai/lelu/commit/6431becd8b6c8036626a130a44ef258a6e60e00c))
+* **mcpauth:** replace a registered code/state instead of appending a second ([ffcd848](https://github.com/Lelu-ai/lelu/commit/ffcd848df5926d82b9295e1dcff09ba640d68ede))
+* **mcpauth:** URL-encode state when building the OAuth redirect ([#84](https://github.com/Lelu-ai/lelu/issues/84)) ([b7d27f9](https://github.com/Lelu-ai/lelu/commit/b7d27f9cfccf1a1ebb85ccb2f0a2fd3fb6f740f7))
+* **mcpauth:** URL-encode state when building the OAuth redirect ([#84](https://github.com/Lelu-ai/lelu/issues/84)) ([21d2db2](https://github.com/Lelu-ai/lelu/commit/21d2db243874a64bf7a035b1467cea46ead29e78))
+
+
+### Miscellaneous
+
+* remove dead files and committed engine binary ([ae2b4f4](https://github.com/Lelu-ai/lelu/commit/ae2b4f443c7b319a5a80d44c9a8bddc8483d291c))
+
 ## [0.2.1] (2026-10-15)
 
 ### Security Fixes

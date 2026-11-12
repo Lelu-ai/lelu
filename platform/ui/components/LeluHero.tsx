@@ -1,10 +1,25 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { heroStats } from "@/data";
 import { LeluMark } from "@/components/ui/LeluMark";
 
 const LeluHero = () => {
+  const [stars, setStars] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("https://api.github.com/repos/Lelu-ai/lelu")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => {
+        if (active && Number.isFinite(data?.stargazers_count)) setStars(data.stargazers_count);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="relative pt-24 pb-20 md:pt-32 md:pb-28 overflow-hidden">
       {/* Subtle grid background */}
@@ -96,15 +111,17 @@ const LeluHero = () => {
           transition={{ duration: 0.8, delay: 0.5 }}
           className="flex flex-wrap justify-center gap-x-8 gap-y-2"
         >
-          {heroStats.map((s, i) => (
-            <div key={i} className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
-              <span className="font-semibold text-[#0A0A0A] dark:text-white">{s.value}</span>
-              <span>{s.label}</span>
-              {i < heroStats.length - 1 && (
-                <span className="ml-8 text-[#E7E5E4] dark:text-[#20222B] select-none">·</span>
-              )}
-            </div>
-          ))}
+          <a
+            href="https://github.com/Lelu-ai/lelu"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-white transition-colors"
+          >
+            <span className="font-semibold text-[#0A0A0A] dark:text-white">
+              {stars !== null ? `${stars.toLocaleString()}` : "—"}
+            </span>
+            <span>GitHub Stars</span>
+          </a>
         </motion.div>
       </div>
     </div>

@@ -151,6 +151,37 @@ func TestAuthorizeRedirectPreservesRegisteredQueryAndFragment(t *testing.T) {
 	}
 }
 
+// A registered redirect_uri may already carry `code` or `state` of its own. The
+// response must hold exactly one of each, the ones we issued, instead of
+// appending a second value that leaves the client guessing which to use.
+func TestAuthorizeRedirectReplacesRegisteredCodeAndState(t *testing.T) {
+	const redirectURI = "https://app.example.com/callback?code=old&state=old"
+	_, h := newAuthorizeTestServer(t, redirectURI)
+
+	rec := authorize(t, h, url.Values{
+		"client_id":             {"test-client"},
+		"redirect_uri":          {redirectURI},
+		"response_type":         {"code"},
+		"code_challenge":        {"challenge"},
+		"code_challenge_method": {"S256"},
+		"state":                 {"fresh"},
+	})
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status %d, want 302: %s", rec.Code, rec.Body.String())
+	}
+	loc, err := url.Parse(rec.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := loc.Query()
+	if got := q["code"]; len(got) != 1 || got[0] == "" || got[0] == "old" {
+		t.Fatalf("code is %q, want one value that is not the registered one", got)
+	}
+	if got := q["state"]; len(got) != 1 || got[0] != "fresh" {
+		t.Fatalf("state is %q, want exactly one value %q", got, "fresh")
+	}
+}
+
 // The code that comes back must be the one that was stored and issued.
 func TestAuthorizeRedirectCarriesTheIssuedCode(t *testing.T) {
 	const redirectURI = "https://app.example.com/callback"

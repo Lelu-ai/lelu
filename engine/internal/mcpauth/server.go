@@ -330,7 +330,9 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 
 // withQuery returns target with params merged into its query string. An existing
 // query is kept and a fragment is preserved (the query goes before it), because
-// either may already carry what the client needs to correlate the response.
+// either may already carry what the client needs to correlate the response. A
+// key the params set replaces any value the registered URL already carried, so
+// the response holds one `code` and one `state`, not two.
 func withQuery(target string, params url.Values) (string, error) {
 	u, err := url.Parse(target)
 	if err != nil {
@@ -338,7 +340,11 @@ func withQuery(target string, params url.Values) (string, error) {
 	}
 	q := u.Query()
 	for k, vs := range params {
-		for _, v := range vs {
+		if len(vs) == 0 {
+			continue
+		}
+		q.Set(k, vs[0])
+		for _, v := range vs[1:] {
 			q.Add(k, v)
 		}
 	}

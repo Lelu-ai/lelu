@@ -2967,7 +2967,7 @@ func (h *Handler) handleFallbackStatus(w http.ResponseWriter, _ *http.Request) {
 
 // ─── Health ───────────────────────────────────────────────────────────────────
 
-func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -3031,19 +3031,54 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	}
 	deps["rate_limiting"] = map[string]any{"enabled": h.rateLimit.Enabled()}
 
-	payload := map[string]any{
-		"status":  "ok",
-		"service": "lelu-engine",
-		"version": Version,
-	}
-	if len(deps) > 0 {
-		payload["dependencies"] = deps
-	}
-	if status != http.StatusOK {
-		payload["status"] = "degraded"
+	// Anonymous callers get a minimal body (only status) so they cannot
+	// learn the engine version, dependency inventory or auth mode. Callers
+	// with a valid credential get the full detailed body. Docker/Helm health
+	// checks only need the status code, which is unchanged.
+	//
+	// /healthz is exempt from the auth middleware, so a caller presenting a
+	// valid credential will not have a principal in context yet — check the
+	// credential here to decide which body to return.
+	_, authenticated := principalFromContext(r.Context())
+	if !authenticated {
+		authHeader := r.Header.Get("Authorization")
+		if h.apiKey != "" {
+			expected := "Bearer " + h.apiKey
+			if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expected)) == 1 {
+				authenticated = true
+			}
+		}
+		if !authenticated && h.keyVerify != nil {
+			if token, ok := strings.CutPrefix(authHeader, "Bearer "); ok && strings.HasPrefix(token, "lelu_sk_") {
+				if _, valid := h.keyVerify.verify(r.Context(), token); valid {
+					authenticated = true
+				}
+			}
+		}
 	}
 
-	writeJSON(w, status, payload)
+	if authenticated {
+		payload := map[string]any{
+			"status":  "ok",
+			"service": "lelu-engine",
+			"version": Version,
+		}
+		if len(deps) > 0 {
+			payload["dependencies"] = deps
+		}
+		if status != http.StatusOK {
+			payload["status"] = "degraded"
+		}
+		writeJSON(w, status, payload)
+	} else {
+		payload := map[string]any{"status": "ok"}
+		if status != http.StatusOK {
+			payload["status"] = "degraded"
+			writeJSON(w, http.StatusServiceUnavailable, payload)
+			return
+		}
+		writeJSON(w, http.StatusOK, payload)
+	}
 }
 
 // Version is the engine release, injected at build time with

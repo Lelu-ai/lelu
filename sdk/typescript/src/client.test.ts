@@ -22,6 +22,14 @@ function mockError(status: number, errorMsg: string) {
   });
 }
 
+function mockRefusal(reason: string) {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status: 403,
+    json: async () => ({ allowed: false, reason }),
+  });
+}
+
 // Mirrors the engine's POST /v1/agent/authorize response (agentAuthorizeResponse
 // in engine/internal/server/server.go). The engine emits boolean flags — there is
 // no top-level `decision` field; the SDK derives it from allowed/requires_human_review/compute.
@@ -361,6 +369,21 @@ describe("LeluClient", () => {
       });
       await client.issueAgentToken(agent.id);
       expect(mockFetch.mock.calls[1][0]).toContain("/v1/agents/agent-1/token");
+    });
+  });
+
+  describe("redeemReview()", () => {
+    it("returns a refused redemption as RedeemResult instead of throwing", async () => {
+      mockRefusal("insufficient confidence");
+      const result = await client.redeemReview("review-1", { tool: "read_file" });
+      expect(result).toEqual({
+        allowed: false,
+        reason: "insufficient confidence",
+        reviewId: "review-1",
+      });
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(url).toContain("/v1/queue/review-1/redeem");
+      expect(init.method).toBe("POST");
     });
   });
 });

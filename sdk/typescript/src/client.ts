@@ -585,10 +585,30 @@ export class LeluClient {
    */
   async redeemReview(review: string | AuthDecision, req: AuthorizeRequest): Promise<RedeemResult> {
     const reviewId = this.reviewIdOf(review);
-    return this.post<RedeemResult>(
-      `/v1/queue/${encodeURIComponent(reviewId)}/redeem`,
-      this.authorizeBody(req),
-    );
+    const res = await fetch(`${this.baseUrl}/v1/queue/${encodeURIComponent(reviewId)}/redeem`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(this.authorizeBody(req)),
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+    // A refused redemption (403 with {allowed: false, reason}) is an answer,
+    // not an error — return it as a RedeemResult so the caller can inspect
+    // `allowed` and `reason` rather than catching an exception.
+    if (res.status === 403 && json["allowed"] === false) {
+      return {
+        allowed: false,
+        reason: (json["reason"] as string) ?? "redeem refused",
+        reviewId,
+      };
+    }
+    if (!res.ok) {
+      throw new AuthEngineError(
+        (json["error"] as string) ?? "engine error",
+        res.status,
+        json
+      );
+    }
+    return json as unknown as RedeemResult;
   }
 
   /**

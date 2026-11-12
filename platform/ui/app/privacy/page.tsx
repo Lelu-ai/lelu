@@ -167,7 +167,7 @@ export default function PrivacyPage() {
                 <div className="p-4 rounded-xl bg-[#F4F4F5] dark:bg-[#12141A] border border-[#E7E5E4] dark:border-[#20222B]">
                   <h4 className="font-bold text-[#0A0A0A] dark:text-white mb-1 text-[13px]">A. Account & Contact Information</h4>
                   <p className="text-[13px] text-[#737373] dark:text-zinc-400">
-                    Full name, business email address, password hash (via bcrypt/argon2), organization name, and billing details processed by our PCI-DSS compliant payment provider.
+                    Full name, business email address, password hash (via scrypt), organization name, and billing details processed by our PCI-DSS compliant payment provider.
                   </p>
                 </div>
 
@@ -268,7 +268,7 @@ export default function PrivacyPage() {
                 8. Global Compliance (GDPR & CCPA/CPRA)
               </h2>
               <p>
-                Lelu complies with applicable data privacy regulations, including the European Union General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA/CPRA).
+                Lelu is designed to align with applicable data privacy regulations, including the European Union General Data Protection Regulation (GDPR) and the California Consumer Privacy Act (CCPA/CPRA).
               </p>
               <p>
                 For European users, Lelu serves as a Data Processor for agent evaluation telemetry and a Data Controller for Customer account credentials. Standard Contractual Clauses (SCCs) and Data Processing Addendums (DPAs) are available for Enterprise customers upon request.

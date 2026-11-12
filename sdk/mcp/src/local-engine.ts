@@ -56,6 +56,24 @@ async function ensureLocalApiKey(): Promise<string> {
   return key;
 }
 
+// Human reviewer key: passed to the child engine as LELU_REVIEWER_KEYS so
+// only a holder of this credential can approve human reviews. Stored in a
+// file only the user is told about, never emitted on MCP stdio (the model
+// must never read it).
+async function ensureLocalReviewerKey(): Promise<string> {
+  const keyPath = path.join(leluHome(), "reviewer.key");
+  try {
+    const existing = (await fsp.readFile(keyPath, "utf8")).trim();
+    if (existing) return existing;
+  } catch {
+    // first run
+  }
+  const key = `human_${randomBytes(24).toString("base64url")}`;
+  await fsp.mkdir(path.dirname(keyPath), { recursive: true });
+  await fsp.writeFile(keyPath, `${key}\n`, { mode: 0o600 });
+  return key;
+}
+
 // ─── Starter policies ─────────────────────────────────────────────────────────
 //
 // Written on first run. Uses top-level pattern rules (actor-independent) so
@@ -400,10 +418,11 @@ async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000)
  */
 export async function startLocalEngine(opts: { preset?: string } = {}): Promise<LocalEngine> {
   const preset = resolvePreset(opts.preset);
-  const [bin, policyPath, apiKey] = await Promise.all([
+  const [bin, policyPath, apiKey, reviewerKey] = await Promise.all([
     resolveBinary(),
     ensurePolicy(preset),
     ensureLocalApiKey(),
+    ensureLocalReviewerKey(),
   ]);
   const home = leluHome();
   const port = await freePort();
@@ -421,6 +440,7 @@ export async function startLocalEngine(opts: { preset?: string } = {}): Promise<
       LISTEN_ADDR: `127.0.0.1:${port}`,
       POLICY_PATH: policyPath,
       API_KEY: apiKey,
+      LELU_REVIEWER_KEYS: `human:${reviewerKey}`,
       DATABASE_PATH: path.join(home, "lelu.db"),
       LELU_RSA_KEY_PATH: path.join(home, "signing.key.pem"),
     },
@@ -472,5 +492,10 @@ export async function startLocalEngine(opts: { preset?: string } = {}): Promise<
   }
 
   console.error(`[lelu-mcp] Local Lelu engine ready on ${url} (policy: ${policyPath})`);
+  const reviewerKeyPath = path.join(leluHome(), "reviewer.key");
+  console.error(
+    `[lelu-mcp] Human reviewer key written to ${displayPath(reviewerKeyPath)} — ` +
+    `share it only with people who may approve reviews. Never paste it into an MCP tool.`
+  );
   return { url, apiKey, stop };
 }

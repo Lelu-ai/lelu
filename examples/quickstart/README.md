@@ -58,6 +58,29 @@ four decisions. This is **actual output** from the run:
 }
 ```
 
+> **Before you trust human review**
+>
+> Without `LELU_REVIEWER_KEYS`, any holder of the engine API key can approve a human review, including the agent that triggered it. The engine warns at boot, but review is not a security control until reviewer credentials are configured.
+>
+> - Set `LELU_REVIEWER_KEYS` to one or more `name:secret` pairs, comma-separated (each secret must be at least 16 characters), for example: `LELU_REVIEWER_KEYS="alice:change-me-to-a-long-random-secret"`.
+> - Present the matching credential in the `X-Lelu-Reviewer-Key` header when approving or denying a queued review (alongside the normal API key).
+> - Example: approve a pending review against `lelu-engine` running locally (replace `$REVIEW_ID`, API key, and reviewer secret with your values):
+>
+> ```bash
+> # list pending reviews to find a REVIEW_ID
+> curl -sS http://localhost:8082/v1/queue/pending \
+>   -H "Authorization: Bearer $LELU_API_KEY"
+>
+> # approve with an authenticated reviewer key
+> curl -sS -X POST "http://localhost:8082/v1/queue/$REVIEW_ID/approve" \
+>   -H "Authorization: Bearer $LELU_API_KEY" \
+>   -H "X-Lelu-Reviewer-Key: alice:$LELU_REVIEWER_SECRET" \
+>   -H "Content-Type: application/json" \
+>   -d '{"resolved_by":"alice","note":"Reviewed and approved."}'
+> ```
+>
+> With reviewer keys configured, the engine records the authenticated reviewer identity from the credential (not a self-asserted `resolved_by`). See [Deployment security](../../docs/DEPLOYMENT_SECURITY.md) for more.
+
 ## The policy behind it
 
 All four behaviours come from one small file, [`policy.yaml`](./policy.yaml):

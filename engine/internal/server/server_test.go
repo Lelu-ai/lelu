@@ -147,6 +147,40 @@ func TestHealth(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
 
+func TestHealth_AnonymousLivenessOnly(t *testing.T) {
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "test-key", nil)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/healthz")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "ok", body["status"])
+	assert.NotContains(t, body, "dependencies")
+	assert.NotContains(t, body, "version")
+}
+
+func TestHealth_AuthenticatedDetailed(t *testing.T) {
+	srv := newTestHTTPServerWithConfig(t, samplePolicy, "test-key", nil)
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/healthz", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Equal(t, "ok", body["status"])
+	assert.Contains(t, body, "version")
+	assert.Contains(t, body, "dependencies")
+}
+
 // ── /v1/authorize ─────────────────────────────────────────────────────────────
 
 func TestAuthorize_Allowed(t *testing.T) {

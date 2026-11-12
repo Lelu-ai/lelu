@@ -37,6 +37,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -306,16 +307,18 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectURL := effectiveRedirect
-	sep := "?"
-	if strings.Contains(redirectURL, "?") {
-		sep = "&"
+	u, parseErr := url.Parse(effectiveRedirect)
+	if parseErr != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid redirect URI")
+		return
 	}
-	redirectURL += sep + "code=" + code
+	q = u.Query()
+	q.Set("code", code)
 	if state != "" {
-		redirectURL += "&state=" + state
+		q.Set("state", state)
 	}
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	u.RawQuery = q.Encode()
+	http.Redirect(w, r, u.String(), http.StatusFound)
 }
 
 // ── Token Endpoint ────────────────────────────────────────────────────────────

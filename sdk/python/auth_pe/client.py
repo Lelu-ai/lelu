@@ -164,18 +164,18 @@ class LeluClient:
         resolved_url = base_url or os.environ.get("LELU_BASE_URL")
 
         if resolved_url is None:
-            if resolved_key:
-                # Default to cloud when any lelu_sk_* key is provided
-                resolved_url = LELU_CLOUD_URL
+            # Zero-config: with no explicit target, connect to the engine
+            # `lelu-mcp` is already running here (recorded in ~/.lelu).
+            # Do not default to the cloud just because an API key is set —
+            # that would silently send actions and context to the hosted
+            # service. Require an explicit base_url, LELU_BASE_URL, or a
+            # discoverable local engine.
+            local = discover_local_engine()
+            if local.base_url:
+                resolved_url = local.base_url
+                resolved_key = local.api_key
             else:
-                # Zero-config: with no explicit target, connect to the engine
-                # `lelu-mcp` is already running here (recorded in ~/.lelu).
-                local = discover_local_engine()
-                if local.base_url:
-                    resolved_url = local.base_url
-                    resolved_key = local.api_key
-                else:
-                    resolved_url = "http://localhost:8080"
+                resolved_url = "http://localhost:8080"
         resolved_url = resolved_url.rstrip("/")
 
         headers: dict[str, str] = {"Content-Type": "application/json"}

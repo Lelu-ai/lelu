@@ -15,6 +15,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # npm --provenance signs the package with this run's OIDC identity.
+      id-token: write
     steps:
       - name: Resolve release-please token
         id: rp_token
@@ -107,6 +109,15 @@ jobs:
         if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
         working-directory: sdk/typescript
         run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          # npm refuses to publish a version twice. If this version is already
+          # on the registry (e.g. published by hand), skip instead of failing,
+          # so the Python and Go steps below still run.
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::warning::$NAME@$VERSION is already on npm; skipping publish."
+            exit 0
+          fi
           npm ci
           npm run build
           npm publish --access public --provenance

@@ -13,8 +13,16 @@ spec:
       labels:
         app: lelu-engine
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
       containers:
         - name: engine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           image: {{ .Values.engine.image }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           ports:
@@ -31,6 +39,25 @@ spec:
                 secretKeyRef:
                   name: lelu-secrets
                   key: engineJwtSigningKey
+            # Without API_KEY the engine refuses every request (it fails closed).
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-secrets
+                  key: engineApiKey
+            - name: VAULT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-secrets
+                  key: engineVaultKey
+            # name:secret pairs (secret >= 16 chars). Unset means ANY holder of
+            # API_KEY can approve human reviews, including the agent itself.
+            - name: LELU_REVIEWER_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: lelu-secrets
+                  key: engineReviewerKeys
+                  optional: true
             - name: CONTROL_PLANE_URL
               value: {{ .Values.engine.env.CONTROL_PLANE_URL | quote }}
             - name: CP_HMAC_SECRET
@@ -63,7 +90,14 @@ spec:
           volumeMounts:
             - name: policy
               mountPath: /etc/lelu
+            # Signing key, SQLite database and audit-chain state. emptyDir
+            # survives container restarts but not pod rescheduling; point this
+            # at a PersistentVolumeClaim for durable audit evidence.
+            - name: state
+              mountPath: /var/lib/lelu
       volumes:
+        - name: state
+          emptyDir: {}
         - name: policy
           configMap:
             name: lelu-policy

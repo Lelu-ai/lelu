@@ -4,6 +4,9 @@ global:
 secrets:
   engine:
     jwtSigningKey: change-me-in-production
+    apiKey: change-me-in-production
+    vaultKey: change-me-in-production
+    reviewerKeys: ""        # e.g. "alice:<random 16+ chars>" — set this, or any API-key holder can approve reviews
     cpHmacSecret: ""
   platform:
     apiKey: platform-dev-key

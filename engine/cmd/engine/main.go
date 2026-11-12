@@ -92,6 +92,10 @@ func main() {
 	dbPath := envOr("DATABASE_PATH", "/var/lib/lelu/lelu.db")
 	behavioralAnalyticsEnabled := envOr("BEHAVIORAL_ANALYTICS_ENABLED", "true") == "true"
 
+	if !isProductionEnv() && (signingKey == "change-me-in-production" || signingKey == "change-me-in-dev") {
+		log.Printf("WARNING: JWT_SIGNING_KEY is the published default. Tokens signed with it can be forged by anyone, and — unless VAULT_KEY is set — the OAuth token vault is encrypted under it too. Set JWT_SIGNING_KEY and VAULT_KEY to random values before storing real credentials.")
+	}
+
 	if isProductionEnv() {
 		if signingKey == "" || signingKey == "change-me-in-production" {
 			log.Fatal("JWT_SIGNING_KEY must be explicitly set to a strong secret in production")

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -168,11 +169,60 @@ func (e *Evaluator) LoadPolicy(path string) error {
 	return e.LoadPolicyBytes(data)
 }
 
+// validDecisions are the values a top-level rule's `decision` may take.
+var validDecisions = map[string]bool{"allow": true, "deny": true, "human_review": true, "compute": true}
+
+// validatePolicy rejects mistakes that would otherwise be silently ignored at
+// evaluation time, such as a misspelt `decision: alow` that skipped the rule.
+func validatePolicy(p *Policy) error {
+	for i, r := range p.Rules {
+		if !validDecisions[r.Decision] {
+			return fmt.Errorf("rules[%d] (%q): decision %q is not one of allow, deny, human_review, compute", i, r.ID, r.Decision)
+		}
+		if r.Match == "" {
+			return fmt.Errorf("rules[%d] (%q): match is required", i, r.ID)
+		}
+		if r.Decision == "compute" && r.SafeTool == "" {
+			return fmt.Errorf("rules[%d] (%q): a compute rule needs safe_tool", i, r.ID)
+		}
+	}
+	return nil
+}
+
+// numericArg reads a numeric argument, accepting JSON numbers and numeric strings.
+func numericArg(args map[string]interface{}, key string) (float64, bool) {
+	switch v := args[key].(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		return f, err == nil
+	}
+	return 0, false
+}
+
+// isRefundAction reports whether an action name has "refund" as a whole token.
+func isRefundAction(action string) bool {
+	for _, t := range strings.FieldsFunc(strings.ToLower(action), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+	}) {
+		if t == "refund" || t == "refunds" {
+			return true
+		}
+	}
+	return false
+}
+
 // LoadPolicyBytes parses and hot-swaps policy from raw YAML bytes.
 func (e *Evaluator) LoadPolicyBytes(data []byte) error {
 	var p Policy
 	if err := yaml.Unmarshal(data, &p); err != nil {
 		return fmt.Errorf("evaluator: parse policy: %w", err)
+	}
+	if err := validatePolicy(&p); err != nil {
+		return fmt.Errorf("evaluator: invalid policy: %w", err)
 	}
 	sum := sha256.Sum256(data)
 	digest := hex.EncodeToString(sum[:])
@@ -374,21 +424,39 @@ func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*D
 		}
 	}
 
-	// Check inherited role permissions.
-	if scope.Inherits != "" {
-		role, found := p.Roles[scope.Inherits]
-		if !found {
-			return &Decision{Allowed: false, Reason: fmt.Sprintf("inherited role %q not found", scope.Inherits)}, nil
+	// Check inherited role permissions. A scope with no `inherits` has no allow
+	// list at all, so it permits nothing: only deny lists would otherwise
+	// constrain it, which turned "list what is forbidden" into default-allow.
+	if scope.Inherits == "" {
+		return &Decision{Allowed: false, Reason: fmt.Sprintf("agent scope %q has no `inherits` role, so no action is allowed", req.Actor), PolicyDigest: e.policyDigest}, nil
+	}
+	role, found := p.Roles[scope.Inherits]
+	if !found {
+		return &Decision{Allowed: false, Reason: fmt.Sprintf("inherited role %q not found", scope.Inherits), PolicyDigest: e.policyDigest}, nil
+	}
+	permitted := false
+	for _, a := range role.Allow {
+		if matchAction(a, req.Action) {
+			permitted = true
+			break
 		}
-		permitted := false
-		for _, a := range role.Allow {
-			if matchAction(a, req.Action) {
-				permitted = true
-				break
+	}
+	if !permitted {
+		return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q not in inherited role %q", req.Action, scope.Inherits), PolicyDigest: e.policyDigest}, nil
+	}
+
+	// max_refund_amount: an amount above the limit needs a human. Only applies
+	// when the caller supplied a numeric args.amount for a refund-like action;
+	// the engine cannot check a number it was never given.
+	if !dec.RequiresHumanReview {
+		if amount, ok := numericArg(req.Args, "amount"); ok && isRefundAction(req.Action) {
+			for _, c := range scope.Constraints {
+				if c.MaxRefundAmount != nil && amount > *c.MaxRefundAmount {
+					dec.RequiresHumanReview = true
+					dec.Reason = fmt.Sprintf("refund amount %.2f exceeds the limit of %.2f for agent %q; human approval required", amount, *c.MaxRefundAmount, req.Actor)
+					break
+				}
 			}
-		}
-		if !permitted {
-			return &Decision{Allowed: false, Reason: fmt.Sprintf("action %q not in inherited role %q", req.Action, scope.Inherits), PolicyDigest: e.policyDigest}, nil
 		}
 	}
 

@@ -57,17 +57,35 @@ It's one HTTP call from any language or framework, every decision is written to 
 
 ## Why Lelu?
 
-**Give your agent a permission system it can't talk its way around.**
+**A decision point and approval layer for AI agent actions — with a signed record of every decision.**
 
-Okta tells you **who can do what**. Lelu tells you **when they're doing it wrong**. Traditional auth tools (OPA, Casbin, AWS AVP) block unauthorized access — they can't detect when a *legitimately authorized* agent is being manipulated by prompt injection, acting on low confidence, or behaving anomalously. Lelu closes that gap.
+Lelu sits next to your policy engine, not in place of it. OPA, Cedar, Cerbos and your identity provider decide who may do what; Lelu adds a human-approval step that is bound to the exact call that was reviewed, and a signed, hash-chained record of every decision. It also offers advisory signals — a phrase-based prompt-injection screen and a confidence gate — that can only make a decision stricter. See [What Lelu does not do](#what-lelu-does-not-do) before you rely on it.
 
 OPA, Casbin, and AWS AVP handle role & permission checks, but stop there. Lelu does that too, and adds:
 
-- Prompt-injection detection (5-layer filter)
-- LLM confidence gating on verified log-probs
+- Advisory prompt-injection screening (phrase matching; English only, easy to evade — a speed bump, not a defence)
+- Confidence gating on a caller-supplied confidence signal (the engine cannot verify it)
 - Human-in-the-loop pause → approve → resume (Slack / Teams / PagerDuty)
 - Behavioral anomaly & reputation scoring
 - A full audit log of every decision
+
+---
+
+## What Lelu does not do
+
+Read this before you depend on Lelu. These limits come from an independent audit of version 0.0.14 and are being worked on; each has a tracking issue.
+
+- **It advises; it does not enforce.** Lelu returns a decision. Something on the agent's side must obey it. The Claude Code plugin and a gateway integration put that step outside the model; an MCP tool the model may choose to call does not.
+- **One API key does everything by default.** In the default single-key mode the key an agent authorizes with can also change the policy and resolve reviews. Run with separate credentials: set `LELU_REVIEWER_KEYS` (so only a reviewer key can approve) and keep the admin key away from the agent.
+- **Human review is self-service until you set `LELU_REVIEWER_KEYS`.** Without it, any holder of the API key can approve a review, including the agent that triggered it. The engine logs a warning at boot.
+- **Actor names are self-asserted** unless the caller presents a workload token (`X-Lelu-Agent-Token`). Policy keyed on actor name protects nothing against a caller that lies about it.
+- **YAML policy matches action names, not arguments.** Use Rego for argument-aware rules. A deny list over names can be sidestepped by renaming the action.
+- **The injection screen is a speed bump.** It matches a short list of English phrases and misses most paraphrases, other languages and encodings. It also flags ordinary text that contains words like "act as a".
+- **Audit events can be dropped under load** unless you set `LELU_AUDIT_BLOCK_ON_FULL=true`.
+- **Single process.** The engine stores state in SQLite and process memory. Do not run more than one replica.
+- **Set `JWT_SIGNING_KEY` and `VAULT_KEY`** to random values. The defaults are public.
+
+Found something else? See [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -146,17 +164,17 @@ if (decision.decision === "allow") {
 Every action flows through a layered pipeline — the strictest outcome wins:
 
 - **Prompt-injection filter** — 5 layers: exact → homoglyph → fuzzy → structural → entropy
-- **Confidence gate** — verified LLM token log-probs¹ — low confidence → deny or downgrade
+- **Confidence gate** — caller-supplied token log-probs¹ — low confidence → deny or downgrade
 - **Policy evaluator** — YAML roles + OPA/Rego, deny-first, wildcard patterns
 - **Risk model** — `criticality × (1 − confidence) × reliability × anomaly_factor`
 - **Human-review queue** — uncertain decisions pause for approval (Slack / Teams / PagerDuty)
 - **Behavioral analytics** — shadow-agent detection, reputation scoring, baseline drift alerts
 
-¹ Read from the provider (OpenAI, some Bedrock families) — never self-reported by the agent. No signal available (e.g. Anthropic Claude)? The engine applies its `MissingSignalMode` policy instead of trusting a fabricated score.
+¹ The engine checks that the signal is well-formed for the named provider; it cannot check that the numbers came from a real provider response. Treat it as an input to a stricter decision, not as evidence. A provider with no log-probs (e.g. Anthropic Claude) is rejected, and `MissingSignalMode` decides instead.
 
-Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.1 · AES-256-GCM [OAuth token vault](docs/) with 8 auto-refresh providers · NHI inventory with OWASP top-10 checks (`/v1/nhi/inventory`).
+Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.1 · an experimental AES-256-GCM OAuth token vault (providers are off until you configure `VAULT_<NAME>_CLIENT_ID`; set `VAULT_KEY`) · an experimental NHI inventory with six heuristic checks over the engine's own data (`/v1/nhi/inventory`).
 
-**Stack:** Go engine · Next.js dashboard · SQLite (local) / Postgres (prod) · Redis (optional)
+**Stack:** Go engine · Next.js dashboard · SQLite for the engine (single process; Redis optional for the review queue) · Postgres for the dashboard and control-plane API only
 
 ---
 
@@ -166,7 +184,7 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 - [langchain](examples/langchain) — gate a plain LangChain `StructuredTool` before execution
 - [crewai](examples/crewai) — gate CrewAI tool calls; a prompt-injected refund agent gets stopped
 - [strands](docs/integrations/strands.md) — register as a Strands intervention handler; denials, safe-tool redirects and human approval all use Strands' own actions
-- [bedrock](examples/bedrock) — gate Amazon Bedrock agents on the model's *own verified* confidence
+- [bedrock](examples/bedrock) — gate Amazon Bedrock agents on the model's reported confidence (offline demo with a mock response)
 - [agentgateway](examples/agentgateway) — Lelu as the decision brain behind agentgateway (ext-authz PEP)
 
 SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp)
@@ -186,7 +204,7 @@ Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host 
 <details>
 <summary><b>Can't the agent just lie about its confidence?</b></summary>
 
-No. Production engines only accept **verified** confidence signals — token log-probs read from the LLM provider, never a number the agent self-reports. When no verified signal exists, the engine applies its `MissingSignalMode` policy instead of trusting a fabricated score.
+Yes, today. By default the engine rejects a bare self-reported number, but it accepts a `confidence_signal` object, and it cannot tell whether that object came from a real provider response. Closing this properly needs the signal to come from something the agent does not control, such as an LLM gateway that sees the provider reply. Until then, confidence can only be used to tighten a decision, and a caller who wants to loosen it can.
 </details>
 
 <details>

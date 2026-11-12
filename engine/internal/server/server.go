@@ -1033,11 +1033,13 @@ func (h *Handler) checkPromptInjection(w http.ResponseWriter, r *http.Request, r
 		h.agentTracer.RecordDecision(span, false, false, 0, 1.0, "injection_denied")
 	}
 
-	writeJSON(w, http.StatusOK, agentAuthorizeResponse{
+	// Shadow mode is observation only, so an injection hit is reported through
+	// the same would_have_* fields as every other denial instead of blocking.
+	writeJSON(w, http.StatusOK, h.applyShadowMode(agentAuthorizeResponse{
 		Allowed: false,
 		Reason:  reason,
 		TraceID: traceID,
-	})
+	}))
 	return true
 }
 
@@ -2751,6 +2753,9 @@ func (h *Handler) handleQueueWait(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+	// The server-wide WriteTimeout (10 s) would cut a long poll off with no
+	// response. Extend the write deadline for this request only.
+	_ = http.NewResponseController(w).SetWriteDeadline(deadline.Add(5 * time.Second))
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 

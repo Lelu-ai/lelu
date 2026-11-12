@@ -4,6 +4,9 @@ global:
 secrets:
   engine:
     jwtSigningKey: "REPLACE_ME"
+    apiKey: "REPLACE_ME"
+    vaultKey: "REPLACE_ME"
+    reviewerKeys: "REPLACE_ME"   # name:secret pairs, secret >= 16 chars
     cpHmacSecret: "REPLACE_ME"
   platform:
     apiKey: "REPLACE_ME"
@@ -15,7 +18,11 @@ secrets:
 
 engine:
   enabled: true
-  replicaCount: 2
+  # The engine keeps its review queue, audit chain, signing key and rate-limit
+  # counters in one process. Running more than one replica gives each its own
+  # copy and silently breaks consistency, so keep this at 1 until shared state
+  # lands (see the "shared state for more than one replica" issue).
+  replicaCount: 1
   # No public image is published yet — build engine/Dockerfile yourself,
   # push it to your own registry, and set this to that path.
   image: "REPLACE_ME"

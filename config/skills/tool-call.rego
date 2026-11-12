@@ -1,5 +1,7 @@
 package lelu
 
+import rego.v1
+
 default authz = {
   "allowed": false,
   "reason": "default deny"

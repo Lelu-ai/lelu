@@ -37,9 +37,6 @@ type Client struct {
 // NewClient constructs a new Lelu SDK client.
 func NewClient(cfg ClientConfig) *Client {
 	defaultURL := "http://localhost:8080"
-	if cfg.APIKey != "" {
-		defaultURL = LeluCloudURL
-	}
 
 	baseURL := strings.TrimSuffix(cfg.BaseURL, "/")
 	if baseURL == "" {

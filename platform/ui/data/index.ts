@@ -4,13 +4,6 @@ export const navItems = [
   { name: "Policies", link: "/policies" },
 ];
 
-export const heroStats = [
-  { value: "28k+", label: "GitHub Stars" },
-  { value: "<50ms", label: "P95 Latency" },
-  { value: "100%", label: "Audit Coverage" },
-  { value: "SOC 2", label: "Compliant" },
-];
-
 // 6 numbered features for the grid
 export const numberedFeatures = [
   {
@@ -52,7 +45,7 @@ export const numberedFeatures = [
     num: "06",
     title: "Real-time enforcement",
     desc: "Behavioral analytics, anomaly detection, and prompt injection blocking — all in-line.",
-    chip: "<50ms",
+    chip: "realtime",
     chipColor: "neutral" as const,
   },
 ];
@@ -162,13 +155,6 @@ export const gridItems = [
   },
 ];
 
-export const stats = [
-  { value: "99.9%", label: "Uptime SLA" },
-  { value: "<50ms", label: "P95 Latency" },
-  { value: "100%", label: "Audit Coverage" },
-  { value: "SOC 2", label: "Compliant" },
-];
-
 export const features = [
   {
     id: 1,
@@ -235,20 +221,4 @@ export const companies = [
   { id: 5, name: "docker.", img: "/dock.svg", nameImg: "/dockerName.svg" },
 ];
 
-export const testimonials = [
-  {
-    quote: "Lelu has completely transformed how we secure our agent swarms. The policy-as-code approach is exactly what we needed.",
-    name: "Alex River",
-    title: "Director of Engineering, V-Security",
-  },
-  {
-    quote: "Integrating Lelu into our LangChain workflows was seamless. Decisions are gated in milliseconds.",
-    name: "Sarah Chen",
-    title: "Senior AI Researcher, AgentX",
-  },
-  {
-    quote: "The audit trail and confidence metadata have made SOC 2 compliance a breeze for our AI platform.",
-    name: "David Kim",
-    title: "CTO, SafeSwarm AI",
-  },
-];
+

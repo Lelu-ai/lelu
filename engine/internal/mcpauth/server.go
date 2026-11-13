@@ -36,6 +36,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -134,6 +135,62 @@ func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /oauth/introspect", s.handleIntrospect)
 }
 
+// validateRedirectURI refuses a redirect_uri that /oauth/authorize must not
+// send a code to.
+//
+// https is always fine. http is only fine for a loopback host, which is what a
+// local client uses and what the OAuth native-app guidance allows. Any other
+// scheme is a custom app scheme and is allowed, except the three that run code
+// or read files in the caller's context. A `*` would make the registered value
+// a pattern rather than an exact match, and a fragment is never sent to the
+// server, so both are refused.
+func validateRedirectURI(raw string) error {
+	if raw == "" {
+		return fmt.Errorf("redirect_uri must not be empty")
+	}
+	if strings.Contains(raw, "*") {
+		return fmt.Errorf("redirect_uri %q must not contain a wildcard", raw)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("redirect_uri %q is not a valid URL", raw)
+	}
+	if u.Fragment != "" || strings.Contains(raw, "#") {
+		return fmt.Errorf("redirect_uri %q must not contain a fragment", raw)
+	}
+	if u.Scheme == "" {
+		return fmt.Errorf("redirect_uri %q must be an absolute URL with a scheme", raw)
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "https":
+		return nil
+	case "http":
+		if !isLoopbackHost(u.Host) {
+			return fmt.Errorf("redirect_uri %q must use https, unless it points at localhost or 127.0.0.1", raw)
+		}
+		return nil
+	case "javascript", "data", "file":
+		return fmt.Errorf("redirect_uri %q uses a scheme that is not allowed", raw)
+	}
+	return nil
+}
+
+// isLoopbackHost reports whether host (with an optional port) is loopback.
+func isLoopbackHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	h := host
+	if hostname, _, err := net.SplitHostPort(host); err == nil {
+		h = hostname
+	}
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(h, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
 // ── Dynamic Client Registration (RFC 7591) ───────────────────────────────────
 
 func (s *Server) handleRegisterClient(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +221,16 @@ func (s *Server) handleRegisterClient(w http.ResponseWriter, r *http.Request) {
 		if !containsString(SupportedScopes, sc) {
 			writeError(w, http.StatusBadRequest, "invalid_scope",
 				fmt.Sprintf("scope %q is not supported (supported: %s)", sc, strings.Join(SupportedScopes, " ")))
+			return
+		}
+	}
+
+	// A registered redirect_uri is where authorization codes go, so it is
+	// checked now rather than at /oauth/authorize: a client that registers
+	// `javascript:` or a wildcard would otherwise get a code delivered there.
+	for _, uri := range req.RedirectURIs {
+		if err := validateRedirectURI(uri); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_redirect_uri", err.Error())
 			return
 		}
 	}

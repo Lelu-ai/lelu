@@ -21,6 +21,14 @@
 * **Engine releases publish a container image again.** Images were only built on plain `v*.*.*` tags, which engine releases stopped using after `v0.0.14`, so no `engine-v*` release had one. `engine-release.yml` now pushes `ghcr.io/lelu-ai/lelu-engine:<version>` (and `latest` for non-prerelease tags) for `linux/amd64` and `linux/arm64`. The Dockerfile no longer forces `GOARCH=amd64`, which put an amd64 binary in the arm64 image, and stamps the version so `/healthz` and `--version` report it. Reported in the Nauro pilot.
 * **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
 
+## [0.3.1](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.0...engine-v0.3.1) (2026-11-14)
+
+
+### Bug Fixes
+
+* **mcpauth:** refuse unsafe redirect URIs at client registration ([525887a](https://github.com/Lelu-ai/lelu/commit/525887abd85c42bfc062e8fac3e13d85ae59b50b))
+* **mcpauth:** refuse unsafe redirect URIs at client registration ([96424c1](https://github.com/Lelu-ai/lelu/commit/96424c10dd7c38b2377c2320400c3a2b50ee6143))
+
 ## [0.3.0](https://github.com/Lelu-ai/lelu/compare/engine-v0.2.1...engine-v0.3.0) (2026-11-12)
 
 

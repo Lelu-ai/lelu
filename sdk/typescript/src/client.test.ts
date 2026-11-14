@@ -363,4 +363,33 @@ describe("LeluClient", () => {
       expect(mockFetch.mock.calls[1][0]).toContain("/v1/agents/agent-1/token");
     });
   });
+
+  // ── redeemReview ──────────────────────────────────────────────────────────
+
+  describe("redeemReview()", () => {
+    it("returns the refusal result on 403 instead of throwing", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ allowed: false, reason: "payload mismatch" }),
+      });
+      const result = await client.redeemReview("rv-1", { tool: "approve_refunds" });
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe("payload mismatch");
+    });
+
+    it("returns the allowed result on 200", async () => {
+      mockOK({ allowed: true, reason: "approved", review_id: "rv-1" });
+      const result = await client.redeemReview("rv-1", { tool: "approve_refunds" });
+      expect(result.allowed).toBe(true);
+      expect(result.reason).toBe("approved");
+    });
+
+    it("throws AuthEngineError on other HTTP errors", async () => {
+      mockError(500, "engine error");
+      await expect(
+        client.redeemReview("rv-1", { tool: "approve_refunds" })
+      ).rejects.toBeInstanceOf(AuthEngineError);
+    });
+  });
 });

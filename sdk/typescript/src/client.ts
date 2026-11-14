@@ -588,6 +588,8 @@ export class LeluClient {
     return this.post<RedeemResult>(
       `/v1/queue/${encodeURIComponent(reviewId)}/redeem`,
       this.authorizeBody(req),
+      undefined,
+      { allowStatuses: [403] },
     );
   }
 
@@ -1231,7 +1233,12 @@ export class LeluClient {
     return h;
   }
 
-  private async post<T>(path: string, body: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+  private async post<T>(
+    path: string,
+    body: unknown,
+    extraHeaders?: Record<string, string>,
+    opts?: { allowStatuses?: number[] },
+  ): Promise<T> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     try {
@@ -1241,7 +1248,7 @@ export class LeluClient {
         body: JSON.stringify(body),
         signal: ctrl.signal,
       });
-      return this.parseResponse<T>(res);
+      return this.parseResponse<T>(res, opts?.allowStatuses);
     } finally {
       clearTimeout(timer);
     }
@@ -1277,9 +1284,9 @@ export class LeluClient {
     }
   }
 
-  private async parseResponse<T>(res: Response): Promise<T> {
+  private async parseResponse<T>(res: Response, allowStatuses: number[] = []): Promise<T> {
     const json = (await res.json()) as Record<string, unknown>;
-    if (!res.ok) {
+    if (!res.ok && !allowStatuses.includes(res.status)) {
       throw new AuthEngineError(
         (json["error"] as string) ?? "engine error",
         res.status,

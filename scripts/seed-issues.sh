@@ -6,8 +6,8 @@
 #   scripts/seed-issues.sh --create --level 1   # only one difficulty level
 #
 # Each file has a front matter block (title, labels) followed by the issue body.
-# Requires: gh (authenticated for the target repo). Safe to re-run only after
-# deleting issues you already created; it does not de-duplicate.
+# Requires: gh (authenticated for the target repo). Issues whose title already
+# exists in the repository (open or closed) are skipped, so re-running is safe.
 set -euo pipefail
 cd "$(dirname "$0")/../.github/seed-issues"
 
@@ -33,12 +33,21 @@ if [ "$create" = 1 ]; then
   done
 fi
 
+existing=""
+if command -v gh >/dev/null && gh auth status >/dev/null 2>&1; then
+  existing=$(gh issue list --state all --limit 1000 --json title --jq '.[].title' 2>/dev/null || true)
+fi
+
 count=0
 for f in ${level:+$level-}*.md; do
   [ -e "$f" ] || continue
   title=$(sed -n 's/^title: //p' "$f" | head -1)
   labels=$(sed -n 's/^labels: //p' "$f" | head -1)
   body=$(awk 'BEGIN{n=0} /^---$/{n++; next} n>=2{print}' "$f")
+  if [ -n "$existing" ] && printf '%s\n' "$existing" | grep -qxF -- "$title"; then
+    echo "skip (exists): $title"
+    continue
+  fi
   count=$((count+1))
   if [ "$create" = 1 ]; then
     gh issue create --title "$title" --label "$labels" --body "$body"

@@ -384,6 +384,32 @@ describe("LeluClient", () => {
       expect(result.allowed).toBe(true);
       expect(result.reason).toBe("approved");
     });
+    it("maps review_id and trace_id from the engine to reviewId and traceId on 200", async () => {
+      mockOK({ allowed: true, reason: "approved", review_id: "rv-1", trace_id: "tr-9" });
+      const result = await client.redeemReview("rv-1", { tool: "approve_refunds" });
+      expect(result.reviewId).toBe("rv-1");
+      expect(result.traceId).toBe("tr-9");
+      expect(result).not.toHaveProperty("review_id");
+      expect(result).not.toHaveProperty("trace_id");
+    });
+
+    it("maps review_id and trace_id on the 403 refusal path too", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        json: async () => ({ allowed: false, reason: "payload mismatch", review_id: "rv-1", trace_id: "tr-10" }),
+      });
+      const result = await client.redeemReview("rv-1", { tool: "approve_refunds" });
+      expect(result.allowed).toBe(false);
+      expect(result.reviewId).toBe("rv-1");
+      expect(result.traceId).toBe("tr-10");
+    });
+
+    it("leaves reviewId and traceId unset when the engine does not send them", async () => {
+      mockOK({ allowed: true, reason: "approved" });
+      const result = await client.redeemReview("rv-1", { tool: "approve_refunds" });
+      expect(result).toEqual({ allowed: true, reason: "approved" });
+    });
 
     it("throws AuthEngineError on other HTTP errors", async () => {
       mockError(500, "engine error");

@@ -11,6 +11,7 @@
 ### Fixes
 
 * **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
+* **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`.
 * **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).
 * `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
 * `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.

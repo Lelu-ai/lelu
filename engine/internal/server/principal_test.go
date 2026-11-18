@@ -83,6 +83,50 @@ func TestRateLimitKey_SameUserSameKeyRegardlessOfClaimedTenant(t *testing.T) {
 	}
 }
 
+// Issue #113: in single-key mode the limiter must key on the verified
+// credential, not the caller-declared tenant_id — otherwise rotating tenant
+// ids grants a fresh budget each time.
+func TestRateLimitKey_StaticKeyUsesCredentialHashNotClaimedTenant(t *testing.T) {
+	ctx := withPrincipal(context.Background(), Principal{
+		IsStaticAdminKey:     true,
+		StaticCredentialHash: "hash-of-the-static-key",
+	})
+	k1 := rateLimitKey(ctx, "tenant-a")
+	k2 := rateLimitKey(ctx, "tenant-b")
+	if k1 != k2 {
+		t.Fatalf("static key rate limit key changed with claimed tenant_id (%q vs %q)", k1, k2)
+	}
+	if k1 != "credential:hash-of-the-static-key" {
+		t.Fatalf("static key rate limit key = %q, want a key derived from the credential hash", k1)
+	}
+}
+
+func TestAuthMiddleware_StaticKeyBindsCredentialHash(t *testing.T) {
+	h := &Handler{apiKey: "static-key"}
+	var captured Principal
+	var hadPrincipal bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, hadPrincipal = principalFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", nil)
+	req.Header.Set("Authorization", "Bearer static-key")
+	rec := httptest.NewRecorder()
+	h.authMiddleware(next).ServeHTTP(rec, req)
+
+	if !hadPrincipal || !captured.IsStaticAdminKey {
+		t.Fatalf("expected static admin principal, got present=%v %+v", hadPrincipal, captured)
+	}
+	if captured.StaticCredentialHash == "" {
+		t.Fatal("static key principal must carry a credential hash so rate limiting keys on it")
+	}
+	// The stored value must be a hash, never the raw credential.
+	if captured.StaticCredentialHash == "static-key" {
+		t.Fatal("credential hash must not be the raw key")
+	}
+}
+
 // ── authMiddleware binds the right Principal ─────────────────────────────────
 // keyverify_test.go already covers status codes for these paths; this checks
 // what actually lands in the request context, which is the part Nate
@@ -265,9 +309,9 @@ func TestEvaluateAgentDecision_AuditUsesVerifiedTenantNotClaimed(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	_, handled := h.evaluateAgentDecision(r.Context(), rec, r, agentAuthorizeRequest{
-		TenantID: "attacker-claimed-tenant",
-		Actor:    "invoice_bot",
-		Action:   "view_invoices",
+		TenantID:   "attacker-claimed-tenant",
+		Actor:      "invoice_bot",
+		Action:     "view_invoices",
 		Confidence: f64(0.95),
 	}, nil, time.Now(), "test-input-hash")
 

@@ -1451,21 +1451,21 @@ func (h *Handler) evaluateAgentDecision(ctx context.Context, w http.ResponseWrit
 	// only by its reference and digest, never by the complete provider payload.
 	evidenceRef, evidenceReceiptDigest := externalEvidenceAuditRefs(req.Args)
 	h.audit.Log(audit.Event{
-		TenantID:              req.TenantID,
-		TraceID:               traceID,
-		Actor:                 req.Actor,
-		Action:                req.Action,
-		Resource:              req.Resource,
-		ConfidenceScore:       confidenceScore,
-		ProviderSignalPresent: providerSignalPresent,
-		ActorVerified:         actorVerified,
-		Decision:              decisionStringFull(allowed, requiresReview, isCompute),
-		Reason:                finalReason,
-		DowngradedScope:       downgradedScope,
-		LatencyMS:             totalLatency,
-		InputHash:             inputHash,
-		OutputHash:            resp.OutputHash,
-		PolicyDigest:                   evalDec.PolicyDigest,
+		TenantID:                      req.TenantID,
+		TraceID:                       traceID,
+		Actor:                         req.Actor,
+		Action:                        req.Action,
+		Resource:                      req.Resource,
+		ConfidenceScore:               confidenceScore,
+		ProviderSignalPresent:         providerSignalPresent,
+		ActorVerified:                 actorVerified,
+		Decision:                      decisionStringFull(allowed, requiresReview, isCompute),
+		Reason:                        finalReason,
+		DowngradedScope:               downgradedScope,
+		LatencyMS:                     totalLatency,
+		InputHash:                     inputHash,
+		OutputHash:                    resp.OutputHash,
+		PolicyDigest:                  evalDec.PolicyDigest,
 		ExternalEvidenceRef:           evidenceRef,
 		ExternalEvidenceReceiptDigest: evidenceReceiptDigest,
 	})
@@ -3118,6 +3118,15 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 	}
 }
 
+// staticCredentialHash derives a stable, non-reversible identity for the
+// single static/admin credential. Rate limiting keys on this in single-key
+// mode rather than a caller-declared tenant_id, which can be rotated at will
+// to escape the budget (issue #113).
+func staticCredentialHash(credential string) string {
+	sum := sha256.Sum256([]byte(credential))
+	return hex.EncodeToString(sum[:])[:32]
+}
+
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip auth for health check, metrics, OIDC/MCP discovery, and the
@@ -3164,7 +3173,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 		// leave the engine open.
 		if h.apiKey == "" && h.keyVerify == nil {
 			if strings.EqualFold(strings.TrimSpace(os.Getenv("LELU_DEV_INSECURE")), "true") {
-				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true}))
+				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true, StaticCredentialHash: staticCredentialHash("dev-insecure")}))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -3180,7 +3189,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			expected := "Bearer " + h.apiKey
 			// Constant-time comparison to avoid leaking the key via response timing.
 			if subtle.ConstantTimeCompare([]byte(authHeader), []byte(expected)) == 1 {
-				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true}))
+				r = r.WithContext(withPrincipal(r.Context(), Principal{IsStaticAdminKey: true, StaticCredentialHash: staticCredentialHash(h.apiKey)}))
 				next.ServeHTTP(w, r)
 				return
 			}

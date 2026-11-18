@@ -24,6 +24,13 @@ type Principal struct {
 	// lelu_sk_ key. That credential is intentionally the engine's one admin
 	// credential in that mode — see handlePolicyPut.
 	IsStaticAdminKey bool
+	// StaticCredentialHash is a hash of the credential that authenticated a
+	// static-admin request. In single-key mode there is no per-account UserID,
+	// so rate limiting keys on this instead of the caller-declared tenant_id —
+	// which the caller can rotate at will to escape its budget (issue #113).
+	// Empty for account-bound keys (those use UserID) and for principals built
+	// outside authMiddleware. Never the raw credential.
+	StaticCredentialHash string
 }
 
 type principalContextKey struct{}
@@ -72,8 +79,13 @@ func principalMayActAs(p Principal, userID string) bool {
 // limit just by relabeling which tenant they claim to be. See Nate Howard's
 // review.
 func rateLimitKey(ctx context.Context, tenantID string) string {
-	if p, ok := principalFromContext(ctx); ok && !p.IsStaticAdminKey && p.UserID != "" {
-		return p.UserID
+	if p, ok := principalFromContext(ctx); ok {
+		if !p.IsStaticAdminKey && p.UserID != "" {
+			return p.UserID
+		}
+		if p.IsStaticAdminKey && p.StaticCredentialHash != "" {
+			return "credential:" + p.StaticCredentialHash
+		}
 	}
 	return tenantID
 }

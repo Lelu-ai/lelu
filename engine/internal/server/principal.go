@@ -24,13 +24,6 @@ type Principal struct {
 	// lelu_sk_ key. That credential is intentionally the engine's one admin
 	// credential in that mode — see handlePolicyPut.
 	IsStaticAdminKey bool
-	// StaticCredentialHash is a hash of the credential that authenticated a
-	// static-admin request. In single-key mode there is no per-account UserID,
-	// so rate limiting keys on this instead of the caller-declared tenant_id —
-	// which the caller can rotate at will to escape its budget (issue #113).
-	// Empty for account-bound keys (those use UserID) and for principals built
-	// outside authMiddleware. Never the raw credential.
-	StaticCredentialHash string
 }
 
 type principalContextKey struct{}
@@ -73,18 +66,19 @@ func principalMayActAs(p Principal, userID string) bool {
 // rateLimitKey returns what a rate limiter should key this request on: the
 // verified principal's UserID when one exists, since that's something the
 // caller can't change from one request to the next — falling back to the
-// caller-declared tenantID only when there's no verified per-account
-// identity to prefer (the static admin credential, or a path auth hasn't
-// been wired to). Keying on tenantID alone lets a caller reset their own
-// limit just by relabeling which tenant they claim to be. See Nate Howard's
-// review.
+// caller-declared tenantID only when a request has no verified identity
+// (a path auth hasn't been wired to). In single-key mode there is exactly
+// one static credential, so all static-admin traffic shares a single fixed
+// budget; keying on the caller-declared tenantID lets a caller escape its
+// limit just by relabeling which tenant it claims to be (issue #113). See
+// Nate Howard's review.
 func rateLimitKey(ctx context.Context, tenantID string) string {
 	if p, ok := principalFromContext(ctx); ok {
-		if !p.IsStaticAdminKey && p.UserID != "" {
-			return p.UserID
+		if p.IsStaticAdminKey {
+			return "credential:static-admin"
 		}
-		if p.IsStaticAdminKey && p.StaticCredentialHash != "" {
-			return "credential:" + p.StaticCredentialHash
+		if p.UserID != "" {
+			return p.UserID
 		}
 	}
 	return tenantID

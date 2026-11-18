@@ -58,7 +58,7 @@ func TestRateLimitKey(t *testing.T) {
 		want       string
 	}{
 		{"platform principal overrides the claimed tenant", &Principal{UserID: "user-1"}, "whatever-i-feel-like", "user-1"},
-		{"static admin falls back to the claimed tenant", &Principal{IsStaticAdminKey: true}, "tenant-a", "tenant-a"},
+		{"static admin uses one fixed key regardless of claimed tenant", &Principal{IsStaticAdminKey: true}, "tenant-a", "credential:static-admin"},
 		{"no principal falls back to the claimed tenant", nil, "tenant-b", "tenant-b"},
 	}
 	for _, tc := range cases {
@@ -83,25 +83,22 @@ func TestRateLimitKey_SameUserSameKeyRegardlessOfClaimedTenant(t *testing.T) {
 	}
 }
 
-// Issue #113: in single-key mode the limiter must key on the verified
-// credential, not the caller-declared tenant_id — otherwise rotating tenant
-// ids grants a fresh budget each time.
-func TestRateLimitKey_StaticKeyUsesCredentialHashNotClaimedTenant(t *testing.T) {
-	ctx := withPrincipal(context.Background(), Principal{
-		IsStaticAdminKey:     true,
-		StaticCredentialHash: "hash-of-the-static-key",
-	})
+// Issue #113: in single-key mode there is one static credential, so all
+// traffic shares a single fixed rate-limit key regardless of the tenant_id
+// the caller claims — otherwise rotating tenant ids grants a fresh budget.
+func TestRateLimitKey_StaticKeyUsesConstantKeyNotClaimedTenant(t *testing.T) {
+	ctx := withPrincipal(context.Background(), Principal{IsStaticAdminKey: true})
 	k1 := rateLimitKey(ctx, "tenant-a")
 	k2 := rateLimitKey(ctx, "tenant-b")
 	if k1 != k2 {
 		t.Fatalf("static key rate limit key changed with claimed tenant_id (%q vs %q)", k1, k2)
 	}
-	if k1 != "credential:hash-of-the-static-key" {
-		t.Fatalf("static key rate limit key = %q, want a key derived from the credential hash", k1)
+	if k1 != "credential:static-admin" {
+		t.Fatalf("static key rate limit key = %q, want the single fixed key", k1)
 	}
 }
 
-func TestAuthMiddleware_StaticKeyBindsCredentialHash(t *testing.T) {
+func TestAuthMiddleware_StaticKeyBindsAdminPrincipal(t *testing.T) {
 	h := &Handler{apiKey: "static-key"}
 	var captured Principal
 	var hadPrincipal bool
@@ -118,12 +115,8 @@ func TestAuthMiddleware_StaticKeyBindsCredentialHash(t *testing.T) {
 	if !hadPrincipal || !captured.IsStaticAdminKey {
 		t.Fatalf("expected static admin principal, got present=%v %+v", hadPrincipal, captured)
 	}
-	if captured.StaticCredentialHash == "" {
-		t.Fatal("static key principal must carry a credential hash so rate limiting keys on it")
-	}
-	// The stored value must be a hash, never the raw credential.
-	if captured.StaticCredentialHash == "static-key" {
-		t.Fatal("credential hash must not be the raw key")
+	if captured.UserID != "" {
+		t.Fatalf("a static admin request must have no derived UserID, got %q", captured.UserID)
 	}
 }
 
@@ -309,9 +302,9 @@ func TestEvaluateAgentDecision_AuditUsesVerifiedTenantNotClaimed(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	_, handled := h.evaluateAgentDecision(r.Context(), rec, r, agentAuthorizeRequest{
-		TenantID:   "attacker-claimed-tenant",
-		Actor:      "invoice_bot",
-		Action:     "view_invoices",
+		TenantID: "attacker-claimed-tenant",
+		Actor:    "invoice_bot",
+		Action:   "view_invoices",
 		Confidence: f64(0.95),
 	}, nil, time.Now(), "test-input-hash")
 

@@ -816,6 +816,68 @@ func TestRateLimit_AuthEndpoint(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
 }
 
+// Issue #113: with a single static API key, callers can rotate the
+// tenant_id in the request body to escape per-tenant budgets. The limiter
+// must key static-key traffic on one fixed identity instead, so N requests
+// across N different tenant_ids share one budget and the (N+1)th is 429.
+func TestRateLimit_StaticKeySharesOneBudgetAcrossTenants(t *testing.T) {
+	clearRiskEnv(t)
+	eval := evaluator.New()
+	require.NoError(t, eval.LoadPolicyBytes(samplePolicy))
+
+	rl := ratelimit.New(ratelimit.Config{
+		Defaults: ratelimit.TenantLimits{
+			AuthChecksPerMinute: 3,
+			TokenMintsPerMinute: 100,
+		},
+	})
+	h, err := server.New(
+		eval,
+		tokens.New(tokens.Config{SigningKey: "test-key"}),
+		confidence.New(),
+		audit.New(audit.Config{Sink: &bytes.Buffer{}}),
+		nil,
+		"static-key", // single static admin credential
+		server.ConfidenceConfig{},
+		server.EnforcementModeEnforce,
+		nil,
+		rl,
+		nil, // fallback
+		nil, // telemetry
+		nil, // database
+	)
+	require.NoError(t, err)
+	httpSrv := server.NewHTTPServer(":0", h)
+	srv := httptest.NewServer(httpSrv.Handler)
+	defer srv.Close()
+
+	post := func(tenant string) int {
+		body, _ := json.Marshal(map[string]any{
+			"tenant_id": tenant,
+			"user_id":   "user_123",
+			"action":    "approve_refunds",
+		})
+		req, err := http.NewRequest(http.MethodPost, srv.URL+"/v1/authorize", bytes.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer static-key")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	// Different claimed tenant ids, all on the one static key.
+	for i := 0; i < 3; i++ {
+		assert.Equal(t, http.StatusOK, post("attacker-tenant-"+string(rune('a'+i))),
+			"call %d with a fresh tenant id should still pass", i+1)
+	}
+	// 4th call, another fresh tenant id — must be rejected: the budget is
+	// shared, not reset by relabeling the tenant.
+	assert.Equal(t, http.StatusTooManyRequests, post("attacker-tenant-d"),
+		"rotating tenant_id must not escape the static key's budget")
+}
+
 // ─── Fallback status endpoint ────────────────────────────────────────────────
 
 func TestFallbackStatus_NilFallback(t *testing.T) {

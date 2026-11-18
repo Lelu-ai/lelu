@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ProCta from "@/components/billing/ProCta";
 import { motion } from "framer-motion";
 
 /* ── Pricing — free while in beta, no accounts ─────────────────────── */
@@ -54,7 +55,7 @@ const TIERS = [
       "Email support",
       "Cancel any time from your dashboard",
     ],
-    cta: { label: "Upgrade to Pro", href: "/dashboard" },
+    cta: { label: "Upgrade to Pro", href: "/dashboard", checkout: true },
     highlight: true,
     badge: "For production",
   },
@@ -163,7 +164,9 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              {t.cta.external ? (
+              {"checkout" in t.cta && t.cta.checkout ? (
+                <ProCta label={t.cta.label} />
+              ) : t.cta.external ? (
                 <a
                   href={t.cta.href}
                   target="_blank"

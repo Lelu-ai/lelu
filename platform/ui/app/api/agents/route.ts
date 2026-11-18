@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { listAgents, createAgent } from "@/lib/agents";
+import { checkAgentLimit } from "@/lib/quota";
 
 export async function GET() {
   const session = await getCurrentUser();
@@ -34,6 +35,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Free accounts can register a few agents; more needs the paid plan.
+    // 402 Payment Required carries what the dashboard needs to show an upgrade.
+    const limit = await checkAgentLimit(session.userId);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Agent limit reached (${limit.count}/${limit.limit} on the ${limit.plan} plan). Upgrade to Pro for up to 50 agents, or revoke an agent you no longer use.`,
+          code: "agent_limit_reached",
+          plan: limit.plan,
+          limit: limit.limit,
+        },
+        { status: 402 },
+      );
+    }
     const agent = await createAgent({
       userId: session.userId,
       name: name.trim(),

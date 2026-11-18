@@ -7,9 +7,13 @@ import { createHmac } from "node:crypto";
 import fs from "node:fs";
 import ts from "typescript";
 
-const src = fs.readFileSync(new URL("../lib/billing/paddle.ts", import.meta.url), "utf8");
-const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const m = await import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+const load = async (file) => {
+  const src = fs.readFileSync(new URL(file, import.meta.url), "utf8");
+  const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+  return import("data:text/javascript;base64," + Buffer.from(js).toString("base64"));
+};
+const m = await load("../lib/billing/paddle.ts");
+const cs = await load("../lib/billing/checkout-state.ts");
 
 let passed = 0;
 const test = (name, fn) => {
@@ -100,6 +104,28 @@ test("paddleConfig defaults to the sandbox and only uses production when asked",
   assert.equal(m.paddleConfig({ ...base, PADDLE_ENVIRONMENT: "production" }).environment, "production");
   assert.equal(m.paddleApiBase({}), "https://sandbox-api.paddle.com");
   assert.equal(m.paddleApiBase({ PADDLE_ENVIRONMENT: "production" }), "https://api.paddle.com");
+});
+
+// ── checkout state (pricing page / dashboard) ──
+const okBody = { environment: "sandbox", clientToken: "test_x", priceId: "pri_x", email: "a@b.co", userId: "u1" };
+test("config 200 with a complete body is ready", () => {
+  const r = cs.classifyConfigResponse(200, okBody);
+  assert.equal(r.status, "ready"); assert.deepEqual(r.config, okBody);
+});
+test("config 401 means signed out, 503 means billing is not configured", () => {
+  assert.equal(cs.classifyConfigResponse(401, { error: "Unauthorized" }).status, "signed_out");
+  assert.equal(cs.classifyConfigResponse(503, { error: "x" }).status, "unconfigured");
+});
+test("anything else, or an incomplete body, is an error, never ready", () => {
+  assert.equal(cs.classifyConfigResponse(500, okBody).status, "error");
+  assert.equal(cs.classifyConfigResponse(200, null).status, "error");
+  assert.equal(cs.classifyConfigResponse(200, "x").status, "error");
+  for (const k of ["clientToken", "priceId", "userId"]) assert.equal(cs.classifyConfigResponse(200, { ...okBody, [k]: "" }).status, "error", k);
+  assert.equal(cs.classifyConfigResponse(200, { ...okBody, environment: "staging" }).status, "error");
+  assert.equal(cs.classifyConfigResponse(200, { ...okBody, email: undefined }).status, "error");
+});
+test("a signed-out visitor returns to the pricing page with checkout set to open", () => {
+  assert.equal(cs.loginUrlForUpgrade(), "/login?next=%2Fpricing%3Fupgrade%3D1");
 });
 
 console.log(`\n${passed} test(s) passed${process.exitCode ? ", with failures" : ""}`);

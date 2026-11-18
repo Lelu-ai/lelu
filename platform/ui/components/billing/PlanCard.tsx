@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { classifyConfigResponse, type CheckoutConfig } from "@/lib/billing/checkout-state";
+import { openProCheckout } from "./paddle-client";
 
 // Shows the user's plan and monthly usage, with an Upgrade button (free users)
 // or a Manage billing button (paying users). Billing is optional: if the
@@ -12,55 +14,6 @@ interface Usage {
   authRequests: number;
   authQuota: number;
   resetDate: string;
-}
-
-interface CheckoutConfig {
-  environment: "sandbox" | "production";
-  clientToken: string;
-  priceId: string;
-  email: string;
-  userId: string;
-}
-
-interface PaddleEvent {
-  name?: string;
-}
-
-// The small slice of Paddle.js (v2) used here.
-interface PaddleGlobal {
-  Environment: { set: (env: "sandbox") => void };
-  Initialize: (opts: { token: string; eventCallback?: (e: PaddleEvent) => void }) => void;
-  Checkout: {
-    open: (opts: {
-      items: { priceId: string; quantity: number }[];
-      customer?: { email: string };
-      customData?: Record<string, string>;
-    }) => void;
-  };
-}
-
-declare global {
-  interface Window {
-    Paddle?: PaddleGlobal;
-  }
-}
-
-const PADDLE_JS = "https://cdn.paddle.com/paddle/v2/paddle.js";
-
-function loadPaddleJs(): Promise<PaddleGlobal> {
-  return new Promise((resolve, reject) => {
-    if (window.Paddle) return resolve(window.Paddle);
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${PADDLE_JS}"]`);
-    const script = existing ?? document.createElement("script");
-    const onLoad = () => (window.Paddle ? resolve(window.Paddle) : reject(new Error("Paddle.js did not load")));
-    script.addEventListener("load", onLoad, { once: true });
-    script.addEventListener("error", () => reject(new Error("Could not load Paddle.js")), { once: true });
-    if (!existing) {
-      script.src = PADDLE_JS;
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  });
 }
 
 export default function PlanCard() {
@@ -81,8 +34,8 @@ export default function PlanCard() {
   useEffect(() => {
     loadUsage().catch(() => {});
     fetch("/api/billing/paddle/config")
-      .then((r) => (r.ok ? (r.json() as Promise<CheckoutConfig>) : null))
-      .then((c) => setBilling(c))
+      .then(async (r) => classifyConfigResponse(r.status, await r.json().catch(() => null)))
+      .then((state) => setBilling(state.status === "ready" ? state.config : null))
       .catch(() => {});
     return () => {
       if (pollTimer.current) clearInterval(pollTimer.current);
@@ -91,7 +44,7 @@ export default function PlanCard() {
 
   // The plan changes when Paddle's webhook reaches us, a moment after the
   // payment. Poll briefly instead of asking the user to refresh.
-  const waitForPaidPlan = useCallback(() => {
+  const waitForPaidPlanInCard = useCallback(() => {
     setMessage("Payment received. Activating your plan…");
     let tries = 0;
     if (pollTimer.current) clearInterval(pollTimer.current);
@@ -113,21 +66,7 @@ export default function PlanCard() {
     setBusy(true);
     setMessage("");
     try {
-      const paddle = await loadPaddleJs();
-      if (billing.environment === "sandbox") paddle.Environment.set("sandbox");
-      paddle.Initialize({
-        token: billing.clientToken,
-        eventCallback: (e) => {
-          if (e.name === "checkout.completed") waitForPaidPlan();
-        },
-      });
-      paddle.Checkout.open({
-        items: [{ priceId: billing.priceId, quantity: 1 }],
-        customer: { email: billing.email },
-        // Lets the webhook find this account. See lib/billing/plan.ts for why a
-        // claim made in the browser is treated carefully.
-        customData: { user_id: billing.userId },
-      });
+      await openProCheckout(billing, waitForPaidPlanInCard);
     } catch {
       setMessage("Could not open the checkout. Please try again.");
     } finally {

@@ -32,8 +32,6 @@ explicitly, in both the configured and unconfigured cases.
 | `LELU_REVIEWER_KEYS` | unset | `name:secret` pairs, comma-separated. Presented in the `X-Lelu-Reviewer-Key` header. **Unset, human review is not a security control** — reviewer identity falls back to a `resolved_by` string the caller supplies, and an agent holding an API key can resolve the reviews it triggered under any name but its own. |
 | `TENANT_AUTH_RATE_LIMIT` | `6000`/min | Per-tenant authorize ceiling. At `0` the limiter is never constructed and a single credential can saturate the audit writer. |
 | `TENANT_MINT_RATE_LIMIT` | `600`/min | Per-tenant token-mint ceiling. Same. |
-
-These ceilings are **per tenant in `PLATFORM_URL` mode** (keyed on the verified account). With a single static `API_KEY`, all traffic shares one fixed budget regardless of the `tenant_id` in the request body — the caller cannot mint a fresh budget by relabeling that field. Deployments that need per-tenant limits with a shared key are not supported; use account-bound `lelu_sk_` keys instead.
 | `LELU_AUDIT_STATE_PATH` | `<db dir>/audit-chain.json` | Receipt-chain continuity across restarts. Unset, every process start opens a fresh genesis and deleting one process lifetime of events leaves a log that still verifies. |
 | `LELU_AUDIT_BLOCK_ON_FULL` | `false` | `true` applies backpressure instead of dropping audit events, so a decision cannot be returned to a caller without its record being queued. Costs hot-path latency. Turn it on where the log is evidence rather than telemetry. |
 | `LELU_ADVERTISE_AUTH_SERVER` | `false` | Publishes `/.well-known/oauth-authorization-server` and `openid-configuration`. Only turn this on if you intend third-party MCP resource servers to trust tokens this engine signs. There is no resource-owner consent step; scope is bounded by the client's registration, not by a human's decision. `/.well-known/jwks.json` is always published — audit receipts are unverifiable without it. |
@@ -42,6 +40,8 @@ These ceilings are **per tenant in `PLATFORM_URL` mode** (keyed on the verified 
 | `MCP_AUTH_TOKEN` | required for HTTP | The MCP server holds the engine's API key and mints agent tokens on its callers' behalf. The HTTP/SSE transport refuses to start without this. Not used by the stdio transport, where the peer is the process that spawned it. |
 | `MCP_BIND_ADDR` | `127.0.0.1` | Bind address for the MCP HTTP transport. |
 | `LELU_DEV_INSECURE` | unset | Local development only. Runs with no authentication at all. |
+
+These ceilings are **per tenant in `PLATFORM_URL` mode** (keyed on the verified account). With a single static `API_KEY`, all traffic shares one fixed budget regardless of the `tenant_id` in the request body — the caller cannot mint a fresh budget by relabeling that field. Deployments that need per-tenant limits with a shared key are not supported; use account-bound `lelu_sk_` keys instead.
 
 ## Things a stock deployment needs to get right
 

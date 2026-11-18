@@ -41,6 +41,8 @@ explicitly, in both the configured and unconfigured cases.
 | `MCP_BIND_ADDR` | `127.0.0.1` | Bind address for the MCP HTTP transport. |
 | `LELU_DEV_INSECURE` | unset | Local development only. Runs with no authentication at all. |
 
+These ceilings are **per tenant in `PLATFORM_URL` mode** (keyed on the verified account). With a single static `API_KEY`, all traffic shares one fixed budget regardless of the `tenant_id` in the request body — the caller cannot mint a fresh budget by relabeling that field. Deployments that need per-tenant limits with a shared key are not supported; use account-bound `lelu_sk_` keys instead.
+
 ## Things a stock deployment needs to get right
 
 **A writable `/var/lib/lelu`.** Without it the engine cannot persist its RSA

@@ -58,7 +58,7 @@ func TestRateLimitKey(t *testing.T) {
 		want       string
 	}{
 		{"platform principal overrides the claimed tenant", &Principal{UserID: "user-1"}, "whatever-i-feel-like", "user-1"},
-		{"static admin falls back to the claimed tenant", &Principal{IsStaticAdminKey: true}, "tenant-a", "tenant-a"},
+		{"static admin uses one fixed key regardless of claimed tenant", &Principal{IsStaticAdminKey: true}, "tenant-a", "credential:static-admin"},
 		{"no principal falls back to the claimed tenant", nil, "tenant-b", "tenant-b"},
 	}
 	for _, tc := range cases {
@@ -80,6 +80,43 @@ func TestRateLimitKey_SameUserSameKeyRegardlessOfClaimedTenant(t *testing.T) {
 	k2 := rateLimitKey(ctx, "tenant-b")
 	if k1 != k2 {
 		t.Fatalf("same principal produced different rate-limit keys (%q vs %q) just by changing the claimed tenant_id — that's the exact bypass being fixed", k1, k2)
+	}
+}
+
+// Issue #113: in single-key mode there is one static credential, so all
+// traffic shares a single fixed rate-limit key regardless of the tenant_id
+// the caller claims — otherwise rotating tenant ids grants a fresh budget.
+func TestRateLimitKey_StaticKeyUsesConstantKeyNotClaimedTenant(t *testing.T) {
+	ctx := withPrincipal(context.Background(), Principal{IsStaticAdminKey: true})
+	k1 := rateLimitKey(ctx, "tenant-a")
+	k2 := rateLimitKey(ctx, "tenant-b")
+	if k1 != k2 {
+		t.Fatalf("static key rate limit key changed with claimed tenant_id (%q vs %q)", k1, k2)
+	}
+	if k1 != "credential:static-admin" {
+		t.Fatalf("static key rate limit key = %q, want the single fixed key", k1)
+	}
+}
+
+func TestAuthMiddleware_StaticKeyBindsAdminPrincipal(t *testing.T) {
+	h := &Handler{apiKey: "static-key"}
+	var captured Principal
+	var hadPrincipal bool
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured, hadPrincipal = principalFromContext(r.Context())
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/agent/authorize", nil)
+	req.Header.Set("Authorization", "Bearer static-key")
+	rec := httptest.NewRecorder()
+	h.authMiddleware(next).ServeHTTP(rec, req)
+
+	if !hadPrincipal || !captured.IsStaticAdminKey {
+		t.Fatalf("expected static admin principal, got present=%v %+v", hadPrincipal, captured)
+	}
+	if captured.UserID != "" {
+		t.Fatalf("a static admin request must have no derived UserID, got %q", captured.UserID)
 	}
 }
 

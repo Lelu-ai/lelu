@@ -66,14 +66,20 @@ func principalMayActAs(p Principal, userID string) bool {
 // rateLimitKey returns what a rate limiter should key this request on: the
 // verified principal's UserID when one exists, since that's something the
 // caller can't change from one request to the next — falling back to the
-// caller-declared tenantID only when there's no verified per-account
-// identity to prefer (the static admin credential, or a path auth hasn't
-// been wired to). Keying on tenantID alone lets a caller reset their own
-// limit just by relabeling which tenant they claim to be. See Nate Howard's
-// review.
+// caller-declared tenantID only when a request has no verified identity
+// (a path auth hasn't been wired to). In single-key mode there is exactly
+// one static credential, so all static-admin traffic shares a single fixed
+// budget; keying on the caller-declared tenantID lets a caller escape its
+// limit just by relabeling which tenant it claims to be (issue #113). See
+// Nate Howard's review.
 func rateLimitKey(ctx context.Context, tenantID string) string {
-	if p, ok := principalFromContext(ctx); ok && !p.IsStaticAdminKey && p.UserID != "" {
-		return p.UserID
+	if p, ok := principalFromContext(ctx); ok {
+		if p.IsStaticAdminKey {
+			return "credential:static-admin"
+		}
+		if p.UserID != "" {
+			return p.UserID
+		}
 	}
 	return tenantID
 }

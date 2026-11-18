@@ -18,6 +18,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import FlowBackground from "@/components/modern/FlowBackground";
+import PlanCard from "@/components/billing/PlanCard";
 
 interface ApiKey {
   id: string;
@@ -179,6 +180,8 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        <PlanCard />
 
         {/* Stats cards — 2×2 on mobile, 4-col on lg */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8 sm:mb-10">

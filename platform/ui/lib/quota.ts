@@ -9,6 +9,17 @@ export const PLAN_LIMITS = {
 
 export type Plan = keyof typeof PLAN_LIMITS;
 
+// Registered agents (the agent registry / NHI inventory), by plan. Revoked
+// agents do not count, so a free user can free a slot by revoking one.
+export const PLAN_AGENT_LIMITS = {
+  free: 3,
+  paid: 50,
+} as const;
+
+function agentLimitForPlan(plan: string): number {
+  return PLAN_AGENT_LIMITS[plan as Plan] ?? PLAN_AGENT_LIMITS.free;
+}
+
 function limitForPlan(plan: string): number {
   return PLAN_LIMITS[plan as Plan] ?? PLAN_LIMITS.free;
 }
@@ -50,4 +61,25 @@ export async function checkQuota(userId: string): Promise<QuotaStatus> {
   const [plan, used] = await Promise.all([getUserPlan(userId), getMonthlyUsage(userId)]);
   const limit = limitForPlan(plan);
   return { plan, limit, used, allowed: used < limit };
+}
+
+export interface AgentLimitStatus {
+  plan: string;
+  limit: number;
+  count: number;
+  allowed: boolean;
+}
+
+// Whether the user may register another agent on their plan. Call before
+// createAgent().
+export async function checkAgentLimit(userId: string): Promise<AgentLimitStatus> {
+  await ensureSchema();
+  const sql = db();
+  const [plan, rows] = await Promise.all([
+    getUserPlan(userId),
+    sql`SELECT COUNT(*) AS count FROM lelu_agents WHERE user_id = ${userId} AND status <> 'revoked'`,
+  ]);
+  const count = Number(rows[0]?.count ?? 0);
+  const limit = agentLimitForPlan(plan);
+  return { plan, limit, count, allowed: count < limit };
 }

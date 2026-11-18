@@ -21,16 +21,17 @@ const TIERS = [
       "MIT licensed · community support",
     ],
     cta: { label: "Start now", href: "/docs/quickstart" },
-    highlight: true,
-    badge: "Free today",
+    highlight: false,
+    badge: "Free forever",
   },
   {
-    name: "Cloud",
+    name: "Cloud Free",
     price: "$0",
     period: "free tier",
     tagline: "Hosted engine and dashboard, run by us.",
     features: [
       "Free account — 1,000 authorize calls/month",
+      "Up to 3 registered agents",
       "Managed engine — nothing to deploy",
       "Web dashboard & policy editor",
       "Hosted audit history",
@@ -40,6 +41,22 @@ const TIERS = [
     cta: { label: "Create free account", href: "/register" },
     highlight: false,
     badge: "Account required",
+  },
+  {
+    name: "Pro",
+    price: "$20",
+    period: "month",
+    tagline: "More headroom for agents running in production.",
+    features: [
+      "100,000 authorize calls/month (100× the free tier)",
+      "Up to 50 registered agents",
+      "Everything in Cloud Free",
+      "Email support",
+      "Cancel any time from your dashboard",
+    ],
+    cta: { label: "Upgrade to Pro", href: "/dashboard" },
+    highlight: true,
+    badge: "For production",
   },
   {
     name: "Enterprise",
@@ -66,15 +83,23 @@ const TIERS = [
 const FAQ = [
   {
     q: "Is it really free?",
-    a: "Yes. The engine, SDKs, MCP server, and dashboard are MIT-licensed open source — self-host everything with no limits, forever. The hosted cloud also has a real free tier: 1,000 authorize calls/month, no credit card required.",
+    a: "The engine, SDKs, MCP server, and dashboard are MIT-licensed open source — self-host everything with no limits, forever. The hosted cloud has a free tier (1,000 authorize calls/month and 3 registered agents, no credit card) and a $20/month Pro plan for more.",
+  },
+  {
+    q: "What do I get with Pro?",
+    a: "100,000 authorize calls a month instead of 1,000, and up to 50 registered agents instead of 3. Everything else in the hosted cloud is the same as the free tier. If you need more than Pro offers, open a discussion and we will talk.",
   },
   {
     q: "Do I need an account?",
     a: "No, for local/self-hosted — run npx -y lelu-mcp start and accept any API key you choose at startup, nothing to sign up for. Yes, for the hosted cloud dashboard and cloud API keys — create a free account to get started.",
   },
   {
-    q: "What happens if I go over the free cloud quota?",
-    a: "Requests beyond the free tier's monthly limit are declined with a clear quota error — nothing bills automatically, because there is nothing to bill. If you need a higher quota, open a discussion and we will raise it, or self-host, where there is no limit at all.",
+    q: "What happens if I go over my monthly quota?",
+    a: "Requests beyond your plan's monthly limit are declined with a clear quota error and are never billed as overage. You can upgrade to Pro from the dashboard, or self-host, where there is no limit.",
+  },
+  {
+    q: "How do I pay, and can I cancel?",
+    a: "Pro is billed monthly in US dollars at checkout, and applicable sales tax or VAT is added there. You can manage or cancel your subscription any time from the Manage billing button on your dashboard.",
   },
 ];
 
@@ -87,17 +112,18 @@ export default function PricingPage() {
           Pricing
         </span>
         <h1 className="mx-auto mt-3 max-w-2xl text-[30px] sm:text-[38px] font-semibold tracking-tight text-[#0A0A0A] dark:text-white leading-[1.15]">
-          Free while we build.
+          Free to self-host. $20/month when you need more.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-[#737373] dark:text-[#8B8D98]">
           Self-host the full engine forever — no account, no credit card, no signup.
-          Want the hosted dashboard instead? Create a free cloud account, no card required.
+          Prefer the hosted dashboard? Start on the free cloud tier, and upgrade to Pro when your agents
+          outgrow it.
         </p>
       </section>
 
       {/* Tiers */}
       <section className="px-4 pb-16">
-        <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-3">
+        <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-2 lg:grid-cols-4">
           {TIERS.map((t, i) => (
             <motion.div
               key={t.name}
@@ -157,7 +183,7 @@ export default function PricingPage() {
             </motion.div>
           ))}
         </div>
-        <p className="mx-auto mt-6 max-w-5xl text-center font-mono text-[11.5px] text-[#8E8E93] dark:text-[#5A5C66]">
+        <p className="mx-auto mt-6 max-w-6xl text-center font-mono text-[11.5px] text-[#8E8E93] dark:text-[#5A5C66]">
           $ npx -y lelu-mcp start&nbsp;&nbsp;·&nbsp;&nbsp;the full engine, running locally, in under a minute
         </p>
       </section>

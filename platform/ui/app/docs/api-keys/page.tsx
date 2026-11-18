@@ -99,7 +99,7 @@ export default function ApiKeysPage() {
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div className="text-[14px] text-[#0A0A0A] dark:text-[#FAFAFA] leading-relaxed">
-              The free tier has fair-use limits while Lelu is in beta. Keys look like{" "}
+              The free tier allows 1,000 authorize calls a month and 3 registered agents; Pro raises that to 100,000 calls and 50 agents. Keys look like{" "}
               <code className="font-mono text-[13px]">lelu_sk_&lt;prefix&gt;_&lt;secret&gt;</code> and are shown
               once at creation — only a hash is stored. Optional expiry can be set when creating a key.
             </div>

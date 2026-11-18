@@ -585,12 +585,24 @@ export class LeluClient {
    */
   async redeemReview(review: string | AuthDecision, req: AuthorizeRequest): Promise<RedeemResult> {
     const reviewId = this.reviewIdOf(review);
-    return this.post<RedeemResult>(
+    // The engine answers in snake_case on both 200 and 403 (handleQueueRedeem).
+    const data = await this.post<{
+      allowed: boolean;
+      reason: string;
+      review_id?: string;
+      trace_id?: string;
+    }>(
       `/v1/queue/${encodeURIComponent(reviewId)}/redeem`,
       this.authorizeBody(req),
       undefined,
       { allowStatuses: [403] },
     );
+    return {
+      allowed: data.allowed,
+      reason: data.reason,
+      ...(data.review_id !== undefined ? { reviewId: data.review_id } : {}),
+      ...(data.trace_id  !== undefined ? { traceId:  data.trace_id  } : {}),
+    };
   }
 
   /**

@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "biome lint .",
     "format": "biome format . --write",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:billing": "node scripts/paddle-billing.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.1076.0",

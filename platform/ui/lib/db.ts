@@ -57,6 +57,19 @@ export async function ensureSchema(): Promise<void> {
       ON lelu_users (stripe_customer_id) WHERE stripe_customer_id IS NOT NULL
   `;
 
+  // Provider-neutral billing columns (Paddle today). stripe_customer_id above
+  // is kept for accounts created through the Stripe routes. plan_event_at is
+  // the timestamp of the last billing event applied, so a retried or
+  // out-of-order webhook can never overwrite a newer plan.
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS billing_provider TEXT`;
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS billing_customer_id TEXT`;
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS billing_subscription_id TEXT`;
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS plan_event_at TIMESTAMPTZ`;
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_lelu_users_billing_customer
+      ON lelu_users (billing_provider, billing_customer_id) WHERE billing_customer_id IS NOT NULL
+  `;
+
   // Backfill for databases created before OAuth-only (no password) users existed.
   await sql`
     ALTER TABLE lelu_users ALTER COLUMN password_hash DROP NOT NULL

@@ -160,22 +160,28 @@ class LeluClient:
         timeout: float = 5.0,
         api_key: str | None = None,
     ) -> None:
-        resolved_key = api_key or os.environ.get("LELU_API_KEY")
         resolved_url = base_url or os.environ.get("LELU_BASE_URL")
+        env_key = os.environ.get("LELU_API_KEY")
 
+        # An API key alone never selects the cloud: sending actions and context
+        # to a hosted service just because a key is set would be a silent
+        # data-flow decision. To use the cloud, pass ``base_url`` (or set
+        # ``LELU_BASE_URL``) explicitly. This matches the TypeScript SDK.
         if resolved_url is None:
-            if resolved_key:
-                # Default to cloud when any lelu_sk_* key is provided
-                resolved_url = LELU_CLOUD_URL
+            # Zero-config: with no explicit target, connect to the engine
+            # `lelu-mcp` is already running here (recorded in ~/.lelu), else
+            # the default local address.
+            local = discover_local_engine()
+            if local.base_url:
+                resolved_url = local.base_url
+                # Key precedence: an explicit api_key, then the discovered
+                # engine's own recorded key, then LELU_API_KEY.
+                resolved_key = api_key or local.api_key or env_key
             else:
-                # Zero-config: with no explicit target, connect to the engine
-                # `lelu-mcp` is already running here (recorded in ~/.lelu).
-                local = discover_local_engine()
-                if local.base_url:
-                    resolved_url = local.base_url
-                    resolved_key = local.api_key
-                else:
-                    resolved_url = "http://localhost:8080"
+                resolved_url = "http://localhost:8080"
+                resolved_key = api_key or env_key
+        else:
+            resolved_key = api_key or env_key
         resolved_url = resolved_url.rstrip("/")
 
         headers: dict[str, str] = {"Content-Type": "application/json"}

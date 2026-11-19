@@ -10,6 +10,8 @@ Lelu lets you gate every agent action against a policy, route low-confidence cal
 npm install lelu-agent-auth
 ```
 
+Which engine and SDK versions go together: [docs/COMPATIBILITY.md](../../docs/COMPATIBILITY.md).
+
 ## Quick start
 
 No account, no API key, no Docker. Run the local engine once:
@@ -71,6 +73,7 @@ Sign in at **[lelu-ai.com](https://lelu-ai.com)** and create a key at **[/api-ke
 
 ```ts
 export const auth = lelu({
+  baseUrl: process.env.LELU_BASE_URL, // the engine to use; an API key alone does not select the cloud
   apiKey: process.env.LELU_API_KEY,   // key from lelu-ai.com/api-key
   actor: "billing-agent",
 });

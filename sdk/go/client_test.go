@@ -299,10 +299,19 @@ func TestNewClient_DefaultURL(t *testing.T) {
 		t.Fatalf("expected localhost, got %s", c.baseURL)
 	}
 
-	// With API key → cloud URL
+	// With an API key alone the default is still the local engine, not the cloud.
 	c2 := NewClient(ClientConfig{APIKey: "lelu_sk_test_123"})
-	if c2.baseURL != LeluCloudURL {
-		t.Fatalf("expected cloud URL %s, got %s", LeluCloudURL, c2.baseURL)
+	if c2.baseURL != "http://localhost:8080" {
+		t.Fatalf("expected localhost for a key with no BaseURL, got %s", c2.baseURL)
+	}
+	if c2.apiKey != "lelu_sk_test_123" {
+		t.Fatalf("the caller's API key must be kept, got %q", c2.apiKey)
+	}
+
+	// The cloud is reachable only by asking for it.
+	cloud := NewClient(ClientConfig{BaseURL: LeluCloudURL, APIKey: "lelu_sk_test_123"})
+	if cloud.baseURL != LeluCloudURL {
+		t.Fatalf("expected cloud URL %s with explicit BaseURL, got %s", LeluCloudURL, cloud.baseURL)
 	}
 
 	// Explicit base URL overrides default

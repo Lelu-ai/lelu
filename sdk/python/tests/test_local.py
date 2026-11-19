@@ -80,11 +80,58 @@ def test_explicit_base_url_wins_over_discovery(lelu_home: Path) -> None:
     assert "Authorization" not in client._client.headers
 
 
-def test_api_key_still_targets_cloud(lelu_home: Path) -> None:
+def test_api_key_alone_does_not_target_cloud(lelu_home: Path) -> None:
+    # A key must never silently route actions to the hosted service. With a
+    # discoverable local engine the client uses it, and keeps the caller's key.
     _write_runtime(lelu_home)
+    (lelu_home / "engine.key").write_text("lelu_local_abc123\n")
 
     client = LeluClient(api_key="lelu_sk_x_y")
+    assert str(client._client.base_url) == "http://127.0.0.1:53421"
+    assert client._client.headers["Authorization"] == "Bearer lelu_sk_x_y"
+
+
+def test_api_key_without_engine_uses_localhost_not_cloud(lelu_home: Path) -> None:
+    client = LeluClient(api_key="lelu_sk_x_y")
+    assert str(client._client.base_url) == "http://localhost:8080"
+    assert client._client.headers["Authorization"] == "Bearer lelu_sk_x_y"
+
+
+def test_cloud_needs_an_explicit_base_url(lelu_home: Path) -> None:
+    from lelu import LELU_CLOUD_URL
+
+    client = LeluClient(base_url=LELU_CLOUD_URL, api_key="lelu_sk_x_y")
     assert str(client._client.base_url) == "https://lelu-ai.com"
+
+
+def test_env_key_is_sent_with_an_explicit_base_url(
+    lelu_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LELU_API_KEY", "lelu_env_key")
+    client = LeluClient(base_url="http://engine.example.com")
+    assert client._client.headers["Authorization"] == "Bearer lelu_env_key"
+
+
+def test_discovered_engine_key_beats_env_key(
+    lelu_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LELU_API_KEY", "lelu_env_key")
+    _write_runtime(lelu_home)
+    (lelu_home / "engine.key").write_text("lelu_local_abc123\n")
+
+    client = LeluClient()
+    assert client._client.headers["Authorization"] == "Bearer lelu_local_abc123"
+
+
+def test_env_key_used_when_discovered_engine_has_none(
+    lelu_home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LELU_API_KEY", "lelu_env_key")
+    _write_runtime(lelu_home)
+
+    client = LeluClient()
+    assert str(client._client.base_url) == "http://127.0.0.1:53421"
+    assert client._client.headers["Authorization"] == "Bearer lelu_env_key"
 
 
 def test_default_url_without_engine(lelu_home: Path) -> None:

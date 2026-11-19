@@ -16,7 +16,7 @@ Quick start::
 """
 
 from .client import LeluClient, LELU_CLOUD_URL
-from .instance import LeluInstance, lelu
+from .instance import HandlerCaller, LeluInstance, lelu
 from .local import LocalEngineInfo, discover_local_engine
 from .langchain import (
     SecuredTool,
@@ -108,6 +108,7 @@ __all__ = [
     "LELU_CLOUD_URL",
     # Shared-instance factory + zero-config local discovery
     "lelu",
+    "HandlerCaller",
     "LeluInstance",
     "LocalEngineInfo",
     "discover_local_engine",

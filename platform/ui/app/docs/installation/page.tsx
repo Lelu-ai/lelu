@@ -196,9 +196,11 @@ export const lelu = createClient({
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Pass both values explicitly. The TypeScript client does not read{" "}
+              Set the base URL explicitly: an API key does not select a cloud URL. If you leave{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">apiKey</code>{" "}
+              out, the client reads{" "}
               <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>{" "}
-              on its own, and an API key does not select a cloud URL — without a base URL it
+              from the environment. Without a base URL it
               connects to the engine <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx lelu-mcp start</code> is
               running, or <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">http://localhost:8080</code>.
             </p>
@@ -264,7 +266,7 @@ if (decision.allowed) {
                 { href: "/docs/quickstart", label: "Quickstart — authorize your first action →" },
                 { href: "/docs/integrations/vercel-ai", label: "Vercel AI SDK integration →" },
                 { href: "/docs/integrations/langchain", label: "LangChain integration →" },
-                { href: "/docs/policies", label: "Write authorization policies →" },
+                { href: "/docs/concepts/policies", label: "Write authorization policies →" },
               ].map((l) => (
                 <li key={l.href}>
                   <a

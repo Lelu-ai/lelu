@@ -78,6 +78,13 @@ for (const block of response.content) {
     }
   }
 
+  if (decision.decision === "compute" && decision.safeTool) {
+    // Allowed, but redirected: run the safe tool Lelu chose with its safe
+    // arguments, not the original call.
+    await executeTool(decision.safeTool, decision.safeArgs ?? {});
+    continue;
+  }
+
   await executeTool(block.name, block.input);
 }`}</pre>
           </div>

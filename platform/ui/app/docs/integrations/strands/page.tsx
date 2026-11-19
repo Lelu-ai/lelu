@@ -59,9 +59,9 @@ export default function DocsStrands() {
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Installation</h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-4">
             The Python SDK requires Python 3.11 or later. Install{" "}
-            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">strands-agents</code> alongside it: the{" "}
-            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">[strands]</code> extra that pulls it in automatically ships in
-            the next Python SDK release, and the current release (0.4.41) does not have it.
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">strands-agents</code> alongside it, or use the{" "}
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">[strands]</code> extra that pulls it in automatically
+            (available from Python SDK 0.4.42).
           </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">

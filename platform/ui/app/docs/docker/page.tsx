@@ -235,7 +235,11 @@ cd lelu`}
                       <span className="text-xs text-zinc-500 font-mono">terminal</span>
                     </div>
                     <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
-                      {`# Build and start all services
+                      {`# The MCP container refuses to start without a token (16+ characters).
+# Set one first; the other services start either way.
+export MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+
+# Build and start all services
 docker compose up -d --build
 
 # Or without building (if images exist)
@@ -326,13 +330,13 @@ docker compose up -d`}
                 </a>
               </div>
               <div>
-                • <strong>Engine API:</strong> https://lelu-ai.com
+                • <strong>Engine API:</strong> http://localhost:8083
               </div>
               <div>
                 • <strong>Platform API:</strong> http://localhost:9091
               </div>
               <div>
-                • <strong>MCP Server:</strong> http://localhost:3003
+                • <strong>MCP Server:</strong> http://localhost:3003 (send <code>Authorization: Bearer $MCP_AUTH_TOKEN</code>)
               </div>
             </div>
           </div>

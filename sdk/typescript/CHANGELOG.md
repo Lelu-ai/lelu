@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-**Requires the next engine release (after 0.2.1).** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
+**Requires engine 0.3.0 or later.** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
 
 ### Breaking
 

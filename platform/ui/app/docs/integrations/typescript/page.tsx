@@ -35,8 +35,8 @@ export default function DocsTypeScriptSDK() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
 
-// Point at the engine you run and pass its key explicitly — an API key
-// alone does not select a URL, and LELU_API_KEY is not read automatically.
+// Point at the engine you run. An API key alone does not select a URL; if you
+// omit apiKey, the client falls back to the LELU_API_KEY environment variable.
 const lelu = createClient({
   baseUrl: "http://localhost:8083", // e.g. the Docker Compose engine
   apiKey: process.env.LELU_API_KEY,

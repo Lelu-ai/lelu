@@ -73,7 +73,7 @@ export default function DocsHumanInLoop() {
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm">
                 The request is added to the pending queue. The agent receives a response indicating
-                it must wait, along with a <code>requestId</code>.
+                it must wait, along with a <code>review_id</code> (<code>reviewId</code> in the SDKs) that identifies the queued item.
               </p>
             </div>
 
@@ -154,13 +154,20 @@ export default function DocsHumanInLoop() {
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`# Approve a request
-curl -X POST $LELU_ENGINE_URL/v1/queue/req_12345/approve \\
-  -H "Authorization: Bearer YOUR_API_KEY"
+                <code>{`# REVIEW_ID is the review_id from the authorize response
+# Approve a request
+curl -X POST $LELU_ENGINE_URL/v1/queue/$REVIEW_ID/approve \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-Lelu-Reviewer-Key: YOUR_REVIEWER_SECRET" \\
+  -H "Content-Type: application/json" \\
+  -d '{"resolved_by": "alice", "note": "Reviewed"}'
 
 # Deny a request
-curl -X POST $LELU_ENGINE_URL/v1/queue/req_12345/deny \\
-  -H "Authorization: Bearer YOUR_API_KEY"`}</code>
+curl -X POST $LELU_ENGINE_URL/v1/queue/$REVIEW_ID/deny \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "X-Lelu-Reviewer-Key: YOUR_REVIEWER_SECRET" \\
+  -H "Content-Type: application/json" \\
+  -d '{"resolved_by": "alice", "note": "Not safe"}'`}</code>
               </pre>
             </div>
           </div>

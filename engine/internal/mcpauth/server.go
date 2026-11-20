@@ -169,7 +169,7 @@ func validateRedirectURI(raw string) error {
 			return fmt.Errorf("redirect_uri %q must use https, unless it points at localhost or 127.0.0.1", raw)
 		}
 		return nil
-	case "javascript", "data", "file":
+	case "javascript", "data", "file", "vbscript", "blob":
 		return fmt.Errorf("redirect_uri %q uses a scheme that is not allowed", raw)
 	}
 	return nil
@@ -184,7 +184,7 @@ func isLoopbackHost(host string) bool {
 	if hostname, _, err := net.SplitHostPort(host); err == nil {
 		h = hostname
 	}
-	if h == "localhost" {
+	if strings.EqualFold(h, "localhost") {
 		return true
 	}
 	ip := net.ParseIP(strings.Trim(h, "[]"))

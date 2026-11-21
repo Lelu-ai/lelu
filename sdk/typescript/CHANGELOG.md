@@ -16,6 +16,20 @@
 * `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
 * `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
 
+## [0.1.1](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.0...typescript-sdk-v0.1.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **sdk-typescript:** redeemReview returns refusal result on 403 ([ba6434c](https://github.com/Lelu-ai/lelu/commit/ba6434c408166a382a4dc3ab8c161613b9b094b8))
+* **sdk-typescript:** redeemReview returns refusal result on 403 ([8f00af5](https://github.com/Lelu-ai/lelu/commit/8f00af5ce045b250861334767eaefb57736784ac))
+
+
+### Documentation
+
+* fix the pages Nauro round 2 found still out of date ([ac2d57a](https://github.com/Lelu-ai/lelu/commit/ac2d57ad1c78caa3f55c13b36a6aa93a655b04f0))
+* fix the pages Nauro round 2 found still out of date ([3769938](https://github.com/Lelu-ai/lelu/commit/376993891651fcacf2e7a819461de387599113b5))
+
 ## [0.1.0](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.0.36...typescript-sdk-v0.1.0) (2026-11-12)
 
 

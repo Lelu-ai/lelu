@@ -1,10 +1,18 @@
-import { OpenAI } from 'openai';
+import type { OpenAI } from 'openai' with { 'resolution-mode': 'import' };
 
 export class SemanticPolicyGenerator {
-  private openai: OpenAI;
+  private openai: Promise<OpenAI> | undefined;
 
-  constructor(apiKey: string) {
-    this.openai = new OpenAI({ apiKey });
+  constructor(private readonly apiKey: string) {}
+
+  private getClient(): Promise<OpenAI> {
+    this.openai ??= import('openai').catch((cause: unknown) => {
+      throw new Error(
+        "Could not load the optional 'openai' package for SemanticPolicyGenerator. Install it with `npm install openai`.",
+        { cause },
+      );
+    }).then(({ OpenAI }) => new OpenAI({ apiKey: this.apiKey }));
+    return this.openai;
   }
 
   /**
@@ -51,7 +59,8 @@ Requirements:
 4. Include comments explaining the logic.
 `;
 
-    const response = await this.openai.chat.completions.create({
+    const openai = await this.getClient();
+    const response = await openai.chat.completions.create({
       // gpt-4-turbo-preview was shut down on 2026-03-26: https://developers.openai.com/api/docs/deprecations
       model: "gpt-4.1",
       messages: [

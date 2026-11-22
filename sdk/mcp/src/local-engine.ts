@@ -301,11 +301,15 @@ export class DownloadHttpError extends Error {
 }
 
 export interface DownloadOptions {
-  /** Total tries, including the first. Default 5. */
+  /** Total tries, including the first. Default 8. */
   attempts?: number;
   /** Abort a try when no bytes arrive for this long. Default 30s. */
   stallMs?: number;
-  /** Delay before the first retry; doubles each retry, capped at 8s. Default 1s. */
+  /**
+   * Delay before the first retry; doubles each retry, capped at 30s. Default 1s.
+   * With the default 8 tries that waits about 1.5 minutes in total, enough to
+   * ride out a short network outage instead of giving up after seconds.
+   */
   backoffMs?: number;
   /** Called as bytes arrive. `total` is null when the server doesn't say. */
   onProgress?: (received: number, total: number | null) => void;
@@ -324,7 +328,7 @@ function isRetryableStatus(status: number): boolean {
  * time, only on silence, so slow connections still finish.
  */
 export async function downloadWithResume(url: string, opts: DownloadOptions = {}): Promise<Buffer> {
-  const attempts = opts.attempts ?? 5;
+  const attempts = opts.attempts ?? 8;
   const stallMs = opts.stallMs ?? 30_000;
   const backoffMs = opts.backoffMs ?? 1_000;
 
@@ -388,7 +392,7 @@ export async function downloadWithResume(url: string, opts: DownloadOptions = {}
       lastError = controller.signal.aborted ? controller.signal.reason : err;
       if (attempt < attempts) {
         opts.onRetry?.(attempt, lastError);
-        await new Promise((r) => setTimeout(r, Math.min(backoffMs * 2 ** (attempt - 1), 8_000)));
+        await new Promise((r) => setTimeout(r, Math.min(backoffMs * 2 ** (attempt - 1), 30_000)));
       }
     } finally {
       clearTimeout(stallTimer);

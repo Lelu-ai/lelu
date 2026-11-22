@@ -174,9 +174,11 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
     "Returns its status (pending | approved | denied | expired) and, once resolved, who resolved it and their note. " +
     "Read-only: reviews are resolved by a human, not by the agent.",
     {
-      reviewId: z.string().describe("The review_id returned by lelu_agent_authorize"),
+      // snake_case on purpose: it is the same name lelu_agent_authorize returns
+      // and this description uses, so a model can pass the value straight back.
+      review_id: z.string().describe("The review_id returned by lelu_agent_authorize"),
     },
-    async ({ reviewId }) => {
+    async ({ review_id: reviewId }) => {
       const item = await get<{
         id: string;
         actor: string;

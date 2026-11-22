@@ -23,6 +23,16 @@
       "package-name": "lelu-agent-auth-sdk",
       "changelog-path": "CHANGELOG.md",
       "release-type": "python"
+    },
+    "sdk/mcp": {
+      "component": "lelu-mcp",
+      "package-name": "lelu-mcp",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node",
+      "extra-files": [
+        { "type": "json", "path": "server.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "server.json", "jsonpath": "$.packages[0].version" }
+      ]
     }
   },
   "release-type": "simple",

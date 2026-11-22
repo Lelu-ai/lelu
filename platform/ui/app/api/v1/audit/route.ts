@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/apikeys";
 import { listAuditEvents } from "@/lib/audit";
+import { PLANS } from "@/lib/billing/plans";
+import { getUserPlan } from "@/lib/quota";
 
 export async function GET(req: NextRequest) {
   // --- Auth ---
@@ -34,10 +36,13 @@ export async function GET(req: NextRequest) {
 
   // --- Fetch ---
   // A sandbox key (the public demo key) sees only the shared sandbox's events,
-  // never any account's. An account key sees only its own.
+  // never any account's. An account key sees its own, within its plan's
+  // audit history.
   try {
+    const sinceDays = userId ? PLANS[await getUserPlan(userId)].auditRetentionDays : null;
     const events = await listAuditEvents({
       ...(isSandbox ? { sandbox: true } : { userId }),
+      sinceDays,
       actor,
       action,
       decision,

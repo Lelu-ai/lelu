@@ -70,6 +70,29 @@ export async function ensureSchema(): Promise<void> {
       ON lelu_users (billing_provider, billing_customer_id) WHERE billing_customer_id IS NOT NULL
   `;
 
+  // Per-account monthly call volume (Enterprise, or a one-off arrangement).
+  // NULL means the plan's own amount. See lib/billing/plans.ts.
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS call_limit_override BIGINT`;
+
+  // One row per account per month of overage billed. The primary key makes
+  // the monthly job safe to re-run: a month is charged at most once, and a
+  // failed charge stays 'failed' until a later run retries it.
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_overage_charges (
+      user_id          TEXT NOT NULL,
+      period_start     DATE NOT NULL,
+      plan             TEXT NOT NULL,
+      included_calls   BIGINT NOT NULL,
+      used_calls       BIGINT NOT NULL,
+      blocks           INTEGER NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'pending',
+      error            TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, period_start)
+    )
+  `;
+
   // Backfill for databases created before OAuth-only (no password) users existed.
   await sql`
     ALTER TABLE lelu_users ALTER COLUMN password_hash DROP NOT NULL

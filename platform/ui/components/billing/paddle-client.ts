@@ -1,7 +1,8 @@
 import type { CheckoutConfig } from "@/lib/billing/checkout-state";
+import type { SelfServePlan } from "@/lib/billing/plans";
 
-// Browser-side Paddle.js (v2) loading and checkout, shared by the pricing page
-// and the dashboard plan card.
+// Browser-side Paddle.js (v2) loading, checkout and plan switching, shared by
+// the pricing page and the dashboard plan card.
 
 interface PaddleEvent {
   name?: string;
@@ -44,10 +45,12 @@ export function loadPaddleJs(): Promise<PaddleGlobal> {
   });
 }
 
-// Opens Paddle's overlay checkout for the signed-in user. `onCompleted` runs when
-// the payment goes through; the plan itself only changes once Paddle's webhook
-// reaches the server, so callers should poll for it (see waitForPaidPlan).
-export async function openProCheckout(config: CheckoutConfig, onCompleted: () => void): Promise<void> {
+// Opens Paddle's overlay checkout for `plan`. `onCompleted` runs when the
+// payment goes through; the plan itself only changes once Paddle's webhook
+// reaches the server, so callers should poll for it (see waitForPlan).
+export async function openCheckout(config: CheckoutConfig, plan: SelfServePlan, onCompleted: () => void): Promise<void> {
+  const priceId = config.priceIds[plan];
+  if (!priceId) throw new Error(`No price configured for ${plan}`);
   const paddle = await loadPaddleJs();
   if (config.environment === "sandbox") paddle.Environment.set("sandbox");
   paddle.Initialize({
@@ -57,7 +60,7 @@ export async function openProCheckout(config: CheckoutConfig, onCompleted: () =>
     },
   });
   paddle.Checkout.open({
-    items: [{ priceId: config.priceId, quantity: 1 }],
+    items: [{ priceId, quantity: 1 }],
     customer: { email: config.email },
     // Lets the webhook find this account. See lib/billing/plan.ts for why a
     // claim made in the browser is treated carefully.
@@ -65,15 +68,32 @@ export async function openProCheckout(config: CheckoutConfig, onCompleted: () =>
   });
 }
 
-// Polls the usage endpoint until the plan shows as paid (the webhook is a few
-// seconds behind the payment). Resolves true if it flipped, false if it did not
-// within ~30 seconds.
-export async function waitForPaidPlan(intervalMs = 2000, tries = 15): Promise<boolean> {
+// Switches an existing subscription to `plan`. Resolves with an error message,
+// or null when Paddle accepted the change.
+export async function changePlan(plan: SelfServePlan): Promise<string | null> {
+  try {
+    const res = await fetch("/api/billing/paddle/change-plan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+    if (res.ok) return null;
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    return data.error ?? "Could not change the plan. Please try again.";
+  } catch {
+    return "Could not change the plan. Please try again.";
+  }
+}
+
+// Polls the usage endpoint until the account is on `plan` (the webhook is a
+// few seconds behind the payment). Resolves true if it switched, false if it
+// did not within ~30 seconds.
+export async function waitForPlan(plan: SelfServePlan, intervalMs = 2000, tries = 15): Promise<boolean> {
   for (let i = 0; i < tries; i++) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
       const res = await fetch("/api/dashboard/usage");
-      if (res.ok && ((await res.json()) as { plan?: string }).plan === "paid") return true;
+      if (res.ok && ((await res.json()) as { plan?: string }).plan === plan) return true;
     } catch {
       // keep trying
     }

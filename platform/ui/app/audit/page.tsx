@@ -1,5 +1,7 @@
 import { listAuditEvents, getAuditStats, type AuditEventRow } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
+import { PLANS } from "@/lib/billing/plans";
+import { getUserPlan } from "@/lib/quota";
 import { AuditTable } from "@/components/AuditTable";
 import LeluFooter from "@/components/LeluFooter";
 
@@ -45,16 +47,19 @@ export default async function AuditPage({
 }) {
   const params = await searchParams;
   const user = await getCurrentUser();
+  // Free shows its last 30 days of history; paid plans show all of it.
+  const sinceDays = user ? PLANS[await getUserPlan(user.userId).catch(() => "free" as const)].auditRetentionDays : null;
 
   const [events, stats] = await Promise.all([
     listAuditEvents({
       userId: user?.userId,
+      sinceDays,
       actor: params.actor,
       action: params.action,
       decision: params.decision,
       limit: 100,
     }).catch(() => []),
-    getAuditStats(user?.userId).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 })),
+    getAuditStats(user?.userId, sinceDays).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 })),
   ]);
 
   const safeEvents = Array.isArray(events) ? events : [];

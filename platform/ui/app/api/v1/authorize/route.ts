@@ -187,12 +187,13 @@ export async function POST(req: NextRequest) {
       result.decision === "human_review" ? 0.7 : 0.3;
   } else {
     // Real cloud API key — check quota, then run the actual engine pipeline.
+    // Only Free stops at its limit; paid plans continue and are billed overage.
     const quota = await checkQuota(userId!);
     quotaInfo = { plan: quota.plan, used: quota.used, limit: quota.limit };
     if (!quota.allowed) {
       return NextResponse.json(
         {
-          error: `Monthly quota exceeded (${quota.used}/${quota.limit} on the ${quota.plan} plan). Upgrade to Pro for 100,000 calls a month at https://lelu-ai.com/pricing, or self-host the engine for no limit.`,
+          error: `Monthly quota exceeded (${quota.used}/${quota.limit} on the ${quota.plan} plan). Starter ($20/month) includes 100,000 calls and never stops at its limit: see https://lelu-ai.com/pricing. Or self-host the engine for no limit.`,
           plan: quota.plan,
           used: quota.used,
           limit: quota.limit,

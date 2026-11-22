@@ -22,7 +22,7 @@ export async function applyPlanChange(provider: "paddle", change: PlanChange): P
     // the user (or when none is recorded yet). Upgrades always apply: whoever
     // pays, the account gets the paid plan. Opening the checkout from a
     // server-created transaction would close this entirely (see docs).
-    const isPaid = change.plan === "paid";
+    const isPaid = change.plan !== "free";
     const rows = await sql`
       UPDATE lelu_users
       SET plan = ${change.plan},

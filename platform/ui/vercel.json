@@ -37,5 +37,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/billing/overage/run",
+      "schedule": "0 3 1 * *"
+    }
   ]
 }

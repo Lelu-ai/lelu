@@ -33,9 +33,11 @@ export async function GET(req: NextRequest) {
   const decision = searchParams.get("decision") ?? undefined;
 
   // --- Fetch ---
+  // A sandbox key (the public demo key) sees only the shared sandbox's events,
+  // never any account's. An account key sees only its own.
   try {
     const events = await listAuditEvents({
-      userId: userId ?? undefined,
+      ...(isSandbox ? { sandbox: true } : { userId }),
       actor,
       action,
       decision,

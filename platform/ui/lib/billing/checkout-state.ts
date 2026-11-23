@@ -12,6 +12,8 @@ export interface CheckoutConfig {
   userId: string;
   currentPlan: PlanId;
   hasSubscription: boolean;
+  /** The user's Paddle customer id (ctm_...), once they have paid. Lets Paddle Retain recognise them. */
+  paddleCustomerId: string | null;
 }
 
 export type CheckoutState =
@@ -31,6 +33,7 @@ export function classifyConfigResponse(httpStatus: number, body: unknown): Check
   const b = body as Record<string, unknown>;
   const environment = b.environment === "production" ? "production" : b.environment === "sandbox" ? "sandbox" : null;
   const { clientToken, email, userId, currentPlan, hasSubscription } = b;
+  const paddleCustomerId = typeof b.paddleCustomerId === "string" && b.paddleCustomerId.startsWith("ctm_") ? b.paddleCustomerId : null;
   const prices = b.priceIds && typeof b.priceIds === "object" ? (b.priceIds as Record<string, unknown>) : null;
   const starter = prices?.starter;
   const growth = prices?.growth;
@@ -56,6 +59,7 @@ export function classifyConfigResponse(httpStatus: number, body: unknown): Check
       userId,
       currentPlan: currentPlan as PlanId,
       hasSubscription,
+      paddleCustomerId,
     },
   };
 }

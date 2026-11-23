@@ -11,7 +11,7 @@ interface PaddleEvent {
 // The small slice of Paddle.js used here.
 interface PaddleGlobal {
   Environment: { set: (env: "sandbox") => void };
-  Initialize: (opts: { token: string; eventCallback?: (e: PaddleEvent) => void }) => void;
+  Initialize: (opts: { token: string; pwCustomer?: { id: string }; eventCallback?: (e: PaddleEvent) => void }) => void;
   Checkout: {
     open: (opts: {
       items: { priceId: string; quantity: number }[];
@@ -55,6 +55,8 @@ export async function openCheckout(config: CheckoutConfig, plan: SelfServePlan, 
   if (config.environment === "sandbox") paddle.Environment.set("sandbox");
   paddle.Initialize({
     token: config.clientToken,
+    // Paddle Retain matches the visitor by their Paddle customer id (never our id or email).
+    ...(config.paddleCustomerId ? { pwCustomer: { id: config.paddleCustomerId } } : {}),
     eventCallback: (e) => {
       if (e.name === "checkout.completed") onCompleted();
     },

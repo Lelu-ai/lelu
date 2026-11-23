@@ -202,11 +202,17 @@ test("overageChargeRequest adds the blocks to the next renewal invoice", () => {
 // ── checkout state (pricing page / dashboard) ──
 const okBody = {
   environment: "sandbox", clientToken: "test_x", priceIds: { starter: "pri_s", growth: "pri_g" },
-  email: "a@b.co", userId: "u1", currentPlan: "free", hasSubscription: false,
+  email: "a@b.co", userId: "u1", currentPlan: "free", hasSubscription: false, paddleCustomerId: null,
 };
 test("config 200 with a complete body is ready", () => {
   const r = cs.classifyConfigResponse(200, okBody);
   assert.equal(r.status, "ready"); assert.deepEqual(r.config, okBody);
+});
+test("paddleCustomerId passes through only when it is a Paddle customer id", () => {
+  assert.equal(cs.classifyConfigResponse(200, { ...okBody, paddleCustomerId: "ctm_123" }).config.paddleCustomerId, "ctm_123");
+  assert.equal(cs.classifyConfigResponse(200, { ...okBody, paddleCustomerId: "u1" }).config.paddleCustomerId, null);
+  const { paddleCustomerId, ...older } = okBody;
+  assert.equal(cs.classifyConfigResponse(200, older).config.paddleCustomerId, null);
 });
 test("Growth may be unconfigured (null) and the body is still ready", () => {
   assert.equal(cs.classifyConfigResponse(200, { ...okBody, priceIds: { starter: "pri_s", growth: null } }).status, "ready");

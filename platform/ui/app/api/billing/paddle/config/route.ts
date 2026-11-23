@@ -18,7 +18,7 @@ export async function GET() {
   await ensureSchema();
   const sql = db();
   const rows = await sql`
-    SELECT plan, billing_subscription_id
+    SELECT plan, billing_subscription_id, billing_provider, billing_customer_id
     FROM lelu_users
     WHERE id = ${session.userId}
   `;
@@ -32,5 +32,7 @@ export async function GET() {
     currentPlan: normalizePlan(rows[0]?.plan as string | undefined),
     // A subscriber switches plans in place; only a non-subscriber checks out.
     hasSubscription: Boolean(rows[0]?.billing_subscription_id),
+    // Paddle's own customer id, for Paddle Retain (pwCustomer). Null until they pay.
+    paddleCustomerId: rows[0]?.billing_provider === "paddle" ? ((rows[0]?.billing_customer_id as string | null) ?? null) : null,
   });
 }

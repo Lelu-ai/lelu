@@ -74,7 +74,7 @@ export default function PrivacyPage() {
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-widest bg-zinc-200/70 dark:bg-white/10 text-zinc-800 dark:text-zinc-200">
               Privacy & Data Protection
             </span>
-            <span className="text-[12px] text-[#737373]">Effective: August 4, 2026</span>
+            <span className="text-[12px] text-[#737373]">Effective: November 23, 2026</span>
           </div>
           <h1 className="text-[32px] sm:text-[42px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white leading-tight mb-4">
             Privacy Policy
@@ -230,6 +230,7 @@ export default function PrivacyPage() {
                 <li><strong className="text-[#0A0A0A] dark:text-white">Database & Search Engine:</strong> Managed PostgreSQL and Redis clusters with TLS 1.3 encryption.</li>
                 <li><strong className="text-[#0A0A0A] dark:text-white">Transactional Email:</strong> Amazon SES / Postmark for security alerts and verification links.</li>
                 <li><strong className="text-[#0A0A0A] dark:text-white">OAuth Providers:</strong> GitHub / Google (if Customer selects social sign-in).</li>
+                <li><strong className="text-[#0A0A0A] dark:text-white">Payments:</strong> Paddle.com, our Merchant of Record, for paid plans. Paddle collects and processes your payment and billing details (card, billing address, tax information) under its own privacy policy; Lelu receives only your subscription status, plan and Paddle customer reference, never your card number.</li>
               </ul>
             </section>
 

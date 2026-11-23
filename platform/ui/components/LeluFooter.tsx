@@ -65,6 +65,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
             { label: "About", href: "/about" },
             { label: "Terms", href: "/terms" },
             { label: "Privacy", href: "/privacy" },
+            { label: "Refunds", href: "/refund-policy" },
             { label: "GitHub", href: "https://github.com/lelu-ai/lelu", external: true },
           ].map((l) => (
             <li key={l.label}>

@@ -78,7 +78,7 @@ export default function TermsPage() {
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-widest bg-zinc-200/70 dark:bg-white/10 text-zinc-800 dark:text-zinc-200">
               Legal & Compliance
             </span>
-            <span className="text-[12px] text-[#737373]">Effective: August 4, 2026</span>
+            <span className="text-[12px] text-[#737373]">Effective: November 23, 2026</span>
           </div>
           <h1 className="text-[32px] sm:text-[42px] font-bold tracking-[-0.03em] text-[#0A0A0A] dark:text-white leading-tight mb-4">
             Terms of Service
@@ -288,7 +288,24 @@ export default function TermsPage() {
                 10. Fees, Billing & Subscription Terms
               </h2>
               <p>
-                Certain features of the Service are offered on a paid subscription or usage basis (e.g. monthly API authorization calls, evaluation throughput, team seats). All fees are non-refundable except as required by law or explicitly stated in writing.
+                <strong className="text-[#0A0A0A] dark:text-white">Merchant of Record:</strong> Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns, and your purchase is also subject to{" "}
+                <a href="https://www.paddle.com/legal/checkout-buyer-terms" target="_blank" rel="noreferrer" className="text-[#0A0A0A] dark:text-white font-semibold underline">
+                  Paddle&apos;s Buyer Terms
+                </a>
+                .
+              </p>
+              <p>
+                <strong className="text-[#0A0A0A] dark:text-white">Plans and usage:</strong> The hosted cloud is priced per authorize call, with no charge per seat or agent. Paid plans are billed monthly in advance and include a monthly number of authorize calls; calls beyond that amount are billed in arrears on the next invoice at the rate shown on our{" "}
+                <Link href="/pricing" className="text-[#0A0A0A] dark:text-white font-semibold underline">pricing page</Link>
+                . The free tier stops accepting live calls at its monthly limit and is never charged. Prices are in US dollars; applicable sales tax or VAT is calculated and added by Paddle at checkout.
+              </p>
+              <p>
+                <strong className="text-[#0A0A0A] dark:text-white">Renewal, changes and cancellation:</strong> Subscriptions renew automatically each month until cancelled. You can cancel at any time from the billing portal on your dashboard; the plan stays active until the end of the paid period. Upgrades take effect immediately and are prorated; downgrades take effect immediately and the unused amount is credited to your next bill.
+              </p>
+              <p>
+                <strong className="text-[#0A0A0A] dark:text-white">Refunds:</strong> Refunds are handled under our{" "}
+                <Link href="/refund-policy" className="text-[#0A0A0A] dark:text-white font-semibold underline">Refund Policy</Link>
+                , including a 14-day money-back guarantee on your first payment for a plan. Nothing in these Terms limits any refund right you have under applicable law or Paddle&apos;s Buyer Terms.
               </p>
             </section>
 

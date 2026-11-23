@@ -133,6 +133,10 @@ const FAQ = [
     q: "How do I pay, and can I cancel?",
     a: "Plans are billed monthly in US dollars through Paddle, our merchant of record, and sales tax or VAT is added at checkout. Manage or cancel any time from the Manage billing button on your dashboard.",
   },
+  {
+    q: "Can I get a refund?",
+    a: "Yes. Ask within 14 days of your first payment for a plan and we refund it in full, no reason needed. A renewal you meant to cancel is refunded if you ask within 14 days. See the Refund Policy linked at the bottom of this page.",
+  },
 ];
 
 const CARD_LINK =

@@ -84,7 +84,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="text-[16px] text-[#737373] max-w-3xl leading-relaxed">
-            These Terms of Service (&quot;Terms&quot;) govern your access to and use of Lelu AI&apos;s website, APIs, authorization engine, human-in-the-loop review system, software development kits (SDKs), and managed platform services.
+            These Terms of Service (&quot;Terms&quot;) govern your access to and use of Lelu&apos;s website, APIs, authorization engine, human-in-the-loop review system, software development kits (SDKs), and managed platform services. Lelu (&quot;Lelu,&quot; &quot;we,&quot; or &quot;us&quot;) is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu.
           </p>
         </div>
 
@@ -254,7 +254,7 @@ export default function TermsPage() {
                 Lelu&apos;s core authorization engine and SDKs are distributed under the open-source <strong className="text-[#0A0A0A] dark:text-white">MIT License</strong>. You are free to inspect, modify, and self-host the open-source repository in accordance with the MIT license terms.
               </p>
               <p>
-                These Terms of Service specifically apply to the hosted cloud infrastructure, managed dashboard, global control plane, multi-tenant database services, and enterprise API endpoints provided by Lelu AI.
+                These Terms of Service specifically apply to the hosted cloud infrastructure, managed dashboard, global control plane, multi-tenant database services, and enterprise API endpoints provided by Lelu.
               </p>
             </section>
 
@@ -341,7 +341,7 @@ export default function TermsPage() {
                 13. Indemnification
               </h2>
               <p>
-                You agree to defend, indemnify, and hold harmless Lelu AI and its affiliates from and against any claims, liabilities, damages, judgments, losses, and expenses (including reasonable attorney fees) arising out of or in connection with your breach of these Terms or your deployment of AI agents.
+                You agree to defend, indemnify, and hold harmless Lelu, its operator and its affiliates from and against any claims, liabilities, damages, judgments, losses, and expenses (including reasonable attorney fees) arising out of or in connection with your breach of these Terms or your deployment of AI agents.
               </p>
             </section>
 
@@ -361,7 +361,10 @@ export default function TermsPage() {
                 15. Governing Law & Contact Information
               </h2>
               <p>
-                These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict of law principles.
+                These Terms shall be governed by and construed in accordance with the laws of the Federal Democratic Republic of Ethiopia, without regard to its conflict of law principles. The courts of Addis Ababa, Ethiopia, have jurisdiction over any dispute arising from these Terms. Nothing in this section removes any mandatory consumer protection that the law of your country of residence gives you.
+              </p>
+              <p>
+                Lelu is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu. Questions about these Terms: <a href="mailto:legal@lelu-ai.com" className="text-[#0A0A0A] dark:text-white font-semibold underline">legal@lelu-ai.com</a>.
               </p>
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
                 <a

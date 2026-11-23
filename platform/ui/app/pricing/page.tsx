@@ -4,12 +4,12 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import PlanCta from "@/components/billing/PlanCta";
 import { OVERAGE_BLOCK, OVERAGE_USD_PER_BLOCK, PLANS, type PlanId } from "@/lib/billing/plans";
+import { CONTACT_EMAIL, contactMailto } from "@/lib/contact";
 
 /* ── Pricing: per authorize call, never per seat ───────────────────── */
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 const OVERAGE = `$${OVERAGE_USD_PER_BLOCK.toFixed(2)} per ${fmt(OVERAGE_BLOCK)} calls`;
-const DISCUSSIONS = "https://github.com/lelu-ai/lelu/discussions";
 
 interface Tier {
   id: PlanId;
@@ -85,7 +85,7 @@ const TIERS: Tier[] = [
       "SSO / SAML / OIDC and SIEM audit export (coming soon)",
       "Custom integrations",
     ],
-    cta: { kind: "external", label: "Talk to us", href: DISCUSSIONS },
+    cta: { kind: "external", label: "Talk to us", href: contactMailto("Lelu Enterprise plan") },
   },
 ];
 
@@ -127,7 +127,7 @@ const FAQ = [
   },
   {
     q: "Can I pay annually or get a custom volume?",
-    a: "Yes, on Enterprise. Open a discussion and we will set up annual billing or a custom call volume for your account.",
+    a: `Yes, on Enterprise. Email ${CONTACT_EMAIL} and we will set up annual billing or a custom call volume for your account.`,
   },
   {
     q: "How do I pay, and can I cancel?",
@@ -135,7 +135,7 @@ const FAQ = [
   },
   {
     q: "Can I get a refund?",
-    a: "Yes. Ask within 14 days of your first payment for a plan and we refund it in full, no reason needed. A renewal you meant to cancel is refunded if you ask within 14 days. See the Refund Policy linked at the bottom of this page.",
+    a: `Yes. Ask within 14 days of your first payment for a plan and we refund it in full, no reason needed. A renewal you meant to cancel is refunded if you ask within 14 days. Email ${CONTACT_EMAIL}, and see the Refund Policy linked at the bottom of this page.`,
   },
 ];
 
@@ -218,7 +218,7 @@ export default function PricingPage() {
               {t.cta.kind === "plan" ? (
                 <PlanCta plan={t.cta.plan} label={t.cta.label} primary={!!t.highlight} />
               ) : t.cta.kind === "external" ? (
-                <a href={t.cta.href} target="_blank" rel="noreferrer" className={CARD_LINK}>
+                <a href={t.cta.href} className={CARD_LINK}>
                   {t.cta.label}
                 </a>
               ) : (

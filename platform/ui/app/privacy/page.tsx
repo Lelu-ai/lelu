@@ -80,7 +80,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="text-[16px] text-[#737373] max-w-3xl leading-relaxed">
-            At Lelu AI, security and data privacy are foundational to everything we build. This Privacy Policy details how we collect, safeguard, process, and handle information when you interact with our AI agent authorization engine, dashboard, APIs, and SDKs.
+            Lelu (&quot;we&quot; or &quot;us&quot;) is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu. At Lelu, security and data privacy are foundational to everything we build. This Privacy Policy details how we collect, safeguard, process, and handle information when you interact with our AI agent authorization engine, dashboard, APIs, and SDKs.
           </p>
         </div>
 
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
                 1. Overview & Privacy Commitment
               </h2>
               <p>
-                Lelu AI provides infrastructure that sits between autonomous AI agents and downstream execution APIs or enterprise tools. Because security and confidentiality are core to authorization, we adhere to strict data minimization principles. We collect only what is strictly necessary to evaluate agent policies, log verifiable execution audit trails, and operate our platform securely.
+                Lelu provides infrastructure that sits between autonomous AI agents and downstream execution APIs or enterprise tools. Because security and confidentiality are core to authorization, we adhere to strict data minimization principles. We collect only what is strictly necessary to evaluate agent policies, log verifiable execution audit trails, and operate our platform securely.
               </p>
             </section>
 

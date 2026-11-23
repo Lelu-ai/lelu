@@ -9,6 +9,7 @@ import {
   type CheckoutState,
 } from "@/lib/billing/checkout-state";
 import type { SelfServePlan } from "@/lib/billing/plans";
+import { CONTACT_EMAIL, contactMailto } from "@/lib/contact";
 import { changePlan, openCheckout, waitForPlan } from "./paddle-client";
 
 // A paid plan's button on /pricing. It does what the label says:
@@ -25,44 +26,49 @@ const BUTTON =
 const BUTTON_QUIET =
   "mt-6 rounded-md border border-[#D6D3D1] dark:border-white/[0.12] px-4 py-2.5 text-center text-[13.5px] font-medium text-[#0A0A0A] dark:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.05] transition-colors disabled:opacity-60";
 
-const DISCUSSIONS = "https://github.com/lelu-ai/lelu/discussions";
-
 export default function PlanCta({ plan, label, primary = true }: { plan: SelfServePlan; label: string; primary?: boolean }) {
   const [state, setState] = useState<CheckoutState | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // When set, the message ends with our contact email: used whenever the
+  // buyer cannot finish online and has to write to us instead.
+  const [askToEmail, setAskToEmail] = useState(false);
+  const say = useCallback((text: string, email = false) => {
+    setMessage(text);
+    setAskToEmail(email);
+  }, []);
   const autoOpened = useRef(false);
 
   const done = useCallback(async () => {
-    setMessage("Payment received. Activating your plan…");
+    say("Payment received. Activating your plan…");
     await waitForPlan(plan);
     // Even if the plan has not switched yet, the dashboard is where it will show.
     window.location.assign(`/dashboard?upgraded=${plan}`);
-  }, [plan]);
+  }, [plan, say]);
 
   const start = useCallback(
     async (config: CheckoutConfig) => {
       const action = planAction(config, plan);
-      setMessage("");
-      if (action === "current") return setMessage("You're already on this plan.");
-      if (action === "contact") return setMessage("Your plan is custom. Get in touch to change it.");
-      if (action === "unavailable") return setMessage("This plan is not open yet. Join the discussion and we will let you know.");
+      say("");
+      if (action === "current") return say("You're already on this plan.");
+      if (action === "contact") return say("Your plan is custom. Email us to change it:", true);
+      if (action === "unavailable") return say("This plan is not open yet. Email us and we will set it up for you:", true);
       setBusy(true);
       try {
         if (action === "change") {
           const error = await changePlan(plan);
-          if (error) setMessage(error);
+          if (error) say(error);
           else await done();
         } else {
           await openCheckout(config, plan, () => void done());
         }
       } catch {
-        setMessage("Could not open the checkout. Please try again.");
+        say("Could not open the checkout. Please try again.");
       } finally {
         setBusy(false);
       }
     },
-    [plan, done],
+    [plan, done, say],
   );
 
   useEffect(() => {
@@ -83,8 +89,8 @@ export default function PlanCta({ plan, label, primary = true }: { plan: SelfSer
     if (!state) return;
     if (state.status === "signed_out") window.location.assign(loginUrlForUpgrade(plan));
     else if (state.status === "ready") void start(state.config);
-    else if (state.status === "unconfigured") setMessage("Checkout is not open yet. Join the discussion and we will let you know when it is.");
-    else setMessage("Could not check billing right now. Please reload and try again.");
+    else if (state.status === "unconfigured") say("Online checkout opens soon. To start a paid plan now, email us:", true);
+    else say("Could not check billing right now. Please reload and try again.");
   }
 
   const isCurrent = state?.status === "ready" && planAction(state.config, plan) === "current";
@@ -98,14 +104,14 @@ export default function PlanCta({ plan, label, primary = true }: { plan: SelfSer
       {message && (
         <p className="mt-2 text-center text-[12px] text-[#737373] dark:text-[#8B8D98]">
           {message}
-          {(state?.status === "unconfigured" || message.includes("discussion") || message.includes("touch")) && (
+          {askToEmail ? (
             <>
               {" "}
-              <a href={DISCUSSIONS} target="_blank" rel="noreferrer" className="underline">
-                Discussions
+              <a href={contactMailto(`Lelu ${plan} plan`)} className="underline">
+                {CONTACT_EMAIL}
               </a>
             </>
-          )}
+          ) : null}
         </p>
       )}
     </>

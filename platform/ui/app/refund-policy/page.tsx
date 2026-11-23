@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FiMail } from "react-icons/fi";
 import { OVERAGE_BLOCK, OVERAGE_USD_PER_BLOCK } from "@/lib/billing/plans";
+import { CONTACT_EMAIL as CONTACT } from "@/lib/contact";
 
 // Refund policy for the hosted cloud plans. Paddle, our merchant of record,
 // processes every payment and refund, so this page has to agree with what
@@ -12,7 +13,6 @@ export const metadata = {
 };
 
 const UPDATED = "November 23, 2026";
-const CONTACT = "legal@lelu-ai.com";
 const OVERAGE = `$${OVERAGE_USD_PER_BLOCK.toFixed(2)} per ${OVERAGE_BLOCK.toLocaleString("en-US")} calls`;
 
 const CARD = "bg-white dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded-2xl p-6 sm:p-8 space-y-4";
@@ -36,7 +36,7 @@ export default function RefundPolicyPage() {
           </h1>
           <p className="text-[16px] text-[#737373] leading-relaxed">
             This policy covers the paid plans of Lelu&apos;s hosted cloud (Starter, Growth and their usage charges).
-            The open-source engine, SDKs and MCP server are free and are not sold.
+            The open-source engine, SDKs and MCP server are free and are not sold. Lelu is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu.
           </p>
         </div>
 

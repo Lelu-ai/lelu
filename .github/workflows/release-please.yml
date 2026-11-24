@@ -100,7 +100,7 @@ jobs:
       # "bypass two-factor authentication": a token that needs an
       # authenticator code cannot publish from CI.
       - name: Setup Node.js
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] }}
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -108,11 +108,11 @@ jobs:
           # which gets in the way of trusted publishing.
 
       - name: Use an npm that supports trusted publishing
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] }}
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
         run: npm install -g npm@^11.5.1 && npm --version
 
       - name: Configure npm token fallback
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] }}
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
@@ -154,6 +154,20 @@ jobs:
           npm ci
           npm test
           # prepublishOnly builds and checks server.json matches package.json.
+          npm publish --access public --provenance
+
+      - name: Build and Publish OpenClaw plugin
+        if: ${{ steps.release.outputs['sdk/openclaw--release_created'] }}
+        working-directory: sdk/openclaw
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::warning::$NAME@$VERSION is already on npm; skipping publish."
+            exit 0
+          fi
+          npm ci
+          # prepublishOnly type-checks, tests and builds.
           npm publish --access public --provenance
 
       # Publish Python SDK to PyPI

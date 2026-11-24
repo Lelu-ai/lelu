@@ -3,5 +3,6 @@
   "sdk/typescript": "0.1.1",
   "sdk/go": "0.1.9",
   "sdk/python": "0.4.42",
-  "sdk/mcp": "0.0.36"
+  "sdk/mcp": "0.0.36",
+  "sdk/openclaw": "0.1.0"
 }

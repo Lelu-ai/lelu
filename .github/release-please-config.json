@@ -33,6 +33,12 @@
         { "type": "json", "path": "server.json", "jsonpath": "$.version" },
         { "type": "json", "path": "server.json", "jsonpath": "$.packages[0].version" }
       ]
+    },
+    "sdk/openclaw": {
+      "component": "lelu-openclaw",
+      "package-name": "lelu-openclaw",
+      "changelog-path": "CHANGELOG.md",
+      "release-type": "node"
     }
   },
   "release-type": "simple",

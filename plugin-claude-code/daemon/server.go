@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,7 @@ type Request struct {
 	NewString      string            `json:"new_string,omitempty"` // Edit
 	OldString      string            `json:"old_string,omitempty"` // Edit
 	Content        string            `json:"content,omitempty"`    // Write
+	URL            string            `json:"url,omitempty"`        // WebFetch
 	Cwd            string            `json:"cwd"`
 	TranscriptPath string            `json:"transcript_path,omitempty"`
 	Env            map[string]string `json:"env,omitempty"`
@@ -76,6 +79,7 @@ func (e *Engine) Decide(req Request) Response {
 		Tool:      req.Tool,
 		Command:   req.Command,
 		FilePath:  req.FilePath,
+		URL:       req.URL,
 		Cwd:       req.Cwd,
 		Outcome:   real.Outcome,
 		Rule:      real.Rule,
@@ -111,15 +115,34 @@ func (e *Engine) decideTier1(req Request) Response {
 		d := e.Policy.Evaluate(a, e.effectiveHome(req))
 		return Response{Outcome: d.Outcome, Reason: d.Reason, Rule: d.Rule}
 
-	case "Edit", "Write":
+	case "Edit", "Write", "MultiEdit", "NotebookEdit":
 		if e.Policy.pathIsProtectedContains(req.FilePath) {
 			return Response{Outcome: OutcomeDeny, Reason: "target path matches a protected-path rule", Rule: "protected-path"}
 		}
 		return Response{Outcome: OutcomeAllow}
 
-	default:
+	case "Read":
+		if e.Policy.pathIsSensitive(req.FilePath, e.effectiveHome(req)) {
+			return Response{Outcome: OutcomeAsk, Reason: "reading a credential, key or env file; routing to human review", Rule: "sensitive-read"}
+		}
+		return Response{Outcome: OutcomeAllow}
+
+	case "WebFetch":
+		host, ok := e.Policy.webFetchHostAllowed(req.URL)
+		if !ok {
+			return Response{Outcome: OutcomeAsk, Reason: fmt.Sprintf("fetching %q: host %q is not on the web-fetch allow list; routing to human review", req.URL, host), Rule: "web-fetch-host"}
+		}
 		return Response{Outcome: OutcomeAllow}
 	}
+
+	// MCP tools are allowed here as before; checking MCP servers and their
+	// tool definitions is tracked separately (#147).
+	if strings.HasPrefix(req.Tool, "mcp__") || e.Policy.toolAllowed(req.Tool) {
+		return Response{Outcome: OutcomeAllow}
+	}
+	// A tool Lelu has no rule for, including one Claude Code adds later, is
+	// not waved through: a human decides.
+	return Response{Outcome: OutcomeAsk, Reason: fmt.Sprintf("Lelu has no rule for the %q tool; routing to human review", req.Tool), Rule: "unknown-tool"}
 }
 
 // decideHookify evaluates any imported hookify rules found under the
@@ -159,6 +182,48 @@ func (e *Engine) effectiveHome(req Request) string {
 		return h
 	}
 	return e.Home
+}
+
+// pathIsSensitive reports whether path matches a sensitive-path rule
+// (credentials, keys, env files). Read carries a concrete path, as Edit and
+// Write do.
+func (ps *PolicySet) pathIsSensitive(path, home string) bool {
+	for _, rule := range ps.SensitivePaths {
+		if rule.matches(path, home) {
+			return true
+		}
+	}
+	return false
+}
+
+// toolAllowed reports whether tool is on the policy's list of tools that need
+// no check of their own.
+func (ps *PolicySet) toolAllowed(tool string) bool {
+	for _, t := range ps.Tools.Allow {
+		if t == tool {
+			return true
+		}
+	}
+	return false
+}
+
+// webFetchHostAllowed reports whether rawURL's host is on the web-fetch allow
+// list, either exactly or as a subdomain. It also returns the host it
+// checked. A URL that does not parse, or is not http or https, is never
+// allowed.
+func (ps *PolicySet) webFetchHostAllowed(rawURL string) (string, bool) {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" {
+		return "", false
+	}
+	host := strings.ToLower(u.Hostname())
+	for _, allowed := range ps.Tools.WebFetchAllowedHosts {
+		allowed = strings.ToLower(allowed)
+		if host == allowed || strings.HasSuffix(host, "."+allowed) {
+			return host, true
+		}
+	}
+	return host, false
 }
 
 // pathIsProtectedContains checks only the "contains" protected-path rules,

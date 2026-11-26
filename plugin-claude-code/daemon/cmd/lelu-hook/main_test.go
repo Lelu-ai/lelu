@@ -50,7 +50,19 @@ func TestShouldSpawn_OtherErrorNo(t *testing.T) {
 	}
 }
 
+func TestDaemonBinaryPath_PrefersExplicitDaemonBin(t *testing.T) {
+	// hooks/lelu-hook.sh points at the release binary it downloaded into the
+	// data directory; that must win over the plugin folder, which has none.
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "/opt/plugins/lelu")
+	t.Setenv("LELU_DAEMON_BIN", "/home/u/.lelu/claude-plugin/bin/0.2.0/lelu-daemon")
+	got := daemonBinaryPath()
+	if want := "/home/u/.lelu/claude-plugin/bin/0.2.0/lelu-daemon"; got != want {
+		t.Errorf("daemonBinaryPath() = %q, want %q", got, want)
+	}
+}
+
 func TestDaemonBinaryPath_PrefersPluginRoot(t *testing.T) {
+	t.Setenv("LELU_DAEMON_BIN", "")
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "/opt/plugins/lelu")
 	got := daemonBinaryPath()
 	want := filepath.Join("/opt/plugins/lelu", "bin", "lelu-daemon")
@@ -60,6 +72,7 @@ func TestDaemonBinaryPath_PrefersPluginRoot(t *testing.T) {
 }
 
 func TestDaemonBinaryPath_FallsBackToSiblingOfExecutable(t *testing.T) {
+	t.Setenv("LELU_DAEMON_BIN", "")
 	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
 	got := daemonBinaryPath()
 	if got == "" {
@@ -220,5 +233,66 @@ func TestWarningOutput_FailOpenIsVisibleAndNotAnAllow(t *testing.T) {
 	}
 	if !strings.Contains(out.SystemMessage, "daemon unreachable") {
 		t.Errorf("fail-open warning must be shown to the user via systemMessage, got %q", out.SystemMessage)
+	}
+}
+
+func TestFailClosed_FollowsModeUnlessOverridden(t *testing.T) {
+	cases := []struct {
+		name, mode, env string
+		want            bool
+	}{
+		{name: "no mode file is shadow", mode: "", env: "", want: false},
+		{name: "shadow mode", mode: "shadow", env: "", want: false},
+		{name: "enforce mode", mode: "enforce", env: "", want: true},
+		{name: "override on in shadow mode", mode: "shadow", env: "1", want: true},
+		{name: "override off in enforce mode", mode: "enforce", env: "0", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("LELU_DATA_DIR", dir)
+			t.Setenv("LELU_FAIL_CLOSED", tc.env)
+			if tc.mode != "" {
+				if err := os.WriteFile(filepath.Join(dir, "mode"), []byte(tc.mode), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := failClosed(); got != tc.want {
+				t.Errorf("failClosed() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestCannotCheck_ClosedAsksAndOpenTakesNoDecision(t *testing.T) {
+	closed := cannotCheck("daemon unreachable", true)
+	if closed.HookSpecificOutput.PermissionDecision != "ask" {
+		t.Errorf("fail-closed decision = %q, want ask", closed.HookSpecificOutput.PermissionDecision)
+	}
+	if closed.SystemMessage == "" || closed.HookSpecificOutput.PermissionDecisionReason == "" {
+		t.Errorf("fail-closed output must tell the user why: %+v", closed)
+	}
+
+	open := cannotCheck("daemon unreachable", false)
+	if open.HookSpecificOutput.PermissionDecision != "" {
+		t.Errorf("fail-open must not take a decision, got %q", open.HookSpecificOutput.PermissionDecision)
+	}
+	if open.SystemMessage == "" {
+		t.Errorf("fail-open must still warn the user")
+	}
+}
+
+func TestRequestFrom_MapsNotebookPathAndURL(t *testing.T) {
+	var in hookInput
+	in.ToolName = "NotebookEdit"
+	in.ToolInput.NotebookPath = "/p/analysis.ipynb"
+	if got := requestFrom(in).FilePath; got != "/p/analysis.ipynb" {
+		t.Errorf("NotebookEdit FilePath = %q, want the notebook path", got)
+	}
+
+	in = hookInput{ToolName: "WebFetch"}
+	in.ToolInput.URL = "https://example.com/x"
+	if got := requestFrom(in).URL; got != "https://example.com/x" {
+		t.Errorf("WebFetch URL = %q, want it passed through", got)
 	}
 }

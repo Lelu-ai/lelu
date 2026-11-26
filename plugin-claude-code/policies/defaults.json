@@ -139,6 +139,47 @@
       "node"
     ]
   },
+  "tools": {
+    "allow": [
+      "Glob",
+      "Grep",
+      "LS",
+      "NotebookRead",
+      "WebSearch",
+      "TodoRead",
+      "TodoWrite",
+      "Task",
+      "Agent",
+      "TaskOutput",
+      "TaskStop",
+      "BashOutput",
+      "KillShell",
+      "KillBash",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "AskUserQuestion",
+      "Skill",
+      "SlashCommand",
+      "ToolSearch",
+      "ListMcpResourcesTool",
+      "ReadMcpResourceTool"
+    ],
+    "web_fetch_allowed_hosts": [
+      "github.com",
+      "raw.githubusercontent.com",
+      "docs.github.com",
+      "developer.mozilla.org",
+      "go.dev",
+      "pkg.go.dev",
+      "docs.python.org",
+      "pypi.org",
+      "npmjs.com",
+      "docs.rs",
+      "crates.io",
+      "code.claude.com",
+      "docs.claude.com"
+    ]
+  },
   "loop_detection": {
     "enabled": true,
     "repeat_threshold": 5,

@@ -189,6 +189,10 @@ app.post(
 
 ### LangChain
 
+`SecureTool` does not require the optional `openai` package. To use
+`SemanticPolicyGenerator`, install it with `npm install openai`; the client is
+loaded when `generateRegoPolicy()` is first called.
+
 ```ts
 import { SecureTool } from "lelu-agent-auth/langchain";
 import { auth } from "./lib/lelu";

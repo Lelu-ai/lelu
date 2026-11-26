@@ -10,6 +10,8 @@
 
 ### Fixes
 
+* **LangChain imports no longer require `openai`** (#105). `SemanticPolicyGenerator` loads the optional peer on its first generation call and explains how to install it when unavailable.
+
 * **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
 * **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`.
 * **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).

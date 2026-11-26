@@ -66,6 +66,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:optional-openai": "npm run build:sdk && node tests/langchain-without-openai.cjs",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint src --ext .ts",
     "prepublishOnly": "npm run build:sdk"

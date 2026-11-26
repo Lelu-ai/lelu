@@ -69,6 +69,9 @@ type PolicySet struct {
 	// copying, appending — is routed to human review.
 	SensitivePaths   []protectedPathRule `json:"sensitive_paths,omitempty"`
 	RemoteScriptPipe remoteScriptRule    `json:"remote_script_pipe"`
+	// Tools covers every tool other than Bash, the file-editing tools and
+	// MCP tools: which need no check of their own, and where WebFetch may go.
+	Tools         ToolPolicy          `json:"tools"`
 	LoopDetection      LoopConfig          `json:"loop_detection"`
 	SessionBudget       SessionBudgetConfig `json:"session_budget"`
 }
@@ -84,6 +87,37 @@ func LoadPolicySet(path string) (*PolicySet, error) {
 		return nil, err
 	}
 	return &ps, nil
+}
+
+// ToolPolicy says how tools without a rule of their own are handled. Any
+// tool that is neither handled by a specific rule nor listed in Allow is
+// routed to human review, so a tool Claude Code adds later is not waved
+// through unchecked.
+type ToolPolicy struct {
+	// Allow lists tools that need no check: tools that only read or plan,
+	// and Task/Agent, whose sub-agents' own tool calls come through this hook
+	// too.
+	Allow []string `json:"allow"`
+	// WebFetchAllowedHosts lists hosts WebFetch may fetch from without
+	// review. A host also allows its subdomains.
+	WebFetchAllowedHosts []string `json:"web_fetch_allowed_hosts"`
+}
+
+// LocalPolicyFile holds the user's own rules (the ones /lelu adds). It lives
+// in the data directory, not the plugin folder: Claude Code replaces the
+// plugin folder on every update, which would erase rules kept there.
+const LocalPolicyFile = "policy.local.json"
+
+// Merge appends other's lists to ps: rules, plus tools and web-fetch hosts
+// the user trusts. Loop detection, the session budget and the remote-script
+// check keep the values from ps, and no default rule can be removed, so a
+// local file cannot switch the defaults off.
+func (ps *PolicySet) Merge(other *PolicySet) {
+	ps.DestructiveCommands = append(ps.DestructiveCommands, other.DestructiveCommands...)
+	ps.ProtectedPaths = append(ps.ProtectedPaths, other.ProtectedPaths...)
+	ps.SensitivePaths = append(ps.SensitivePaths, other.SensitivePaths...)
+	ps.Tools.Allow = append(ps.Tools.Allow, other.Tools.Allow...)
+	ps.Tools.WebFetchAllowedHosts = append(ps.Tools.WebFetchAllowedHosts, other.Tools.WebFetchAllowedHosts...)
 }
 
 // Outcome is one of Lelu's decision outcomes for this call.

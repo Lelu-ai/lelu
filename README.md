@@ -110,14 +110,14 @@ Your agent gets a `lelu_agent_authorize` tool using the **coding-agent** preset:
 
 ### Claude Code plugin — no tool-calling required
 
-The MCP server above gives your agent a tool it can *choose* to call. The Claude Code plugin goes further: it hooks directly into every `Bash`, `Edit`, and `Write` call via Claude Code's own `PreToolUse` hook, so protection doesn't depend on the agent remembering to ask.
+The MCP server above gives your agent a tool it can *choose* to call. The Claude Code plugin goes further: it hooks directly into every tool call via Claude Code's own `PreToolUse` hook, so protection doesn't depend on the agent remembering to ask.
 
-```bash
-git clone https://github.com/lelu-ai/lelu.git && cd lelu
-claude plugin marketplace add ./
-claude plugin install lelu@lelu
-./plugin-claude-code/install.sh
 ```
+/plugin marketplace add Lelu-ai/lelu
+/plugin install lelu@lelu
+```
+
+On first use the plugin downloads its two Go binaries for your platform from this repo's GitHub release and checks them against the release checksums; [what it downloads and why](plugin-claude-code/README.md#what-the-plugin-downloads).
 
 Expansion-aware — `rm -rf ~/`, `rm -rf $HOME`, and reversed/separated/long-form flag variants are all caught, where a regex on the raw command text [catches 7/10 and false-positives on 4/4 benign commands](plugin-claude-code/benchmarks/report.md) — plus retry-storm detection and a session budget for runaway unattended sessions. **Shadow mode by default**, nothing blocks until you ask it to. Full docs → [plugin-claude-code](plugin-claude-code)
 

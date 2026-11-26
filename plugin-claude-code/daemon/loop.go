@@ -74,8 +74,10 @@ func LoopKey(req Request) string {
 	switch req.Tool {
 	case "Bash":
 		return "Bash:" + req.Command
-	case "Edit", "Write":
+	case "Edit", "Write", "MultiEdit", "NotebookEdit":
 		return req.Tool + ":" + req.FilePath
+	case "WebFetch":
+		return "WebFetch:" + req.URL
 	default:
 		return ""
 	}

@@ -10,10 +10,13 @@
 // shadow mode, or when the daemon is down) left a user with the plugin
 // installed less protected than without it.
 //
-// Failure mode, deliberately: if the daemon can't be reached or times out,
-// this fails open to Claude Code's own permission flow rather than blocking
-// every tool call over an infra hiccup, and tells the user via systemMessage
-// (shown in the UI) as well as the model via additionalContext.
+// Failure mode: if the action can't be checked (the daemon can't be reached
+// or times out, or the hook input is unreadable), the user is always told via
+// systemMessage (shown in the UI) and the model via additionalContext. In
+// shadow mode the call is then left to Claude Code's own permission flow. In
+// enforce mode it is routed to "ask" instead: once the user has turned
+// blocking on, an agent must not be able to get past Lelu by stopping the
+// daemon. LELU_FAIL_CLOSED=1 or =0 overrides either default.
 package main
 
 import (
@@ -48,6 +51,9 @@ type hookInput struct {
 		NewString string `json:"new_string"`
 		OldString string `json:"old_string"`
 		Content   string `json:"content"`
+		// NotebookEdit names its file notebook_path; WebFetch has a url.
+		NotebookPath string `json:"notebook_path"`
+		URL          string `json:"url"`
 	} `json:"tool_input"`
 }
 
@@ -70,36 +76,59 @@ type hookOutput struct {
 func main() {
 	raw, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		allowWithWarning("could not read hook input: " + err.Error())
+		print_(cannotCheck("could not read hook input: "+err.Error(), failClosed()))
 		return
 	}
 
 	var in hookInput
 	if err := json.Unmarshal(raw, &in); err != nil {
-		allowWithWarning("could not parse hook input JSON: " + err.Error())
+		print_(cannotCheck("could not parse hook input JSON: "+err.Error(), failClosed()))
 		return
 	}
 
-	req := daemon.Request{
-		SessionID:      in.SessionID,
-		Tool:           in.ToolName,
-		Command:        in.ToolInput.Command,
-		FilePath:       in.ToolInput.FilePath,
-		NewString:      in.ToolInput.NewString,
-		OldString:      in.ToolInput.OldString,
-		Content:        in.ToolInput.Content,
-		Cwd:            in.Cwd,
-		TranscriptPath: in.TranscriptPath,
-		Env:            currentEnv(),
-	}
-
-	resp, err := askDaemon(req)
+	resp, err := askDaemon(requestFrom(in))
 	if err != nil {
-		allowWithWarning(unreachableMessage(err))
+		print_(cannotCheck(unreachableMessage(err), failClosed()))
 		return
 	}
 
 	print_(decisionFor(resp))
+}
+
+// requestFrom turns Claude Code's hook input into a daemon request.
+func requestFrom(in hookInput) daemon.Request {
+	filePath := in.ToolInput.FilePath
+	if filePath == "" {
+		filePath = in.ToolInput.NotebookPath
+	}
+	return daemon.Request{
+		SessionID:      in.SessionID,
+		Tool:           in.ToolName,
+		Command:        in.ToolInput.Command,
+		FilePath:       filePath,
+		NewString:      in.ToolInput.NewString,
+		OldString:      in.ToolInput.OldString,
+		Content:        in.ToolInput.Content,
+		URL:            in.ToolInput.URL,
+		Cwd:            in.Cwd,
+		TranscriptPath: in.TranscriptPath,
+		Env:            currentEnv(),
+	}
+}
+
+// failClosed reports whether an action Lelu cannot check should be routed to
+// "ask". LELU_FAIL_CLOSED=1 (or true) and =0 (or false) decide outright.
+// Otherwise it follows the plugin mode: enforce fails closed, shadow mode
+// (the default, including when there is no mode file) does not.
+func failClosed() bool {
+	switch strings.ToLower(os.Getenv("LELU_FAIL_CLOSED")) {
+	case "1", "true":
+		return true
+	case "0", "false":
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(dataDir(), "mode"))
+	return err == nil && strings.TrimSpace(string(data)) == "enforce"
 }
 
 // unreachableMessage distinguishes "nothing has been built/installed here
@@ -138,11 +167,16 @@ func decisionFor(resp daemon.Response) hookOutput {
 	return hookOutput{HookSpecificOutput: out}
 }
 
-// allowWithWarning reports a hook failure without taking a permission
-// decision: Lelu could not check the action, so Claude Code's own permission
-// flow decides, and the user is told.
-func allowWithWarning(msg string) {
-	print_(warningOutput(msg))
+// cannotCheck reports that Lelu could not check the action. Failing closed
+// asks the user; otherwise no permission decision is taken, so Claude Code's
+// own permission flow decides. The user is told either way.
+func cannotCheck(msg string, closed bool) hookOutput {
+	out := warningOutput(msg)
+	if closed {
+		out.HookSpecificOutput.PermissionDecision = "ask"
+		out.HookSpecificOutput.PermissionDecisionReason = "Lelu could not check this action, and it is enforcing, so it needs your approval: " + msg
+	}
+	return out
 }
 
 func warningOutput(msg string) hookOutput {
@@ -254,11 +288,16 @@ func spawnDaemon() {
 	// responsibility, and this process is about to exit anyway.
 }
 
-// daemonBinaryPath resolves the daemon binary the same way for a real
-// install (relative to CLAUDE_PLUGIN_ROOT) and for local dev/testing
-// (relative to this hook binary's own location, mirroring install.sh's
-// hooks/ + bin/ sibling layout).
+// daemonBinaryPath resolves the daemon binary. LELU_DAEMON_BIN comes first:
+// hooks/lelu-hook.sh sets it to the release binary it downloaded into the
+// data directory, which is outside the plugin folder. Otherwise the daemon
+// is looked up relative to CLAUDE_PLUGIN_ROOT (a plugin built in place by
+// install.sh), and finally relative to this hook binary's own location,
+// mirroring install.sh's hooks/ + bin/ sibling layout.
 func daemonBinaryPath() string {
+	if bin := os.Getenv("LELU_DAEMON_BIN"); bin != "" {
+		return bin
+	}
 	if root := os.Getenv("CLAUDE_PLUGIN_ROOT"); root != "" {
 		return filepath.Join(root, "bin", "lelu-daemon")
 	}

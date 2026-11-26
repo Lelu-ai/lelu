@@ -1,22 +1,43 @@
 # Lelu — Claude Code plugin
 
-Expansion-aware policy checks before every `Bash`, `Edit`, and `Write` call — the same authorization engine as the rest of this repo, wired into Claude Code's own `PreToolUse` hook instead of exposed as a tool the agent has to remember to call.
+Expansion-aware policy checks before every tool call Claude Code makes — the same authorization engine as the rest of this repo, wired into Claude Code's own `PreToolUse` hook instead of exposed as a tool the agent has to remember to call.
 
 ## Install
 
-```bash
-git clone https://github.com/lelu-ai/lelu.git && cd lelu
-claude plugin marketplace add ./
-claude plugin install lelu@lelu
-./plugin-claude-code/install.sh
+Inside Claude Code:
+
+```
+/plugin marketplace add Lelu-ai/lelu
+/plugin install lelu@lelu
 ```
 
-`install.sh` builds from source if you have Go, or downloads a prebuilt binary from this repo's [releases](https://github.com/lelu-ai/lelu/releases) if you don't. No account, no cloud dependency — everything runs and stays on your machine.
+That's all. No account, no cloud dependency — decisions are made and logged on your machine.
 
-The plugin stores its ledger, mode, socket, and daemon log in
+### What the plugin downloads
+
+The hook and daemon are compiled Go programs, so they are not in the plugin folder. The first time a session starts, [`hooks/lelu-hook.sh`](hooks/lelu-hook.sh) — a short shell script you can read — downloads two files for your OS and CPU (`lelu-hook` and `lelu-daemon`, Linux or macOS, amd64 or arm64) from this repo's `plugin-claude-code-v<version>` [release](https://github.com/lelu-ai/lelu/releases), checks each against that release's `SHA256SUMS.txt`, and installs them in `~/.lelu/claude-plugin/bin/<version>/`.
+
+- It connects only to `github.com` and `release-assets.githubusercontent.com`, over HTTPS, and only until the download succeeds. Nothing is uploaded.
+- The binaries are built from [`daemon/`](daemon) by [this workflow](../.github/workflows/plugin-claude-code-release.yml), which also publishes a build provenance attestation: `gh attestation verify ~/.lelu/claude-plugin/bin/<version>/lelu-hook -R Lelu-ai/lelu`.
+- If the download fails, each tool call shows a warning and is left to Claude Code's normal permission flow; the script retries after 10 minutes.
+- It needs `curl` or `wget`, and `sha256sum` or `shasum`.
+
+The plugin stores its ledger, mode, socket, daemon log, your own rules (`policy.local.json`) and the downloaded binaries in
 `$HOME/.lelu/claude-plugin` by default. Set `LELU_DATA_DIR` to use another
 directory. `LELU_HOME` is accepted as a compatibility alias when
 `LELU_DATA_DIR` is not set.
+
+### Developing the plugin
+
+Build from source and load the plugin straight from your checkout, so nothing is downloaded:
+
+```bash
+git clone https://github.com/lelu-ai/lelu.git && cd lelu
+./plugin-claude-code/install.sh        # builds hooks/lelu-hook and bin/lelu-daemon with Go, starts the daemon
+claude --plugin-dir ./plugin-claude-code
+```
+
+When `hooks/lelu-hook` and `bin/lelu-daemon` exist inside the plugin folder, the launcher uses them instead of the release binaries.
 
 ## What it catches
 
@@ -28,9 +49,36 @@ Also:
 - **Session wall-clock budget** — a session that's been running for hours gets a one-time review prompt, the same failure mode behind real "$6,000 burned overnight" agent incidents.
 - **hookify rule import** — existing `.claude/hookify.*.local.md` rules keep working with zero edits, and get upgraded from a silent notice to an actual pause for review.
 
+## Which tools are checked
+
+The hook runs before every tool call, not a fixed list:
+
+| Tool | Rule |
+|---|---|
+| `Bash` | Expansion-aware command analysis (above) |
+| `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | Denied on a protected path |
+| `Read` | Asks before reading a credential, key or env file (`sensitive_paths`) |
+| `WebFetch` | Asks unless the host, or a parent domain of it, is in `tools.web_fetch_allowed_hosts` |
+| Tools in `tools.allow` | No check of their own: tools that only read or plan, and `Task`/`Agent`, whose sub-agents' tool calls come through this hook too |
+| `mcp__*` | Allowed for now; checking MCP tool definitions is [#147](https://github.com/lelu-ai/lelu/issues/147) |
+| Any other tool | Asks: a tool Lelu has no rule for, including one Claude Code adds later, is not waved through |
+
+To trust another tool or host, add it to `policy.local.json` in the data directory, for example `{"tools": {"allow": ["MyTool"], "web_fetch_allowed_hosts": ["wiki.example.com"]}}`, and restart the daemon (`pkill -x lelu-daemon`).
+
 ## Shadow mode by default
 
 Nothing is blocked by Lelu on install, and Claude Code's own permission prompts, permission rules and auto-mode classifier keep working exactly as before: the hook only ever adds `deny` or `ask`, and never answers `allow` (an explicit `allow` would skip Claude Code's prompt). Every decision is still logged to the configured data directory's `ledger.jsonl` regardless of mode. Run `/lelu:lelu-status` inside Claude Code to see what it would have done, and `/lelu:lelu-enforce` when you're ready to turn on real blocking. `/lelu:lelu-shadow` reverts anytime.
+
+## When Lelu can't check an action
+
+If the daemon can't be reached, the binaries couldn't be downloaded, or the hook input can't be read, you always get a warning. What happens to the call depends on the mode:
+
+- **Shadow mode:** the call goes to Claude Code's normal permission flow, as if Lelu weren't installed.
+- **Enforce mode:** the call is routed to `ask`, so you approve it yourself. Once blocking is on, stopping the daemon doesn't get an action past Lelu.
+
+Set `LELU_FAIL_CLOSED=1` to always ask, or `LELU_FAIL_CLOSED=0` to never ask, whatever the mode.
+
+At the start of each session the plugin also checks that its own `hooks.json`, `lelu-hook.sh` and `policies/defaults.json` are unchanged since this version first ran, and warns you if they were edited. It's a tripwire, not a lock: protecting the plugin's files from the agent is [#118](https://github.com/lelu-ai/lelu/issues/118).
 
 ## Commands
 
@@ -39,10 +87,10 @@ Nothing is blocked by Lelu on install, and Claude Code's own permission prompts,
 | `/lelu:lelu-status` | Current mode, plus a summary of recent decisions |
 | `/lelu:lelu-enforce` | Start actually blocking deny/ask decisions |
 | `/lelu:lelu-shadow` | Back to observe-only |
-| `/lelu <rule>` | Turn a plain-English rule into a policy entry, e.g. `/lelu never touch the prod database` |
+| `/lelu <rule>` | Turn a plain-English rule into a policy entry, e.g. `/lelu never touch the prod database`. Rules are saved in `policy.local.json` in the data directory, so plugin updates keep them. They add to the defaults; they can't remove a default rule. |
 
 ## How it's built
 
-A Go daemon (`daemon/`) behind a local unix socket — no CGO, no database server, an append-only JSONL ledger instead. `hooks/lelu-hook` is the thin adapter Claude Code actually invokes on every tool call; if the daemon is down it takes no decision — Claude Code's normal permission flow handles the call — shows you a warning (`systemMessage`) and tells the model too, and tries to self-start the daemon first. `install.sh` verifies downloaded binaries against the release's `SHA256SUMS.txt` and only reports success once the daemon's socket is up.
+A Go daemon (`daemon/`) behind a local unix socket — no CGO, no database server, an append-only JSONL ledger instead. `hooks/lelu-hook.sh` installs the binaries (see above) and runs `lelu-hook`, the thin adapter that handles every tool call; if the daemon is down it tries to self-start it first, and otherwise follows [When Lelu can't check an action](#when-lelu-cant-check-an-action). `install.sh` verifies downloaded binaries against the release's `SHA256SUMS.txt` and only reports success once the daemon's socket is up.
 
 MIT, same license as the rest of this repo.

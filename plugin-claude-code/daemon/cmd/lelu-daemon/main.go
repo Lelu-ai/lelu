@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -32,6 +33,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("lelu-daemon: loading policy set from %s: %v", policyPath, err)
 	}
+	loadLocalRules(policy, filepath.Join(dataDir, daemon.LocalPolicyFile))
 
 	ledger, err := daemon.OpenLedger(filepath.Join(dataDir, "ledger.jsonl"))
 	if err != nil {
@@ -65,6 +67,24 @@ func main() {
 
 	log.Printf("lelu-daemon: listening on %s (policy=%s, mode file=%s)", sockPath, policyPath, modePath)
 	serve(listener, engine)
+}
+
+// loadLocalRules adds the user's own rules from path to policy. A missing
+// file is normal. A file that does not parse is logged and skipped rather
+// than stopping the daemon: a typo in one added rule must not switch off the
+// default rules too.
+func loadLocalRules(policy *daemon.PolicySet, path string) {
+	local, err := daemon.LoadPolicySet(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		log.Printf("lelu-daemon: ignoring local rules in %s: %v", path, err)
+		return
+	}
+	policy.Merge(local)
+	log.Printf("lelu-daemon: loaded local rules from %s (%d destructive commands, %d protected paths, %d sensitive paths)",
+		path, len(local.DestructiveCommands), len(local.ProtectedPaths), len(local.SensitivePaths))
 }
 
 func serve(listener net.Listener, engine *daemon.Engine) {

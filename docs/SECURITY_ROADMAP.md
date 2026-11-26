@@ -93,8 +93,12 @@ repository, and the project notices vulnerable dependencies quickly.
 - [x] Engine and plugin binaries published with checksums and GitHub build
   provenance attestations
 - [x] OpenSSF Scorecard runs weekly and on every push to `main`
-- [ ] [#90](https://github.com/Lelu-ai/lelu/issues/90): `CODEOWNERS`,
-  Dependabot and a `govulncheck` CI step
+- [x] CodeQL runs on every push and pull request to `main`
+- [x] Dependabot version updates for Actions, Go, npm, pip and Docker
+- [x] Workflow tokens are read-only by default; only the jobs that publish
+  get write access
+- [ ] [#90](https://github.com/Lelu-ai/lelu/issues/90): `CODEOWNERS` and a
+  `govulncheck` CI step
 - [ ] [#124](https://github.com/Lelu-ai/lelu/issues/124): triage the
   `npm audit` findings in `sdk/typescript`
 - [ ] Publish to PyPI with trusted publishing instead of a stored token

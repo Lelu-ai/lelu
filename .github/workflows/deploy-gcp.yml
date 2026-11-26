@@ -15,6 +15,10 @@ concurrency:
 env:
   GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
 
+# Read-only by default; jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ─────────────────────────────────────────────────────────────────────────────
 jobs:
 

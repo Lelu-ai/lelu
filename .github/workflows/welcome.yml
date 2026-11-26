@@ -1,0 +1,64 @@
+# Welcome first-time contributors: comment once on a person's first issue or
+# first pull request in this repository, with links to the contributing guide.
+#
+# pull_request_target is used so the comment can be posted on pull requests
+# from forks. It runs in the base repository's context, so this workflow must
+# never check out or run code from the pull request. It only reads the event
+# payload and calls the GitHub API.
+
+name: Welcome
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const isIssue = context.eventName === 'issues';
+            const item = isIssue ? context.payload.issue : context.payload.pull_request;
+            const author = item.user.login;
+
+            if (item.user.type === 'Bot' || author.endsWith('[bot]')) return;
+            // Maintainers and existing collaborators don't need a welcome.
+            if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(item.author_association)) return;
+
+            // Any other issue or pull request by this author means this is not
+            // their first. Search can lag behind a just-opened item, so the
+            // current one is excluded by number rather than by count.
+            const { owner, repo } = context.repo;
+            const { data } = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} author:${author}`,
+              per_page: 5,
+            });
+            if (data.items.some((i) => i.number !== item.number)) return;
+
+            const guide = `https://github.com/${owner}/${repo}/blob/main/CONTRIBUTING.md`;
+            const body = isIssue
+              ? [
+                  `Thanks for opening your first issue, @${author}! A maintainer will reply here.`,
+                  '',
+                  `If you'd like to fix it yourself, say so and we'll assign it to you. The [contributing guide](${guide}) explains how to set up and run the tests.`,
+                  '',
+                  `If this is a security problem, please close this issue and [report it privately](https://github.com/${owner}/${repo}/security/advisories/new) instead.`,
+                ].join('\n')
+              : [
+                  `Thanks for your first pull request, @${author}! A maintainer will review it.`,
+                  '',
+                  `While you wait: make sure the tests for the parts you changed pass ([how](${guide}#run-the-tests)), and that the pull request links the issue it closes. The Vercel check fails on every pull request from a fork; you can ignore it.`,
+                  '',
+                  'Once this is merged you will be added to the contributors list in the README.',
+                ].join('\n');
+
+            await github.rest.issues.createComment({ owner, repo, issue_number: item.number, body });

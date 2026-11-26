@@ -16,6 +16,7 @@
   <a href="https://pypi.org/project/lelu-agent-auth-sdk/"><img src="https://img.shields.io/pypi/v/lelu-agent-auth-sdk?style=flat-square&label=PyPI" alt="PyPI" /></a>
   <a href="https://www.npmjs.com/package/lelu-agent-auth"><img src="https://img.shields.io/npm/v/lelu-agent-auth?style=flat-square&label=npm" alt="npm" /></a>
   <a href="https://lelu-ai.com/sandbox"><img src="https://img.shields.io/badge/try%20it-sandbox-10b981?style=flat-square" alt="Sandbox" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Lelu-ai/lelu"><img src="https://api.scorecard.dev/projects/github.com/Lelu-ai/lelu/badge?style=flat-square" alt="OpenSSF Scorecard" /></a>
 </p>
 
 <p align="center">
@@ -25,6 +26,8 @@
   <a href="examples/"><b>Examples</b></a> ·
   <a href="sdk/mcp"><b>MCP Server</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
+  <a href="GOVERNANCE.md"><b>Governance</b></a> ·
+  <a href="docs/SECURITY_ROADMAP.md"><b>Security Roadmap</b></a> ·
   <a href="https://github.com/lelu-ai/lelu/discussions"><b>Discussions</b></a>
 </p>
 
@@ -85,7 +88,7 @@ Read this before you depend on Lelu. These limits come from an independent audit
 - **Single process.** The engine stores state in SQLite and process memory. Do not run more than one replica.
 - **Set `JWT_SIGNING_KEY` and `VAULT_KEY`** to random values. The defaults are public.
 
-Found something else? See [SECURITY.md](SECURITY.md).
+All 17 findings from that audit are closed. What we are fixing next, and in what order, is in the [security roadmap](docs/SECURITY_ROADMAP.md). Found something else? See [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -198,7 +201,7 @@ Self-hosting: `npx -y lelu-mcp start` runs the real engine with no build step, o
 <details>
 <summary><b>Is it really free?</b></summary>
 
-Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start`, or build the engine yourself from source. The hosted sandbox at lelu-ai.com is just a convenience.
+Yes — the engine, SDKs, MCP server, plugins, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start`, or build the engine yourself from source. lelu-ai.com also offers a hosted version with paid plans; those pay for hosting, call volume and support, never for security features. The project's commitments on this are in [GOVERNANCE.md](GOVERNANCE.md#open-source-and-the-hosted-service).
 </details>
 
 <details>

@@ -92,6 +92,12 @@ jobs:
     name: publish release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Build provenance: signs an attestation with this run's OIDC identity.
+      # Verify with: gh attestation verify <binary> -R Lelu-ai/lelu
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -101,6 +107,11 @@ jobs:
       - name: Checksums
         working-directory: binaries
         run: sha256sum lelu-engine-* > SHA256SUMS.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: binaries/lelu-engine-*
 
       - uses: softprops/action-gh-release@v2
         with:

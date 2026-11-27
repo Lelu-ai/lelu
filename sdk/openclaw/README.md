@@ -23,14 +23,16 @@ Your agent runs shell commands and edits files on your machine. One bad step, fr
 ## Install
 
 ```bash
-openclaw plugins install npm:lelu-openclaw
+openclaw plugins install lelu-openclaw
 ```
 
-OpenClaw warns that the package comes from npm rather than ClawHub and asks you to confirm. In a script, where there's no one to answer, add `--force`. The plugin is on as soon as it's installed, including in a Gateway that's already running. Check that it loaded:
+This installs it from [ClawHub](https://clawhub.ai), where it's scanned and listed (`openclaw plugins search lelu` finds it). The plugin is on as soon as it's installed, including in a Gateway that's already running. Check that it loaded:
 
 ```bash
 openclaw plugins inspect lelu --runtime
 ```
+
+You can also install it straight from npm with `openclaw plugins install npm:lelu-openclaw`. OpenClaw then warns that the package is outside ClawHub review and asks you to confirm; in a script, add `--force`.
 
 ## Try it
 

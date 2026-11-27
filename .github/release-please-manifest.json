@@ -4,5 +4,5 @@
   "sdk/go": "0.1.9",
   "sdk/python": "0.4.43",
   "sdk/mcp": "0.0.36",
-  "sdk/openclaw": "0.1.1"
+  "sdk/openclaw": "0.1.2"
 }

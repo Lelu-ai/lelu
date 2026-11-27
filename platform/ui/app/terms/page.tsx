@@ -84,7 +84,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="text-[16px] text-[#737373] max-w-3xl leading-relaxed">
-            These Terms of Service (&quot;Terms&quot;) govern your access to and use of Lelu&apos;s website, APIs, authorization engine, human-in-the-loop review system, software development kits (SDKs), and managed platform services. Lelu (&quot;Lelu,&quot; &quot;we,&quot; or &quot;us&quot;) is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu.
+            These Terms of Service (&quot;Terms&quot;) govern your access to and use of Lelu&apos;s website, APIs, authorization engine, human-in-the-loop review system, software development kits (SDKs), and managed platform services. Lelu (&quot;Lelu,&quot; &quot;we,&quot; or &quot;us&quot;) is operated by Lelu-ai, a business owned by Abenezer Getachew Birhane, based in Addis Ababa, Ethiopia.
           </p>
         </div>
 
@@ -364,7 +364,7 @@ export default function TermsPage() {
                 These Terms shall be governed by and construed in accordance with the laws of the Federal Democratic Republic of Ethiopia, without regard to its conflict of law principles. The courts of Addis Ababa, Ethiopia, have jurisdiction over any dispute arising from these Terms. Nothing in this section removes any mandatory consumer protection that the law of your country of residence gives you.
               </p>
               <p>
-                Lelu is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu. Questions about these Terms: <a href="mailto:legal@lelu-ai.com" className="text-[#0A0A0A] dark:text-white font-semibold underline">legal@lelu-ai.com</a>.
+                Lelu is operated by Lelu-ai, a business owned by Abenezer Getachew Birhane, based in Addis Ababa, Ethiopia. Questions about these Terms: <a href="mailto:legal@lelu-ai.com" className="text-[#0A0A0A] dark:text-white font-semibold underline">legal@lelu-ai.com</a>.
               </p>
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
                 <a

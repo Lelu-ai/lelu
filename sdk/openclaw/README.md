@@ -26,7 +26,7 @@ Your agent runs shell commands and edits files on your machine. One bad step, fr
 openclaw plugins install npm:lelu-openclaw
 ```
 
-OpenClaw shows what the plugin can do (one hook that checks tool calls) and asks you to confirm. The plugin is on as soon as it's installed, including in a Gateway that's already running. Check that it loaded:
+OpenClaw warns that the package comes from npm rather than ClawHub and asks you to confirm. In a script, where there's no one to answer, add `--force`. The plugin is on as soon as it's installed, including in a Gateway that's already running. Check that it loaded:
 
 ```bash
 openclaw plugins inspect lelu --runtime

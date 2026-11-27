@@ -1,29 +1,48 @@
-# Lelu for OpenClaw
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Lelu-ai/lelu/main/sdk/openclaw/assets/icon.png" width="96" alt="Lelu">
+</p>
 
-Stops your OpenClaw agent from doing something you can't undo.
+<h1 align="center">Lelu for OpenClaw</h1>
 
-`lelu-openclaw` checks every tool call before it runs:
+<p align="center">
+  <b>Stops your OpenClaw agent from doing something you can't undo.</b><br>
+  One install. No account, no API key, no network calls.
+</p>
 
-- **Blocks** calls that are almost never what you meant, like `rm -rf ~`, formatting a disk, or a fork bomb.
-- **Asks you first** before risky ones, like `sudo`, `git push --force`, dropping a database table, sending email, publishing a package, piping a downloaded script into `bash`, or editing `~/.ssh`. OpenClaw pauses the run and you approve or deny it in chat (or with `/approve`).
-- **Lets everything else through** with no delay and no prompts.
+<p align="center">
+  <a href="https://www.npmjs.com/package/lelu-openclaw"><img src="https://img.shields.io/npm/v/lelu-openclaw?color=7c3aed" alt="npm version"></a>
+  <a href="https://github.com/Lelu-ai/lelu/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
 
-It runs entirely inside OpenClaw. It needs no account and no extra download, and it makes no network calls.
+Your agent runs shell commands and edits files on your machine. One bad step, from a confused model or a prompt-injected web page, can wipe a folder, force-push over your work, or send your SSH key somewhere. Lelu checks every tool call before it runs:
+
+- 🛑 **Blocks** calls that are almost never what you meant: `rm -rf ~`, formatting a disk, a fork bomb.
+- ✋ **Asks you first** before risky ones: `sudo`, `git push --force`, `DROP TABLE`, sending email, `npm publish`, `curl … | bash`, editing `~/.ssh`. OpenClaw pauses the run and you approve or deny it in chat.
+- ✅ **Lets everything else through**, with no delay and no prompts.
 
 ## Install
 
 ```bash
-openclaw plugins install lelu-openclaw
-openclaw plugins enable lelu
+openclaw plugins install npm:lelu-openclaw
 ```
 
-Check it loaded:
+OpenClaw shows what the plugin can do (one hook that checks tool calls) and asks you to confirm. The plugin is on as soon as it's installed, including in a Gateway that's already running. Check that it loaded:
 
 ```bash
-openclaw plugins inspect lelu --runtime --json
+openclaw plugins inspect lelu --runtime
 ```
 
-Then ask your agent to run `sudo ls`. OpenClaw should ask you to approve it first.
+## Try it
+
+Ask your agent to run `sudo ls`. OpenClaw pauses and asks you:
+
+> **Lelu: Runs a command as administrator (sudo)**
+> exec: sudo ls
+> Rule lelu.sudo. Approve only if you expected the agent to do this.
+
+Now ask it to run `rm -rf ~`. It never runs, and the agent is told why:
+
+> Blocked by Lelu (lelu.rm-home-or-root): Recursively deletes the whole disk or home folder. To allow it, add "lelu.rm-home-or-root" to disableRules in the lelu plugin config.
 
 ## What it checks
 
@@ -48,7 +67,7 @@ Then ask your agent to run `sudo ls`. OpenClaw should ask you to approve it firs
 | `lelu.plugin-changes` | Asks you | The agent installing or removing plugins |
 | `lelu.gateway-changes` | Asks you | The agent changing or restarting the Gateway |
 
-The command checks cover `exec`, `process`, `terminal` and `code_execution`. The file checks cover `write`, `edit` and `apply_patch`.
+The command checks cover `exec`, `process`, `terminal`, `code_execution`, `bash`, `shell` and `gateway_process`. The file checks cover `write`, `edit` and `apply_patch`.
 
 ## Configure
 

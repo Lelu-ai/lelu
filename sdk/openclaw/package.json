@@ -36,6 +36,7 @@
   "files": [
     "dist",
     "openclaw.plugin.json",
+    "assets",
     "README.md",
     "LICENSE"
   ],

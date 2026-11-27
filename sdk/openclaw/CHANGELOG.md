@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.3](https://github.com/Lelu-ai/lelu/compare/lelu-openclaw-v0.1.2...lelu-openclaw-v0.1.3) (2026-11-27)
+
+
+### Bug Fixes
+
+* **openclaw:** use the current Lelu logo for the plugin icon ([d504276](https://github.com/Lelu-ai/lelu/commit/d50427609d7206a566b4d06cfdd040ac6ef99960))
+* **openclaw:** use the current Lelu logo for the plugin icon ([b1444c3](https://github.com/Lelu-ai/lelu/commit/b1444c3cec4d874b7edbeece8ae1def44a640e3c))
+
+
+### Documentation
+
+* **openclaw:** install from ClawHub now that the plugin is listed there ([bbd1e24](https://github.com/Lelu-ai/lelu/commit/bbd1e249b41a5862dbefec898103caaf9b45e126))
+* **openclaw:** install from ClawHub now that the plugin is listed there ([039d3fc](https://github.com/Lelu-ai/lelu/commit/039d3fcc0282d61c78b558789616fdde663bcd91))
+
 ## [0.1.2](https://github.com/Lelu-ai/lelu/compare/lelu-openclaw-v0.1.1...lelu-openclaw-v0.1.2) (2026-11-27)
 
 

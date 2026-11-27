@@ -173,7 +173,15 @@
       "SlashCommand",
       "ToolSearch",
       "ListMcpResourcesTool",
-      "ReadMcpResourceTool"
+      "ReadMcpResourceTool",
+      "TaskCreate",
+      "TaskGet",
+      "TaskList",
+      "TaskUpdate",
+      "SendMessage",
+      "ListAgents",
+      "CronList",
+      "LSP"
     ],
     "web_fetch_allowed_hosts": [
       "github.com",

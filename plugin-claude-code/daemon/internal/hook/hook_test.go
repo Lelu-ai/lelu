@@ -1,4 +1,4 @@
-package main
+package hook
 
 import (
 	"encoding/json"
@@ -144,7 +144,7 @@ func TestAskDaemon_SpawnsAndRecoversWhenDaemonIsDown(t *testing.T) {
 	}
 
 	daemonBin := filepath.Join(binDir, "lelu-daemon")
-	build := exec.Command("go", "build", "-o", daemonBin, "../lelu-daemon")
+	build := exec.Command("go", "build", "-o", daemonBin, "../../cmd/lelu-daemon")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("building lelu-daemon fixture: %v\n%s", err, out)
 	}

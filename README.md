@@ -117,7 +117,7 @@ The MCP server above gives your agent a tool it can *choose* to call. The Claude
 /plugin install lelu@lelu
 ```
 
-On first use the plugin downloads its two Go binaries for your platform from this repo's GitHub release and checks them against the release checksums; [what it downloads and why](plugin-claude-code/README.md#what-the-plugin-downloads).
+On first use the plugin downloads its 1.5 MB checker for your platform in the background from this repo's GitHub release and checks it against the release checksums; [what it downloads and why](plugin-claude-code/README.md#what-the-plugin-downloads).
 
 Expansion-aware — `rm -rf ~/`, `rm -rf $HOME`, and reversed/separated/long-form flag variants are all caught, where a regex on the raw command text [catches 7/10 and false-positives on 4/4 benign commands](plugin-claude-code/benchmarks/report.md) — plus retry-storm detection and a session budget for runaway unattended sessions. **Shadow mode by default**, nothing blocks until you ask it to. Full docs → [plugin-claude-code](plugin-claude-code)
 

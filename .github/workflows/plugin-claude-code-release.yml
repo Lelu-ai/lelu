@@ -58,6 +58,10 @@ jobs:
           mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o "dist/lelu-daemon-${GOOS}-${GOARCH}" ./cmd/lelu-daemon
           go build -trimpath -ldflags "-s -w" -o "dist/lelu-hook-${GOOS}-${GOARCH}" ./cmd/lelu-hook
+          # hook and daemon in one binary, gzipped: what the plugin downloads
+          # (about 1.5 MB). The separate binaries above are for install.sh.
+          go build -trimpath -ldflags "-s -w" -o "dist/lelu-${GOOS}-${GOARCH}" ./cmd/lelu
+          gzip -9 -n "dist/lelu-${GOOS}-${GOARCH}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -83,7 +87,7 @@ jobs:
 
       - name: Checksums
         working-directory: binaries
-        run: sha256sum lelu-daemon-* lelu-hook-* > SHA256SUMS.txt
+        run: sha256sum lelu-daemon-* lelu-hook-* lelu-linux-* lelu-darwin-* > SHA256SUMS.txt
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v2
@@ -91,6 +95,8 @@ jobs:
           subject-path: |
             binaries/lelu-daemon-*
             binaries/lelu-hook-*
+            binaries/lelu-linux-*
+            binaries/lelu-darwin-*
 
       - uses: softprops/action-gh-release@v2
         with:

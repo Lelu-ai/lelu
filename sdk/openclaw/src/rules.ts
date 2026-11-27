@@ -40,7 +40,9 @@ export interface Match {
 }
 
 // Tools that run commands or code, and the parameters that carry them.
-const RUNTIME_TOOLS = ["exec", "process", "terminal", "code_execution"];
+// `bash` and `shell` are the names some agent harnesses give their shell tool;
+// `gateway_process` is OpenClaw's background shell.
+const RUNTIME_TOOLS = ["exec", "process", "terminal", "code_execution", "bash", "shell", "gateway_process"];
 const COMMAND_PARAMS = ["command", "cmd", "code", "script", "input", "data", "keys", "text"];
 // Tools that change files, and the parameters that name them.
 const FILE_WRITE_TOOLS = ["write", "edit", "apply_patch"];

@@ -105,6 +105,12 @@ describe("paused for approval", () => {
       "lelu.rm-home-or-root",
     );
   });
+
+  it.each(["bash", "shell", "gateway_process"])("checks the %s shell tool too", (toolName) => {
+    expect(ruleFor({ toolName, params: { command: "rm -rf ~" } })).toBe("lelu.rm-home-or-root");
+    expect(verdictFor({ toolName, params: { command: "sudo ls" } })).toBe("review");
+    expect(verdictFor({ toolName, params: { command: "ls -la" } })).toBe("allow");
+  });
 });
 
 describe("left alone (ordinary work)", () => {

@@ -3,30 +3,197 @@
 from __future__ import annotations
 
 from datetime import datetime
+import math
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 
 # ─── Requests ─────────────────────────────────────────────────────────────────
 
+# "anthropic" is deliberately excluded: Anthropic's API exposes no token-level
+# log-probs or probabilities on any model, and the engine rejects it too
+# (engine/internal/confidence/extract.go).
+ConfidenceProvider = Literal["openai", "bedrock", "local"]
+
+
+def _ensure_finite_float(value: float, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{field_name} must be a finite number")
+    return float(value)
+
+
+class ConfidenceSignal(BaseModel):
+    """Raw token-level or entropy confidence data from an LLM provider response.
+
+    Mirrors ``ConfidenceSignalSchema`` in the TypeScript SDK and
+    ``confidence.Signal`` in ``engine/internal/confidence/extract.go``. The
+    engine extracts the score from these fields directly so callers work
+    against strict engines where self-reported ``confidence`` is disabled.
+    """
+
+    model_config = ConfigDict(frozen=True, populate_by_name=True, extra="forbid")
+
+    provider: ConfidenceProvider
+    token_logprobs: list[float] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("token_logprobs", "tokenLogProbs"),
+        description="Token log-probs (OpenAI or Bedrock log-prob model families).",
+    )
+    token_probabilities: list[float] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("token_probabilities", "tokenProbabilities"),
+        description="Token probabilities in [0, 1] (Bedrock or local models).",
+    )
+    entropy: float | None = Field(
+        default=None,
+        description="Output-distribution entropy >= 0 (local models).",
+    )
+    entropy_max: float | None = Field(
+        default=None,
+        validation_alias=AliasChoices("entropy_max", "entropyMax"),
+        description="Max entropy > 0 used to normalise entropy (local models).",
+    )
+
+    @field_validator("token_logprobs")
+    @classmethod
+    def _validate_token_logprobs(cls, v: list[float] | None) -> list[float] | None:
+        if v is None:
+            return None
+        if not v:
+            raise ValueError("token_logprobs cannot be empty")
+        return [_ensure_finite_float(item, "token_logprobs") for item in v]
+
+    @field_validator("token_probabilities")
+    @classmethod
+    def _validate_token_probabilities(cls, v: list[float] | None) -> list[float] | None:
+        if v is None:
+            return None
+        if not v:
+            raise ValueError("token_probabilities cannot be empty")
+        out: list[float] = []
+        for item in v:
+            fv = _ensure_finite_float(item, "token_probabilities")
+            if not 0.0 <= fv <= 1.0:
+                raise ValueError("token_probabilities must be in [0, 1]")
+            out.append(fv)
+        return out
+
+    @field_validator("entropy")
+    @classmethod
+    def _validate_entropy(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        fv = _ensure_finite_float(v, "entropy")
+        if fv < 0.0:
+            raise ValueError("entropy must be >= 0")
+        return fv
+
+    @field_validator("entropy_max")
+    @classmethod
+    def _validate_entropy_max(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        fv = _ensure_finite_float(v, "entropy_max")
+        if fv <= 0.0:
+            raise ValueError("entropy_max must be > 0")
+        return fv
+
+    @model_validator(mode="after")
+    def _validate_provider_fields(self) -> "ConfidenceSignal":
+        if self.provider == "openai":
+            if not self.token_logprobs:
+                raise ValueError("provider 'openai' requires token_logprobs")
+        elif self.provider == "bedrock":
+            if not self.token_logprobs and not self.token_probabilities:
+                raise ValueError(
+                    "provider 'bedrock' requires token_logprobs or token_probabilities"
+                )
+        elif self.provider == "local":
+            if not self.token_probabilities and self.entropy is None:
+                raise ValueError(
+                    "provider 'local' requires token_probabilities or entropy"
+                )
+        return self
+
+    def to_wire_dict(self) -> dict[str, Any]:
+        """Serialize into the engine's snake_case ``confidence_signal`` JSON shape."""
+        payload: dict[str, Any] = {"provider": self.provider}
+        if self.token_logprobs is not None:
+            payload["token_logprobs"] = list(self.token_logprobs)
+        if self.token_probabilities is not None:
+            payload["token_probabilities"] = list(self.token_probabilities)
+        if self.entropy is not None:
+            payload["entropy"] = self.entropy
+        if self.entropy_max is not None:
+            payload["entropy_max"] = self.entropy_max
+        return payload
+
+    @model_serializer
+    def _serialize_model(self) -> dict[str, Any]:
+        return self.to_wire_dict()
+
+    def extract_score(self) -> float:
+        """Compute the confidence score in [0, 1] matching ``confidence/extract.go``."""
+        if self.provider == "openai":
+            assert self.token_logprobs is not None
+            return _score_from_logprobs(self.token_logprobs)
+        if self.provider == "bedrock":
+            if self.token_logprobs:
+                return _score_from_logprobs(self.token_logprobs)
+            assert self.token_probabilities is not None
+            return sum(self.token_probabilities) / len(self.token_probabilities)
+        if self.token_probabilities:
+            return sum(self.token_probabilities) / len(self.token_probabilities)
+        assert self.entropy is not None
+        max_entropy = (
+            self.entropy_max if self.entropy_max is not None and self.entropy_max > 0 else 1.0
+        )
+        return max(0.0, min(1.0, 1.0 - (self.entropy / max_entropy)))
+
+
+def _score_from_logprobs(values: list[float]) -> float:
+    total = sum(max(0.0, min(1.0, math.exp(lp))) for lp in values)
+    return total / len(values)
+
 
 class AgentContext(BaseModel):
-    """LLM agent context, including an optional confidence score.
+    """LLM agent context, including an optional provider ``confidence_signal``.
 
     Defined above ``AuthorizeRequest`` so the forward reference in
     ``AuthorizeRequest.context`` resolves cleanly under
     ``from __future__ import annotations``.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
+    confidence_signal: ConfidenceSignal | None = Field(
+        default=None,
+        validation_alias=AliasChoices("confidence_signal", "signal"),
+        description=(
+            "Confidence signal derived from your LLM provider's response via "
+            "LeluClient.signal_from. Preferred over confidence: the engine "
+            "extracts the score from the raw token/entropy data itself, so it "
+            "works when CONFIDENCE_ALLOW_UNVERIFIED is false."
+        ),
+    )
     confidence: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
         description=(
-            "LLM confidence score (0–1). Omit to let the engine apply its "
-            "MissingSignalMode policy (default: deny) — never pass a hardcoded "
-            "default; derive it from your provider's response."
+            "Self-reported confidence score (0–1). Dev-mode only: honored when "
+            "the engine runs with CONFIDENCE_ALLOW_UNVERIFIED=true; strict "
+            "engines ignore it. Prefer confidence_signal. Omit both to let the "
+            "engine apply its MissingSignalMode policy (default: deny)."
         ),
     )
     acting_for: str | None = Field(default=None, description="User the agent acts on behalf of")
@@ -35,7 +202,7 @@ class AgentContext(BaseModel):
     @field_validator("confidence")
     @classmethod
     def validate_confidence(cls, v: float | None) -> float | None:
-        if v is not None and not 0.0 <= v <= 1.0:
+        if v is not None and (not math.isfinite(v) or not 0.0 <= v <= 1.0):
             raise ValueError(f"confidence must be between 0 and 1, got {v}")
         return v
 
@@ -302,6 +469,8 @@ class PolicyUpdateResult(BaseModel):
 class SimulatorTraceItem(BaseModel):
     """One historical trace replayed against a proposed policy."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str | None = None
     kind: Literal["human", "agent"]
     tenant_id: str
@@ -312,6 +481,10 @@ class SimulatorTraceItem(BaseModel):
     acting_for: str | None = None
     scope: str | None = None
     confidence: float | None = None
+    confidence_signal: ConfidenceSignal | None = Field(
+        default=None,
+        validation_alias=AliasChoices("confidence_signal", "signal"),
+    )
 
 
 class SimulatorDecision(BaseModel):

@@ -15,7 +15,7 @@ Quick start::
     asyncio.run(main())
 """
 
-from .client import LeluClient, LELU_CLOUD_URL
+from .client import ConfidenceFrom, LeluClient, LELU_CLOUD_URL, SignalFrom
 from .instance import LeluInstance, lelu
 from .local import LocalEngineInfo, discover_local_engine
 from .langchain import (
@@ -29,6 +29,8 @@ from .storage import LocalStorage
 from .models import (
     # Primary request type
     AuthorizeRequest,
+    ConfidenceProvider,
+    ConfidenceSignal,
     # Legacy request types (backward compat)
     AuthRequest,
     AgentAuthRequest,
@@ -106,6 +108,8 @@ except ImportError:
 __all__ = [
     "LeluClient",
     "LELU_CLOUD_URL",
+    "SignalFrom",
+    "ConfidenceFrom",
     # Shared-instance factory + zero-config local discovery
     "lelu",
     "LeluInstance",
@@ -120,6 +124,8 @@ __all__ = [
     "create_secured_tool",
     # Primary request
     "AuthorizeRequest",
+    "ConfidenceProvider",
+    "ConfidenceSignal",
     # Legacy requests
     "AuthRequest",
     "AgentAuthRequest",

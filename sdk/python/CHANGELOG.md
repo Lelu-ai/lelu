@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+* **Send `confidence_signal` and add `LeluClient.signal_from` builders** (#121): `AgentContext` and `SimulatorTraceItem` now accept `confidence_signal: ConfidenceSignal | None` (with `signal=` accepted as a validation alias for TypeScript parity), serialized onto `confidence_signal` for both `POST /v1/agent/authorize` and `POST /v1/queue/{id}/redeem` so approval payload fingerprints stay identical against engines in default strict mode (`CONFIDENCE_ALLOW_UNVERIFIED=false`). Added `LeluClient.signal_from` (`.openai`, `.bedrock`, `.local`, `.anthropic`) mirroring the TypeScript SDK, and marked `LeluClient.confidence_from` as deprecated in favor of `signal_from`.
+
 ### Fixes
 
 * **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.

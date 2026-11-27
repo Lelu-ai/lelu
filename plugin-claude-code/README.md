@@ -56,7 +56,7 @@ The hook runs before every tool call, not a fixed list:
 | Tool | Rule |
 |---|---|
 | `Bash` | Expansion-aware command analysis (above) |
-| `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | Denied on a protected path |
+| `Edit`, `Write`, `MultiEdit`, `NotebookEdit` | Denied on a protected path; asks on Lelu's own files and Claude Code's settings ([below](#lelu-protects-its-own-files)) |
 | `Read` | Asks before reading a credential, key or env file (`sensitive_paths`) |
 | `WebFetch` | Asks unless the host, or a parent domain of it, is in `tools.web_fetch_allowed_hosts` |
 | Tools in `tools.allow` | No check of their own: tools that only read or plan, and `Task`/`Agent`, whose sub-agents' tool calls come through this hook too |
@@ -78,7 +78,17 @@ If the daemon can't be reached, the binaries couldn't be downloaded, or the hook
 
 Set `LELU_FAIL_CLOSED=1` to always ask, or `LELU_FAIL_CLOSED=0` to never ask, whatever the mode.
 
-At the start of each session the plugin also checks that its own `hooks.json`, `lelu-hook.sh` and `policies/defaults.json` are unchanged since this version first ran, and warns you if they were edited. It's a tripwire, not a lock: protecting the plugin's files from the agent is [#118](https://github.com/lelu-ai/lelu/issues/118).
+## Lelu protects its own files
+
+An agent could try to switch Lelu off instead of getting past it: writing `shadow` to the mode file, editing `policy.local.json`, deleting the downloaded binaries, or changing Claude Code's settings to disable the plugin or its hooks. So any change to these, through `Edit`, `Write`, `MultiEdit`, `NotebookEdit` or a shell command, is routed to `ask`:
+
+- Lelu's data directory (`~/.lelu/`, or wherever `LELU_DATA_DIR` points)
+- Claude Code's plugin folder (`~/.claude/plugins/`)
+- Claude Code's settings files (`.claude/settings.json` and `.claude/settings.local.json`, in your home directory or a project)
+
+Reading them is not affected, so `/lelu:lelu-status` and `cat` or `tail` of the ledger work as before. `/lelu:lelu-enforce`, `/lelu:lelu-shadow` and `/lelu` still work, but in enforce mode you approve the change yourself. The list is `guarded_paths` in `policies/defaults.json`.
+
+At the start of each session the plugin also checks that its own `hooks.json`, `lelu-hook.sh` and `policies/defaults.json` are unchanged since this version first ran, and warns you if they were edited, which catches a change made outside Claude Code.
 
 ## Commands
 

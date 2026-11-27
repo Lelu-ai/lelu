@@ -68,6 +68,11 @@ type PolicySet struct {
 	// command naming one as an argument or redirect target — reading,
 	// copying, appending — is routed to human review.
 	SensitivePaths   []protectedPathRule `json:"sensitive_paths,omitempty"`
+	// GuardedPaths are Lelu's own files and Claude Code's plugin and
+	// settings files. Changing one can switch Lelu off or loosen it, so a
+	// change through a file tool or a shell command is routed to human
+	// review. Reading them is not.
+	GuardedPaths []protectedPathRule `json:"guarded_paths,omitempty"`
 	RemoteScriptPipe remoteScriptRule    `json:"remote_script_pipe"`
 	// Tools covers every tool other than Bash, the file-editing tools and
 	// MCP tools: which need no check of their own, and where WebFetch may go.
@@ -87,6 +92,57 @@ func LoadPolicySet(path string) (*PolicySet, error) {
 		return nil, err
 	}
 	return &ps, nil
+}
+
+// GuardPath adds dir to the guarded paths. The daemon calls it with its data
+// directory, so a LELU_DATA_DIR outside ~/.lelu is guarded too.
+func (ps *PolicySet) GuardPath(dir string) {
+	if dir == "" {
+		return
+	}
+	ps.GuardedPaths = append(ps.GuardedPaths, protectedPathRule{Contains: dir})
+}
+
+// PathIsGuarded reports whether path matches a guarded-path rule.
+func (ps *PolicySet) PathIsGuarded(path, home string) bool {
+	for _, rule := range ps.GuardedPaths {
+		if rule.matches(path, home) {
+			return true
+		}
+	}
+	return false
+}
+
+// readOnlyCommands only read the paths they are given. Naming a guarded
+// path in one of them is not a change, so /lelu:lelu-status and a plain
+// `cat` of the ledger stay quiet. Anything not listed (rm, mv, cp, sed,
+// tee, chmod, find, an editor, a script) counts as a possible change.
+var readOnlyCommands = map[string]bool{
+	"cat": true, "head": true, "tail": true, "less": true, "more": true,
+	"grep": true, "egrep": true, "fgrep": true, "rg": true, "ls": true,
+	"wc": true, "jq": true, "stat": true, "file": true, "diff": true,
+	"cmp": true, "sha256sum": true, "shasum": true, "md5sum": true,
+	"realpath": true, "readlink": true, "du": true, "tree": true,
+}
+
+// guardedPathIn reports a guarded path this call may change: any redirect
+// to one, or one named as an argument of a command that is not read-only.
+func (ps *PolicySet) guardedPathIn(call CommandCall, home string) (string, bool) {
+	for _, p := range call.RedirectPaths {
+		if ps.PathIsGuarded(p, home) {
+			return p, true
+		}
+	}
+	name, _ := effectiveCommand(call)
+	if readOnlyCommands[baseName(name)] {
+		return "", false
+	}
+	for _, p := range call.ResolvedPaths {
+		if ps.PathIsGuarded(p, home) {
+			return p, true
+		}
+	}
+	return "", false
 }
 
 // ToolPolicy says how tools without a rule of their own are handled. Any
@@ -116,6 +172,7 @@ func (ps *PolicySet) Merge(other *PolicySet) {
 	ps.DestructiveCommands = append(ps.DestructiveCommands, other.DestructiveCommands...)
 	ps.ProtectedPaths = append(ps.ProtectedPaths, other.ProtectedPaths...)
 	ps.SensitivePaths = append(ps.SensitivePaths, other.SensitivePaths...)
+	ps.GuardedPaths = append(ps.GuardedPaths, other.GuardedPaths...)
 	ps.Tools.Allow = append(ps.Tools.Allow, other.Tools.Allow...)
 	ps.Tools.WebFetchAllowedHosts = append(ps.Tools.WebFetchAllowedHosts, other.Tools.WebFetchAllowedHosts...)
 }
@@ -163,6 +220,10 @@ func (ps *PolicySet) Evaluate(a Analysis, home string) Decision {
 	for _, call := range a.Calls {
 		if d, matched := ps.evaluateCall(call, home); matched {
 			consider(d)
+		}
+		if p, ok := ps.guardedPathIn(call, home); ok {
+			consider(Decision{Outcome: OutcomeAsk, Rule: "self-protection",
+				Reason: "this command may change Lelu's own files or Claude Code's plugin or settings files (" + p + "), which could switch Lelu off — routed to human review"})
 		}
 		if p, ok := ps.sensitivePathIn(call, home); ok {
 			consider(Decision{Outcome: OutcomeAsk, Rule: "sensitive-path",

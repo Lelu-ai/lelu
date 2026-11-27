@@ -34,6 +34,11 @@ func main() {
 		log.Fatalf("lelu-daemon: loading policy set from %s: %v", policyPath, err)
 	}
 	loadLocalRules(policy, filepath.Join(dataDir, daemon.LocalPolicyFile))
+	// Guard the data directory wherever it is: the default ~/.lelu is in the
+	// default policy, but LELU_DATA_DIR can point anywhere.
+	if abs, err := filepath.Abs(dataDir); err == nil {
+		policy.GuardPath(abs)
+	}
 
 	ledger, err := daemon.OpenLedger(filepath.Join(dataDir, "ledger.jsonl"))
 	if err != nil {

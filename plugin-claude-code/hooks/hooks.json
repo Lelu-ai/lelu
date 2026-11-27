@@ -6,7 +6,7 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\" install",
-            "timeout": 300
+            "timeout": 600
           }
         ]
       }

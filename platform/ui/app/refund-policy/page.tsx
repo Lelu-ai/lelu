@@ -36,7 +36,7 @@ export default function RefundPolicyPage() {
           </h1>
           <p className="text-[16px] text-[#737373] leading-relaxed">
             This policy covers the paid plans of Lelu&apos;s hosted cloud (Starter, Growth and their usage charges).
-            The open-source engine, SDKs and MCP server are free and are not sold. Lelu is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu.
+            The open-source engine, SDKs and MCP server are free and are not sold. Lelu is operated by Lelu-ai, a business owned by Abenezer Getachew Birhane, based in Addis Ababa, Ethiopia.
           </p>
         </div>
 

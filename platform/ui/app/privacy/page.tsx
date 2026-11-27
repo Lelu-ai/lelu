@@ -80,7 +80,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="text-[16px] text-[#737373] max-w-3xl leading-relaxed">
-            Lelu (&quot;we&quot; or &quot;us&quot;) is operated by Abenezer Getachew Birhane, an individual sole proprietor based in Addis Ababa, Ethiopia, trading as Lelu. At Lelu, security and data privacy are foundational to everything we build. This Privacy Policy details how we collect, safeguard, process, and handle information when you interact with our AI agent authorization engine, dashboard, APIs, and SDKs.
+            Lelu (&quot;we&quot; or &quot;us&quot;) is operated by Lelu-ai, a business owned by Abenezer Getachew Birhane, based in Addis Ababa, Ethiopia. At Lelu, security and data privacy are foundational to everything we build. This Privacy Policy details how we collect, safeguard, process, and handle information when you interact with our AI agent authorization engine, dashboard, APIs, and SDKs.
           </p>
         </div>
 

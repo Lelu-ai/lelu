@@ -37,7 +37,7 @@ const TEAM = [
 ];
 
 const OVERVIEW = [
-  { label: "Company", value: "Lelu, a sole proprietorship in Addis Ababa, Ethiopia" },
+  { label: "Company", value: "Lelu-ai, owned by Abenezer Getachew Birhane, Addis Ababa, Ethiopia" },
   { label: "Founded", value: "2026" },
   { label: "Founder", value: "Abenezer Getachew" },
   { label: "Team", value: "3 members" },

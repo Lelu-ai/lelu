@@ -119,6 +119,9 @@ func (e *Engine) decideTier1(req Request) Response {
 		if e.Policy.pathIsProtectedContains(req.FilePath) {
 			return Response{Outcome: OutcomeDeny, Reason: "target path matches a protected-path rule", Rule: "protected-path"}
 		}
+		if e.Policy.PathIsGuarded(req.FilePath, e.effectiveHome(req)) {
+			return Response{Outcome: OutcomeAsk, Reason: "this edit changes Lelu's own files or Claude Code's plugin or settings files, which could switch Lelu off; routing to human review", Rule: "self-protection"}
+		}
 		return Response{Outcome: OutcomeAllow}
 
 	case "Read":

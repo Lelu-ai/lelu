@@ -1,13 +1,13 @@
 {
   "name": "lelu",
-  "owner": { "name": "Lelu", "email": "abenezergetachew1990@gmail.com" },
+  "owner": { "name": "Lelu", "email": "abenezer.getachew@lelu-ai.com" },
   "description": "Lelu — runtime authorization for Claude Code",
   "plugins": [
     {
       "name": "lelu",
       "source": "./plugin-claude-code",
       "description": "Expansion-aware policy checks before every tool call. Shadow mode by default.",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "author": { "name": "Lelu" },
       "homepage": "https://lelu-ai.com",
       "license": "MIT",

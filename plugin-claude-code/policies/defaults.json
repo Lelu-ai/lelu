@@ -118,6 +118,17 @@
       ]
     }
   ],
+  "guarded_paths": [
+    {
+      "contains": ".lelu/"
+    },
+    {
+      "contains": ".claude/plugins/"
+    },
+    {
+      "contains": ".claude/settings"
+    }
+  ],
   "remote_script_pipe": {
     "enabled": true,
     "downloaders": [

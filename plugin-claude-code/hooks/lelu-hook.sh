@@ -36,7 +36,7 @@
 
 set -u
 
-LELU_PLUGIN_VERSION="0.2.0"
+LELU_PLUGIN_VERSION="0.2.1"
 REPO="Lelu-ai/lelu"
 
 mode="${1:-hook}"
@@ -71,9 +71,12 @@ warn() {
 
 fetch() { # fetch URL FILE
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 10 --max-time 90 -o "$2" "$1"
+    # No overall time limit, so a slow link still finishes; give up only if
+    # the transfer stalls below 1 KB/s for a minute.
+    curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 15 \
+      --speed-limit 1024 --speed-time 60 --retry 2 -o "$2" "$1"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q --https-only --timeout=20 -O "$2" "$1"
+    wget -q --https-only --timeout=60 --tries=3 -O "$2" "$1"
   else
     return 1
   fi
@@ -87,6 +90,35 @@ sha256_of() { # sha256_of FILE
   else
     return 1
   fi
+}
+
+# The download lock is a directory holding the PID of the process that is
+# downloading. take_lock creates it; lock_owner_alive tells whether that
+# process still exists; clear_lock removes it.
+take_lock() {
+  mkdir "$lock" 2>/dev/null && echo "$$" >"$lock/pid"
+}
+
+lock_owner_alive() {
+  [ -d "$lock" ] || return 1
+  pid=$(cat "$lock/pid" 2>/dev/null)
+  if [ -z "$pid" ]; then
+    # The owner may not have written its PID yet; give it a minute.
+    [ -z "$(find "$lock" -maxdepth 0 -mmin +1 2>/dev/null)" ]
+    return
+  fi
+  kill -0 "$pid" 2>/dev/null
+}
+
+clear_lock() {
+  rm -f "$lock/pid"
+  rmdir "$lock" 2>/dev/null
+}
+
+# remove_tmp deletes this download's temporary directory and its files.
+remove_tmp() {
+  rm -f "$1/SHA256SUMS.txt" "$1/lelu-daemon" "$1/lelu-hook"
+  rmdir "$1" 2>/dev/null
 }
 
 install_release() {
@@ -111,22 +143,36 @@ install_release() {
   fi
 
   # One download at a time: SessionStart and the first tool call can overlap.
-  # A lock older than 10 minutes was left by a process that died.
+  # A lock whose process is gone (for example, one stopped by the hook
+  # timeout) is cleared at once. One older than 30 minutes is cleared anyway,
+  # in case its PID was reused.
   lock="$data_dir/bin/.download-$LELU_PLUGIN_VERSION.lock"
-  if [ -d "$lock" ] && [ -n "$(find "$lock" -maxdepth 0 -mmin +10 2>/dev/null)" ]; then
-    rmdir "$lock" 2>/dev/null
+  if [ -d "$lock" ] && { ! lock_owner_alive || [ -n "$(find "$lock" -maxdepth 0 -mmin +30 2>/dev/null)" ]; }; then
+    clear_lock
   fi
-  if ! mkdir "$lock" 2>/dev/null; then
+  if ! take_lock; then
+    # Another process is downloading: wait up to 90 seconds for it, and take
+    # over if it dies.
     i=0
-    while [ "$i" -lt 90 ] && [ -d "$lock" ]; do
+    while [ "$i" -lt 90 ]; do
+      [ -x "$bin_dir/lelu-hook" ] && [ -x "$bin_dir/lelu-daemon" ] && return 0
+      if ! lock_owner_alive; then
+        clear_lock
+        take_lock && break
+      fi
       sleep 1
       i=$((i + 1))
     done
-    [ -x "$bin_dir/lelu-hook" ] && return 0
-    warn "Lelu is still downloading its binaries, so Lelu is not checking actions."
+    [ "$i" -lt 90 ] || warn "Lelu is still downloading its binaries, so Lelu is not checking actions."
   fi
 
-  tmp=$(mktemp -d "$data_dir/bin/.tmp.XXXXXX") || { rmdir "$lock"; warn "Lelu could not create a temporary directory, so Lelu is not checking actions."; }
+  # Holding the lock: remove what an interrupted download left behind.
+  for old in "$data_dir/bin"/.tmp.*; do
+    [ -d "$old" ] && remove_tmp "$old"
+  done
+
+  tmp=$(mktemp -d "$data_dir/bin/.tmp.XXXXXX") || { clear_lock; warn "Lelu could not create a temporary directory, so Lelu is not checking actions."; }
+  trap 'remove_tmp "$tmp"; clear_lock; exit 1' INT TERM HUP
   base="https://github.com/$REPO/releases/download/plugin-claude-code-v$LELU_PLUGIN_VERSION"
   result=ok
   if ! fetch "$base/SHA256SUMS.txt" "$tmp/SHA256SUMS.txt"; then
@@ -153,8 +199,9 @@ install_release() {
       mv "$tmp/lelu-daemon" "$bin_dir/lelu-daemon" &&
       mv "$tmp/lelu-hook" "$bin_dir/lelu-hook" || result=move
   fi
-  rm -f "$tmp/SHA256SUMS.txt" "$tmp/lelu-daemon" "$tmp/lelu-hook"
-  rmdir "$tmp" "$lock" 2>/dev/null
+  remove_tmp "$tmp"
+  clear_lock
+  trap - INT TERM HUP
 
   case "$result" in
     ok) rm -f "$failed"; return 0 ;;

@@ -1,11 +1,11 @@
 {
   "name": "lelu",
-  "description": "Runtime authorization for Claude Code — expansion-aware policy checks before every tool call. Shadow mode by default.",
-  "version": "0.2.1",
+  "description": "Guardrails for Claude Code. Catches rm -rf on your home directory, force-pushes, edits to protected files, reads of your SSH keys and .env, and attempts to switch Lelu itself off, before they run. Starts in shadow mode, so you see what it would block first. Runs locally, no account.",
+  "version": "0.3.0",
   "author": { "name": "Lelu", "email": "abenezer.getachew@lelu-ai.com" },
   "homepage": "https://lelu-ai.com",
   "repository": "https://github.com/lelu-ai/lelu",
   "license": "MIT",
-  "keywords": ["security", "authorization", "guardrails", "policy", "data-loss-prevention"],
+  "keywords": ["security", "guardrails", "safety", "hooks", "authorization", "secrets", "data-loss-prevention"],
   "network": { "hosts": ["github.com", "release-assets.githubusercontent.com"] }
 }

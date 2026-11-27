@@ -132,6 +132,9 @@ func (e *Engine) decideTier1(req Request) Response {
 
 	case "WebFetch":
 		host, ok := e.Policy.webFetchHostAllowed(req.URL)
+		if !ok && claudeAllowsWebFetch(host, req.Cwd, e.effectiveHome(req)) {
+			ok = true
+		}
 		if !ok {
 			return Response{Outcome: OutcomeAsk, Reason: fmt.Sprintf("fetching %q: host %q is not on the web-fetch allow list; routing to human review", req.URL, host), Rule: "web-fetch-host"}
 		}

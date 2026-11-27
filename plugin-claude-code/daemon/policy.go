@@ -114,7 +114,7 @@ func (ps *PolicySet) PathIsGuarded(path, home string) bool {
 }
 
 // readOnlyCommands only read the paths they are given. Naming a guarded
-// path in one of them is not a change, so /lelu:lelu-status and a plain
+// path in one of them is not a change, so /lelu:status and a plain
 // `cat` of the ledger stay quiet. Anything not listed (rm, mv, cp, sed,
 // tee, chmod, find, an editor, a script) counts as a possible change.
 var readOnlyCommands = map[string]bool{

@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\" install",
-            "timeout": 600
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\" session",
+            "timeout": 30
           }
         ]
       }
@@ -18,7 +18,7 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\"",
-            "timeout": 300
+            "timeout": 600
           }
         ]
       }

@@ -36,7 +36,10 @@ export default function DocsDelegation() {
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 // Supervisor creates a restricted token for the sub-agent
 const token = await lelu.delegate({
@@ -58,7 +61,7 @@ const subAgent = new SubAgent({ leluToken: token.value });`}</pre>
               <span className="text-xs text-zinc-500 font-mono">sub-agent.ts</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`// Sub-agent uses the delegation token instead of the master API key
-const lelu = createClient({ apiKey: delegationToken });
+const lelu = createClient({ baseUrl: process.env.LELU_BASE_URL, apiKey: delegationToken });
 
 const decision = await lelu.authorize({ tool: "delete_record" });
 // => { decision: "deny", reason: "delete_* is blocked in this delegation scope" }`}</pre>

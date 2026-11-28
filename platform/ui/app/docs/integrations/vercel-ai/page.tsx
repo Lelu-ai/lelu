@@ -40,7 +40,10 @@ import { openai } from "@ai-sdk/openai";
 import { createClient } from "lelu-agent-auth";
 import { z } from "zod";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
@@ -81,7 +84,10 @@ export async function POST(req: Request) {
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`"use server";
 import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 export async function runAgentAction(tool: string, input: unknown) {
   const { decision, reason } = await lelu.authorize({ tool });

@@ -23,36 +23,49 @@ export default function DocsApiQueue() {
         </h1>
         <p className="text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">
           Endpoints for managing the human-in-the-loop approval queue. Use these to list pending
-          requests and submit human decisions.
+          reviews and submit human decisions. The queue is served by the Lelu engine (the one{" "}
+          <code>npx lelu-mcp start</code> runs, or your self-hosted engine); the hosted cloud does
+          not serve these routes yet.
+        </p>
+        <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mt-4">
+          Every route takes the review ID: the <code>review_id</code> an authorize response returns
+          with a <code>human_review</code> decision (<code>decision.reviewId</code> in the TypeScript
+          SDK, <code>decision.review_id</code> in Python). The request ID / <code>trace_id</code> is
+          only for tracing and is not a queue key.
         </p>
       </div>
 
       <div className="space-y-12">
         <section>
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">
-            List Pending Requests
+            List Pending Reviews
           </h2>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
               <span className="text-xs font-bold text-blue-400">GET</span>
-              <span className="text-xs text-zinc-400 font-mono">/api/v1/queue</span>
+              <span className="text-xs text-zinc-400 font-mono">/v1/queue/pending</span>
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
                 <code>{`// Response
 {
-  "requests": [
+  "items": [
     {
-      "id": "req_67890fghij",
-      "agent_id": "agent-123",
+      "id": "5b3e2c1a-8f4d-4e6b-9a7c-2d1f0e9b8a76", // the review ID
+      "actor": "agent-123",
       "action": "delete_user",
-      "resource": "user:456",
-      "confidence": 0.85,
+      "resource": { "id": "user:456" },
+      "confidence_score": 0.85,
+      "reason": "Destructive actions require human approval.",
       "status": "pending",
-      "created_at": "2023-10-27T10:00:00Z"
+      "enqueued_at": "2026-11-27T10:00:00Z"
     }
-  ]
+  ],
+  "count": 1,
+  "total": 1,
+  "offset": 0,
+  "limit": 50
 }`}</code>
               </pre>
             </div>
@@ -67,20 +80,23 @@ export default function DocsApiQueue() {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
               <span className="text-xs font-bold text-green-400">POST</span>
-              <span className="text-xs text-zinc-400 font-mono">/api/v1/queue/:id/approve</span>
+              <span className="text-xs text-zinc-400 font-mono">/v1/queue/:review_id/approve</span>
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
                 <code>{`// Request Body
 {
-  "reviewer_id": "user_789",
-  "comment": "Approved per support ticket #9921" // Optional
+  "resolved_by": "user_789",
+  "note": "Approved per support ticket #9921" // Optional
 }
+// With LELU_REVIEWER_KEYS set on the engine, also send the reviewer's key in
+// X-Lelu-Reviewer-Key; the engine then records that reviewer as resolved_by.
 
 // Response (200 OK)
 {
-  "status": "success",
-  "message": "Request approved"
+  "success": true,
+  "resolved_by": "user_789",
+  "reviewer_authenticated": false
 }`}</code>
               </pre>
             </div>
@@ -95,20 +111,21 @@ export default function DocsApiQueue() {
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5 flex items-center gap-2">
               <span className="text-xs font-bold text-green-400">POST</span>
-              <span className="text-xs text-zinc-400 font-mono">/api/v1/queue/:id/deny</span>
+              <span className="text-xs text-zinc-400 font-mono">/v1/queue/:review_id/deny</span>
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
                 <code>{`// Request Body
 {
-  "reviewer_id": "user_789",
-  "comment": "Agent misunderstood the user's intent." // Optional
+  "resolved_by": "user_789",
+  "note": "Agent misunderstood the user's intent." // Optional
 }
 
 // Response (200 OK)
 {
-  "status": "success",
-  "message": "Request denied"
+  "success": true,
+  "resolved_by": "user_789",
+  "reviewer_authenticated": false
 }`}</code>
               </pre>
             </div>

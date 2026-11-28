@@ -84,15 +84,24 @@ const lelu = createClient({
   apiKey: process.env.LELU_API_KEY,
 });
 
-// This call will block if human approval is required
-const decision = await lelu.authorize({
-  action: "delete_user",
-  confidence: 0.75,
-  waitForApproval: true // Default is true
-});
+const request = {
+  tool: "delete_user",
+  actor: "support-agent", // an agent listed in your policy's agent_scopes
+  // A verified signal from the model response, e.g.
+  // LeluClient.signalFrom.openai(completion); the hosted cloud ignores a
+  // bare confidence number.
+  context: { signal },
+};
+const decision = await lelu.authorize(request);
 
-if (decision.allowed) {
-  console.log("Action approved!");
+if (decision.decision === "allow") {
+  console.log("Action allowed");
+} else if (decision.decision === "human_review") {
+  // authorize() does not block: wait for the reviewer, then re-check this
+  // exact request against the approval (needs an engine that serves the
+  // review queue; the hosted cloud does not yet).
+  const outcome = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+  if (outcome.allowed) console.log("Action approved!");
 }`}
             </pre>
           </div>

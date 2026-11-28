@@ -223,15 +223,17 @@ const decision = await lelu.agentAuthorize({
   context: { confidence: 0.85 },
 });
 
-if (decision.allowed) {
+if (decision.decision === "allow") {
   // proceed
-} else if (decision.requiresHumanReview) {
-  // queued for human approval
+} else if (decision.decision === "compute") {
+  // run decision.safeTool with decision.safeArgs, never the original action
+} else if (decision.decision === "human_review") {
+  // queued for human approval (decision.reviewId)
 } else {
   throw new Error(\`Denied: \${decision.reason}\`);
 }`}
               </pre>
-              <CopyBtn text={`import { lelu } from "@/lib/lelu";\n\nconst decision = await lelu.agentAuthorize({\n  actor: "billing-agent",\n  action: "refund:process",\n  resource: { orderId: "ord_123" },\n  context: { confidence: 0.85 },\n});\n\nif (decision.allowed) {\n  // proceed\n} else if (decision.requiresHumanReview) {\n  // queued for human approval\n} else {\n  throw new Error(\`Denied: \${decision.reason}\`);\n}`} id="usage" />
+              <CopyBtn text={`import { lelu } from "@/lib/lelu";\n\nconst decision = await lelu.agentAuthorize({\n  actor: "billing-agent",\n  action: "refund:process",\n  resource: { orderId: "ord_123" },\n  context: { confidence: 0.85 },\n});\n\nif (decision.decision === "allow") {\n  // proceed\n} else if (decision.decision === "compute") {\n  // run decision.safeTool with decision.safeArgs, never the original action\n} else if (decision.decision === "human_review") {\n  // queued for human approval (decision.reviewId)\n} else {\n  throw new Error(\`Denied: \${decision.reason}\`);\n}`} id="usage" />
             </div>
           </div>
         </section>
@@ -318,11 +320,15 @@ if (decision.allowed) {
             </div>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
-              Or set them in the environment. The TypeScript client reads{" "}
+              Or set them in the environment. The TypeScript client reads both{" "}
               <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL</code>{" "}
-              itself, but the key still has to be passed as{" "}
-              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">apiKey: process.env.LELU_API_KEY</code>{" "}
-              (as in step 3):
+              and{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>{" "}
+              itself, so{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">createClient()</code>{" "}
+              with no arguments uses them; an{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">apiKey</code>{" "}
+              you pass takes precedence:
             </p>
 
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5 relative">

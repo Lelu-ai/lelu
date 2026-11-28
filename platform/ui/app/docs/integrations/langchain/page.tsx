@@ -41,7 +41,10 @@ pip install lelu-agent-auth-sdk langchain langchain-openai`}</pre>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { DynamicTool } from "@langchain/core/tools";
 import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 export const deleteRecord = new DynamicTool({
   name: "delete_record",
@@ -73,7 +76,7 @@ export const deleteRecord = new DynamicTool({
 from langchain.tools import BaseTool
 from lelu import LeluClient, AuthorizeRequest
 
-lelu = LeluClient(api_key=os.environ["LELU_API_KEY"])
+lelu = LeluClient(base_url=os.environ.get("LELU_BASE_URL"), api_key=os.environ["LELU_API_KEY"])
 
 class DeleteRecordTool(BaseTool):
     name: str = "delete_record"

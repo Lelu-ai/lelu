@@ -185,6 +185,20 @@ export default function DocsQuickStart() {
               <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">~/.lelu</code>, so
               there is nothing to configure:
             </p>
+            <p className="text-[15px] text-[#737373] leading-[1.65] mb-4">
+              This example targets that local engine.{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx lelu-mcp start</code>{" "}
+              runs it with{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">CONFIDENCE_ALLOW_UNVERIFIED=true</code>, so it accepts a
+              bare <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">confidence</code> number,
+              and its starter policy sends anything matching{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">*payment*</code> to
+              human review. The hosted cloud and a default self-hosted engine ignore a bare number: pass a
+              verified signal from your model&apos;s response instead, e.g.{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">context: {"{ signal: LeluClient.signalFrom.openai(completion) }"}</code>{" "}
+              with an OpenAI completion requested with{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">logprobs: true</code>.
+            </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm mb-5">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
                 <span className="text-[12px] text-[#737373] font-mono">TypeScript</span>
@@ -200,12 +214,18 @@ const auth = lelu();
 
 const request = {
   tool: "refund_payment",
+  // Accepted by the local engine (see above). For the hosted cloud or a
+  // default engine, send context: { signal } instead.
   context: { confidence: 0.85 },
 };
 const result = await auth.authorize(request);
 
 if (result.decision === "allow") {
   // proceed with the action
+} else if (result.decision === "compute") {
+  // redirected — run the safe tool with its safe args, never the original
+  if (!result.safeTool) throw new Error("Redirected without a safe tool");
+  // runTool(result.safeTool, result.safeArgs);
 } else if (result.decision === "human_review") {
   // queued — wait for a reviewer, then re-check this exact request
   // against the approval (keyed by result.reviewId, not result.requestId)
@@ -226,7 +246,12 @@ if (result.decision === "allow") {
             </p>
 
             <p className="text-[15px] text-[#737373] leading-[1.65] mb-3">
-              Or try the hosted API directly with your key:
+              Or try the hosted API directly with your key. The hosted engine ignores a bare{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">confidence</code>{" "}
+              number and only uses a verified{" "}
+              <code className="font-mono text-[13px] px-1.5 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">confidence_signal</code>,
+              built from the token log-probs of the model response that proposed the call (the values
+              below are placeholders):
             </p>
             <div className="rounded-lg overflow-hidden border border-[#E7E5E4] dark:border-[#20222B] text-sm">
               <div className="px-4 py-2 bg-[#F5F5F4] dark:bg-[#0D0E13] border-b border-[#E7E5E4] dark:border-[#20222B]">
@@ -236,7 +261,10 @@ if (result.decision === "allow") {
 {`curl -X POST ${CLOUD_URL}/api/v1/authorize \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer $LELU_API_KEY" \\
-  -d '{ "tool": "refund_payment" }'`}
+  -d '{
+    "tool": "refund_payment",
+    "confidence_signal": { "provider": "openai", "token_logprobs": [-0.02, -0.11, -0.05] }
+  }'`}
               </pre>
             </div>
           </div>

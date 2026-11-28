@@ -276,16 +276,16 @@ deny {
                 `import { createClient } from "lelu-agent-auth";
 
 export const lelu = createClient({
-  apiKey: process.env.LELU_API_KEY!,
-  apiKey: process.env.LELU_API_KEY!,
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
 });`}
               {sdkTab === "Python" &&
                 `from lelu import LeluClient
 import os
 
 lelu = LeluClient(
+    base_url=os.environ.get("LELU_BASE_URL"),  # your engine
     api_key=os.environ["LELU_API_KEY"],
-    api_key=os.environ["LELU_API_KEY"]
 )`}
             </pre>
           </div>

@@ -3,6 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import * as http from "http";
 import * as crypto from "crypto";
+import type { Readable, Writable } from "stream";
 import { z } from "zod";
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -364,10 +365,65 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
 
 // ─── Stdio runner ─────────────────────────────────────────────────────────────
 
-export async function runStdio(cfg?: LeluMcpConfig): Promise<void> {
+export interface StdioStreams {
+  /** Defaults to process.stdin. */
+  stdin?: Readable;
+  /** Defaults to process.stdout. */
+  stdout?: Writable;
+}
+
+/**
+ * Serves MCP over stdio and resolves once the client closes stdin (end of
+ * input), after closing the server.
+ *
+ * The SDK's stdio transport does not react to end of input on its own, so a
+ * client that exited or closed the pipe used to leave this process, and the
+ * local engine it spawned, running until something sent SIGTERM. Callers
+ * should shut down when this resolves; the CLI stops the engine and exits.
+ */
+export async function runStdio(cfg?: LeluMcpConfig, streams: StdioStreams = {}): Promise<void> {
+  const stdin  = streams.stdin  ?? process.stdin;
+  const stdout = streams.stdout ?? process.stdout;
+  const ended = new Promise<void>((resolve) => {
+    if (stdin.readableEnded || stdin.destroyed) return resolve();
+    stdin.once("end", resolve);
+    stdin.once("close", resolve);
+  });
+
   const server    = createLeluMcpServer(cfg);
-  const transport = new StdioServerTransport();
+  const transport = new StdioServerTransport(stdin, stdout);
   await server.connect(transport);
+
+  // Count requests still being answered, so that a client which writes its
+  // last request and then closes stdin (e.g. `echo ... | lelu-mcp`) still
+  // gets the response before shutdown.
+  let pending = 0;
+  let onIdle: (() => void) | undefined;
+  const isRequest = (m: object) => "method" in m && "id" in m;
+  const isResponse = (m: object) => "id" in m && ("result" in m || "error" in m);
+  const onmessage = transport.onmessage;
+  transport.onmessage = (message, ...rest) => {
+    if (isRequest(message)) pending++;
+    onmessage?.(message, ...rest);
+  };
+  const send = transport.send.bind(transport);
+  transport.send = async (message, ...rest) => {
+    try {
+      return await send(message, ...rest);
+    } finally {
+      if (isResponse(message) && pending > 0 && --pending === 0) onIdle?.();
+    }
+  };
+
+  await ended;
+  if (pending > 0) {
+    const graceMs = (cfg?.timeoutMs ?? 10_000) + 2_000;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, graceMs);
+      onIdle = () => { clearTimeout(timer); resolve(); };
+    });
+  }
+  await server.close();
 }
 
 // ─── HTTP/SSE runner ──────────────────────────────────────────────────────────

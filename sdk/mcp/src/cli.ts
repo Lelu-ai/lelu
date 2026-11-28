@@ -28,7 +28,7 @@
  */
 
 import { runStdio, runHttp } from "./server.js";
-import { engineIsHealthy, startLocalEngine } from "./local-engine.js";
+import { engineIsHealthy, startLocalEngine, type LocalEngine } from "./local-engine.js";
 
 // ─── Minimal arg parser ───────────────────────────────────────────────────────
 
@@ -247,9 +247,11 @@ async function main() {
 
   // Zero-config mode: no engine URL given → download (once) and run a local
   // engine with the starter policy. Everything stays on this machine.
+  let localEngine: LocalEngine | undefined;
   if (!explicitUrl && flags["no-local"] !== "true") {
     try {
       const local = await startLocalEngine({ preset: flags["preset"] });
+      localEngine = local;
       engineUrl = local.url;
       // The launcher starts the engine with a generated per-install key —
       // use it unless the user supplied their own.
@@ -284,6 +286,11 @@ async function main() {
     } else {
       console.error(`[lelu-mcp] Listening on stdio…`);
       await runStdio({ engineUrl, apiKey, timeoutMs });
+      // The client closed stdin: nobody is left to serve. Stop the engine we
+      // spawned (if any) and exit rather than lingering until SIGTERM.
+      console.error(`[lelu-mcp] stdin closed by the client; shutting down.`);
+      localEngine?.stop();
+      process.exit(0);
     }
   } catch (err) {
     console.error("[lelu-mcp] Fatal error:", err);

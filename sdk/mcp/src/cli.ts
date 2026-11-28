@@ -17,6 +17,9 @@
  *   --no-local            Never spawn a local engine; use http://localhost:8082
  *   --preset      <name>  Starter policy preset: general | coding-agent (default: general)
  *
+ * If the local engine can't start, lelu-mcp exits; it only uses another
+ * engine when asked to (--engine-url, LELU_ENGINE_URL or --no-local).
+ *
  * Environment variables:
  *   LELU_ENGINE_URL      Lelu Engine base URL (disables local mode)
  *   LELU_API_KEY         Lelu Engine API key
@@ -27,8 +30,9 @@
  *   LELU_POLICY_PRESET   Starter policy preset: general | coding-agent
  */
 
+import { runAdd } from "./add.js";
 import { runStdio, runHttp } from "./server.js";
-import { engineIsHealthy, startLocalEngine } from "./local-engine.js";
+import { engineIsHealthy, startLocalEngine, type LocalEngine } from "./local-engine.js";
 
 // ─── Minimal arg parser ───────────────────────────────────────────────────────
 
@@ -68,19 +72,28 @@ Options:
   --timeout    <ms>     Request timeout in ms  (default: 10000)
   --transport  <mode>   Transport mode: stdio | http  (default: stdio)
   --port       <port>   HTTP port when --transport=http  (default: 3001)
-  --no-local            Never spawn a local engine; expect one on localhost:8082
+  --no-local            Never spawn a local engine; use the one on localhost:8082
   --preset     <name>   Starter policy preset: general | coding-agent  (default: general)
                         coding-agent allows edit/test/build, sends installs, pushes
                         and deploys to human review; written to ~/.lelu/policy.coding-agent.yaml
 
-Add command options:
-  --cursor             Print Cursor MCP config snippet
-  --claude             Print Claude Code command
-  --open-code          Print Open Code MCP config snippet
-  --manual             Print a generic mcpServers config snippet
-  --mode <mode>        Connection mode: sse | stdio (default: sse)
-  --url <url>          SSE endpoint URL (default: http://localhost:3001/sse)
-  --write              Write config to a local file for Cursor/Open Code
+If the local engine can't be started, lelu-mcp exits with the reason. It only
+talks to an engine elsewhere when you ask for one (--engine-url, LELU_ENGINE_URL
+or --no-local).
+
+Add command options (prints the config; notes on where it goes go to stderr):
+  --cursor             Cursor config (.cursor/mcp.json)
+  --claude             Claude Code command
+  --open-code          Open Code config (opencode.json)
+  --manual             Generic mcpServers config (default)
+  --mode <mode>        stdio | sse  (default: stdio — runs
+                       "npx -y lelu-mcp start --transport stdio --preset coding-agent")
+  --preset <name>      Preset for the stdio command (default: coding-agent)
+  --url <url>          SSE endpoint for --mode sse (default: http://localhost:3003/sse,
+                       the port Docker Compose publishes; the config includes an
+                       "Authorization: Bearer <MCP_AUTH_TOKEN>" header to fill in)
+  --write              Add the server to .cursor/mcp.json or ./opencode.json in the
+                       current directory, keeping the servers already there
 
 Tools exposed to the AI agent:
   lelu_agent_authorize   Authorize an agent action (confidence-aware)
@@ -97,16 +110,12 @@ Examples:
   # Start with a custom Engine URL and API key
   npx lelu-mcp start --engine-url http://lelu.internal:8082 --api-key sk_live_xxx
 
-  # Cursor / Claude Desktop config (settings.json or claude_desktop_config.json):
+  # Cursor / Claude Desktop config (.cursor/mcp.json or claude_desktop_config.json):
   # {
   #   "mcpServers": {
   #     "lelu": {
   #       "command": "npx",
-  #       "args": ["lelu-mcp", "start"],
-  #       "env": {
-  #         "LELU_ENGINE_URL": "http://localhost:8082",
-  #         "LELU_API_KEY": "your_key"
-  #       }
+  #       "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"]
   #     }
   #   }
   # }
@@ -116,91 +125,12 @@ Examples:
   npx lelu-mcp add --claude
   npx lelu-mcp add --open-code
 
-  # Write a Cursor config file in the current project
+  # Add lelu to the Cursor config of the project in the current directory
   npx lelu-mcp add --cursor --write
+
+  # Point Cursor at the Docker Compose HTTP/SSE server instead
+  npx lelu-mcp add --cursor --mode sse
 `);
-}
-
-type AddTarget = "cursor" | "claude" | "open-code" | "manual";
-
-function detectAddTarget(flags: Record<string, string>): AddTarget {
-  if (flags["cursor"] === "true") return "cursor";
-  if (flags["claude"] === "true") return "claude";
-  if (flags["open-code"] === "true") return "open-code";
-  if (flags["manual"] === "true") return "manual";
-  return "manual";
-}
-
-function buildMcpServerConfig(flags: Record<string, string>): Record<string, unknown> {
-  const mode = flags["mode"] ?? "sse";
-  const engineUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
-  const apiKey = flags["api-key"] ?? process.env["LELU_API_KEY"];
-  const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
-
-  if (mode === "stdio") {
-    // Only pin env vars the user explicitly provided — with no LELU_ENGINE_URL,
-    // lelu-mcp runs a local engine automatically (zero-config mode).
-    const env: Record<string, string> = {};
-    if (engineUrl) env["LELU_ENGINE_URL"] = engineUrl;
-    if (apiKey) env["LELU_API_KEY"] = apiKey;
-    return {
-      command: "npx",
-      args: ["-y", "lelu-mcp", "start", "--transport", "stdio"],
-      ...(Object.keys(env).length > 0 ? { env } : {}),
-    };
-  }
-
-  return { url: sseUrl };
-}
-
-async function runAdd(flags: Record<string, string>): Promise<void> {
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-
-  const mode = flags["mode"] ?? "sse";
-  if (mode !== "sse" && mode !== "stdio") {
-    console.error(`--mode must be 'sse' or 'stdio', got: ${mode}`);
-    process.exit(1);
-  }
-
-  const target = detectAddTarget(flags);
-  const mcpServerConfig = buildMcpServerConfig(flags);
-  const wrappedConfig = { mcpServers: { lelu: mcpServerConfig } };
-
-  if (target === "claude") {
-    const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
-    if (mode === "stdio") {
-      // Claude Code is a coding agent: the coding-agent preset allows the
-      // edit/test loop and sends installs, pushes and deploys to a human.
-      console.log("claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent");
-      return;
-    }
-    // The HTTP transport requires MCP_AUTH_TOKEN on the server side, so the
-    // client has to present it too. Without this header the server answers
-    // 401 — which is the point: this port fronts the engine's API key.
-    // "sse", not "http": the server speaks the legacy SSE transport
-    // (GET /sse + POST /messages), not streamable HTTP.
-    console.log(`claude mcp add --transport sse lelu ${sseUrl} --header "Authorization: Bearer $MCP_AUTH_TOKEN"`);
-    return;
-  }
-
-  const output = JSON.stringify(wrappedConfig, null, 2);
-  const shouldWrite = flags["write"] === "true";
-
-  if (!shouldWrite || target === "manual") {
-    console.log(output);
-    return;
-  }
-
-  const cwd = process.cwd();
-  const targetPath = target === "cursor"
-    ? path.join(cwd, ".cursor", "mcp.json")
-    : path.join(cwd, ".opencode", "mcp.json");
-
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, output + "\n", "utf8");
-  console.error(`[lelu-mcp] Wrote ${targetPath}`);
-  console.log(output);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -222,11 +152,17 @@ async function main() {
   const flags = parseArgs(args.slice(1));
 
   if (command === "add") {
-    await runAdd(flags);
+    try {
+      await runAdd(flags);
+    } catch (err) {
+      console.error(`[lelu-mcp] ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+    }
     return;
   }
 
-  const explicitUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
+  // An empty LELU_ENGINE_URL counts as unset, not as a URL.
+  const explicitUrl = flags["engine-url"] || process.env["LELU_ENGINE_URL"] || undefined;
   let engineUrl     = explicitUrl ?? "http://localhost:8082";
   let apiKey       = flags["api-key"]    ?? process.env["LELU_API_KEY"];
   const timeoutMs  = flags["timeout"]    ? parseInt(flags["timeout"], 10) : 10_000;
@@ -247,28 +183,30 @@ async function main() {
 
   // Zero-config mode: no engine URL given → download (once) and run a local
   // engine with the starter policy. Everything stays on this machine.
+  let localEngine: LocalEngine | undefined;
   if (!explicitUrl && flags["no-local"] !== "true") {
     try {
-      const local = await startLocalEngine({ preset: flags["preset"] });
-      engineUrl = local.url;
+      localEngine = await startLocalEngine({ preset: flags["preset"] });
+      engineUrl = localEngine.url;
       // The launcher starts the engine with a generated per-install key —
       // use it unless the user supplied their own.
-      apiKey = apiKey ?? local.apiKey;
+      apiKey = apiKey ?? localEngine.apiKey;
     } catch (err) {
+      // No fallback to whatever happens to answer on localhost:8082: that
+      // would send authorization decisions to an engine the user never chose
+      // (with a policy and key they never set), noted only on stderr. Using
+      // another engine takes an explicit --engine-url / LELU_ENGINE_URL or
+      // --no-local. Exit so the MCP host shows the failure.
       console.error(`[lelu-mcp] Could not start a local engine: ${err instanceof Error ? err.message : err}`);
-      // Fall back only to an engine that is actually there. Serving MCP tools
-      // with nothing behind them looks healthy to the host while every
-      // authorize call fails, so exit instead and let the host show the error.
-      if (await engineIsHealthy(engineUrl)) {
-        console.error(`[lelu-mcp] Using the engine already running at ${engineUrl}.`);
-      } else {
-        console.error(
-          `[lelu-mcp] No engine is running at ${engineUrl} either, so there is nothing to authorize against. ` +
-          `Fix the error above, or pass --engine-url for an engine you run yourself.`
-        );
-        process.exit(1);
-      }
+      console.error(
+        `[lelu-mcp] Exiting. Fix the error above, or to use an engine you run yourself pass ` +
+        `--engine-url <url> --api-key <key> (or set LELU_ENGINE_URL / LELU_API_KEY).`
+      );
+      process.exit(1);
     }
+  } else if (!explicitUrl && !(await engineIsHealthy(engineUrl))) {
+    // --no-local: the user asked for the engine on localhost:8082.
+    console.error(`[lelu-mcp] --no-local was given but no engine answers at ${engineUrl}/healthz; tool calls will fail until one does.`);
   }
 
   // Log to stderr so it doesn't pollute the MCP stdio stream
@@ -284,6 +222,11 @@ async function main() {
     } else {
       console.error(`[lelu-mcp] Listening on stdio…`);
       await runStdio({ engineUrl, apiKey, timeoutMs });
+      // The client closed stdin: nobody is left to serve. Stop the engine we
+      // spawned (if any) and exit rather than lingering until SIGTERM.
+      console.error(`[lelu-mcp] stdin closed by the client; shutting down.`);
+      localEngine?.stop();
+      process.exit(0);
     }
   } catch (err) {
     console.error("[lelu-mcp] Fatal error:", err);

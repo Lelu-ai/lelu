@@ -8,17 +8,25 @@
  * spawns the engine as a child process on a free localhost port, and waits
  * for /healthz.
  *
- * Everything runs on the user's machine — no account, no cloud calls beyond
- * the one-time binary download (plus a GitHub API call to resolve the latest
- * engine release, skipped when LELU_ENGINE_VERSION pins a version).
+ * Everything runs on the user's machine — no account. The only network calls
+ * are to GitHub: at each start, a release-list lookup to see whether a newer
+ * engine than the cached one exists (skipped when LELU_ENGINE_VERSION pins a
+ * version), and a download when one does. If GitHub can't be reached, the
+ * cached engine keeps working offline.
  *
  * Environment overrides:
  *   LELU_HOME            data dir (default ~/.lelu)
  *   LELU_ENGINE_BINARY   path to a locally built engine (skips download)
- *   LELU_ENGINE_VERSION  pin a release version, e.g. "0.1.0" (default: latest)
+ *   LELU_ENGINE_VERSION  pin a release version, e.g. "0.1.0" (default: newest);
+ *                        a cached binary of another version is replaced
  *   LELU_POLICY_PATH     policy file to load (default ~/.lelu/policy.yaml, or
  *                        ~/.lelu/policy.<preset>.yaml for a non-general preset)
  *   LELU_POLICY_PRESET   starter policy preset: general | coding-agent
+ *
+ * Per-install secrets, generated on first run and kept in LELU_HOME (0600):
+ *   engine.key        API_KEY the engine requires from callers
+ *   engine.jwt.key    JWT_SIGNING_KEY for minted tokens (an env var overrides it)
+ *   engine.vault.key  VAULT_KEY for the OAuth token vault (an env var overrides it)
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -36,24 +44,63 @@ export interface LocalEngine {
   url: string;
   /** API key the local engine was started with — pass as Bearer token. */
   apiKey: string;
+  /** Engine version as reported by /healthz (or the cached release), if known. */
+  version?: string;
   /** Terminates the engine child process. */
   stop: () => void;
 }
 
-// The engine requires an API key even locally. Generate one per install and
-// persist it in ~/.lelu so the key is stable across restarts (0600, local only).
-async function ensureLocalApiKey(): Promise<string> {
-  const keyPath = path.join(leluHome(), "engine.key");
+/**
+ * Reads the secret stored in `file`, or generates one with `make` and stores
+ * it (0600, local only) so it stays the same across restarts.
+ */
+export async function ensureLocalSecret(file: string, make: () => string): Promise<string> {
   try {
-    const existing = (await fsp.readFile(keyPath, "utf8")).trim();
+    const existing = (await fsp.readFile(file, "utf8")).trim();
     if (existing) return existing;
   } catch {
     // first run
   }
-  const key = `lelu_local_${randomBytes(24).toString("base64url")}`;
-  await fsp.mkdir(path.dirname(keyPath), { recursive: true });
-  await fsp.writeFile(keyPath, `${key}\n`, { mode: 0o600 });
-  return key;
+  const secret = make();
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  // "wx": if another lelu-mcp started at the same moment and wrote first,
+  // use its secret rather than overwriting it.
+  try {
+    await fsp.writeFile(file, `${secret}\n`, { mode: 0o600, flag: "wx" });
+    return secret;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    const existing = (await fsp.readFile(file, "utf8")).trim();
+    if (existing) return existing;
+    await fsp.writeFile(file, `${secret}\n`, { mode: 0o600 });
+    return secret;
+  }
+}
+
+/** Secrets the local engine is started with, generated once per install. */
+export interface LocalEngineSecrets {
+  /** API_KEY: callers present it as a Bearer token. */
+  apiKey: string;
+  /** JWT_SIGNING_KEY: signs the tokens lelu_mint_token returns. */
+  signingKey: string;
+  /** VAULT_KEY: encrypts the engine's OAuth token vault. */
+  vaultKey: string;
+}
+
+/**
+ * The engine requires an API key even locally, and without JWT_SIGNING_KEY it
+ * signs tokens with a published default that anyone can forge tokens with
+ * (VAULT_KEY falls back to that same default). Each is generated once per
+ * install and kept in LELU_HOME beside the others.
+ */
+export async function ensureLocalSecrets(home = leluHome()): Promise<LocalEngineSecrets> {
+  const random = () => randomBytes(32).toString("base64url");
+  const [apiKey, signingKey, vaultKey] = await Promise.all([
+    ensureLocalSecret(path.join(home, "engine.key"), () => `lelu_local_${randomBytes(24).toString("base64url")}`),
+    ensureLocalSecret(path.join(home, "engine.jwt.key"), random),
+    ensureLocalSecret(path.join(home, "engine.vault.key"), random),
+  ]);
+  return { apiKey, signingKey, vaultKey };
 }
 
 // ─── Starter policies ─────────────────────────────────────────────────────────
@@ -255,39 +302,133 @@ export function pickEngineRelease(releases: EngineReleaseInfo[], asset: string):
   return null;
 }
 
-// Resolves the release tag to download from. Pinned versions go straight to
-// their tag (no network call). Unpinned installs must NOT use GitHub's
-// generic `releases/latest` — a second, separate workflow (oss-release.yml)
-// also publishes `lelu-engine-*` binaries under a `v*` tag but without a
-// checksums file, and "latest" can resolve to either. Querying the release
-// list and filtering by prefix and attached files guarantees we always land
-// on a release that has this platform's binary and a matching SHA256SUMS.txt.
-async function resolveEngineReleaseTag(asset: string): Promise<string> {
-  const pinned = process.env["LELU_ENGINE_VERSION"];
-  if (pinned) return `${ENGINE_RELEASE_TAG_PREFIX}${pinned}`;
+const ENGINE_SOURCE_HINT =
+  `Set LELU_ENGINE_VERSION to pin a version (this skips the release lookup), ` +
+  `LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`;
 
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases`, {
-    headers: { "User-Agent": "lelu-mcp", Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) {
-    throw new Error(
-      `Could not list Lelu engine releases (HTTP ${res.status}). ` +
-      `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
-    );
+/**
+ * Describes a failed fetch() including its underlying cause. Node reports
+ * every network failure as just "fetch failed" and puts the reason (DNS
+ * failure, no route to host, refused, timed out...) in `cause`.
+ */
+export function describeFetchError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const parts = [err.message || err.name];
+  let cause: unknown = (err as { cause?: unknown }).cause;
+  for (let depth = 0; cause && depth < 3; depth++) {
+    if (!(cause instanceof Error)) { parts.push(String(cause)); break; }
+    const code = (cause as { code?: unknown }).code;
+    // Happy-eyeballs connects fail with an AggregateError whose message is
+    // empty; its first inner error has the useful text.
+    const inner = cause instanceof AggregateError && cause.errors[0] instanceof Error ? cause.errors[0].message : "";
+    const text = cause.message || inner || (typeof code === "string" ? code : cause.name);
+    parts.push(typeof code === "string" && !text.includes(code) ? `${code} ${text}` : text);
+    cause = (cause as { cause?: unknown }).cause;
   }
-  const releases = (await res.json()) as EngineReleaseInfo[];
-  const tag = pickEngineRelease(releases, asset);
-  if (!tag) {
-    throw new Error(
-      `No "${ENGINE_RELEASE_TAG_PREFIX}*" release of ${REPO} has both ${asset} and ${CHECKSUMS_FILE} attached. ` +
-      `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
-    );
+  return parts.join(": ");
+}
+
+/** Returns the rel="next" URL from a GitHub `Link` header, or null. */
+export function nextPageUrl(link: string | null): string | null {
+  if (!link) return null;
+  for (const part of link.split(",")) {
+    const m = part.match(/<([^>]+)>\s*;\s*rel="?next"?/);
+    if (m) return m[1]!;
   }
-  const newest = releases.find((r) => !r.draft && r.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX))?.tag_name;
-  if (newest && newest !== tag) {
-    console.error(`[lelu-mcp] ${newest} has no ${asset} attached yet; using ${tag} instead.`);
+  return null;
+}
+
+export interface ReleaseLookupOptions {
+  /** GitHub API base URL. Default https://api.github.com (tests use a local server). */
+  apiBase?: string;
+  /** Stop after this many pages of 100 releases. Default 10. */
+  maxPages?: number;
+  /** Per-request timeout. Default 15s. */
+  timeoutMs?: number;
+}
+
+/**
+ * Returns the tag of the newest engine release that ships `asset` and a
+ * checksums file.
+ *
+ * Unpinned installs must NOT use GitHub's generic `releases/latest`: a second
+ * workflow (oss-release.yml) also publishes `lelu-engine-*` binaries under a
+ * `v*` tag but without a checksums file, and "latest" can resolve to either.
+ * Filtering the release list by prefix and attached files always lands on a
+ * release that has this platform's binary and a matching SHA256SUMS.txt.
+ *
+ * Several components release from this repository, so the newest engine
+ * release is not necessarily on the first page of the list. Pages of 100 are
+ * read, following the Link header, until a usable release turns up or
+ * `maxPages` is reached.
+ */
+export async function findLatestEngineRelease(asset: string, opts: ReleaseLookupOptions = {}): Promise<string> {
+  const apiBase = (opts.apiBase ?? "https://api.github.com").replace(/\/$/, "");
+  const maxPages = opts.maxPages ?? 10;
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+
+  let url: string | null = `${apiBase}/repos/${REPO}/releases?per_page=100`;
+  let newest: string | undefined;
+  let pages = 0;
+  while (url && pages < maxPages) {
+    pages++;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "User-Agent": "lelu-mcp", Accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (err) {
+      throw new Error(
+        `Could not reach ${new URL(url).host} to list Lelu engine releases (${describeFetchError(err)}). ${ENGINE_SOURCE_HINT}`
+      );
+    }
+    if (!res.ok) {
+      throw new Error(`Could not list Lelu engine releases (HTTP ${res.status}). ${ENGINE_SOURCE_HINT}`);
+    }
+    const releases = (await res.json()) as EngineReleaseInfo[];
+    newest ??= releases.find((r) => !r.draft && r.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX))?.tag_name;
+    const tag = pickEngineRelease(releases, asset);
+    if (tag) {
+      if (newest && newest !== tag) {
+        console.error(`[lelu-mcp] ${newest} has no ${asset} attached yet; using ${tag} instead.`);
+      }
+      return tag;
+    }
+    url = nextPageUrl(res.headers.get("link"));
   }
-  return tag;
+  throw new Error(
+    `No "${ENGINE_RELEASE_TAG_PREFIX}*" release of ${REPO} has both ${asset} and ${CHECKSUMS_FILE} attached ` +
+    `(searched ${pages} page${pages === 1 ? "" : "s"} of releases). ${ENGINE_SOURCE_HINT}`
+  );
+}
+
+/** "0.3.1", "v0.3.1" and "engine-v0.3.1" all name the release tag engine-v0.3.1. */
+export function engineTagForVersion(version: string): string {
+  const v = version.trim().replace(/^engine-v/, "").replace(/^v/, "");
+  return `${ENGINE_RELEASE_TAG_PREFIX}${v}`;
+}
+
+/**
+ * Compares two engine release tags by semantic version. Returns a negative
+ * number when a is older, positive when newer, 0 when equal, and null when
+ * either tag is not a version this can parse.
+ */
+export function compareEngineTags(a: string, b: string): number | null {
+  const parse = (tag: string) => {
+    const m = tag.replace(/^engine-v/, "").replace(/^v/, "").match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/);
+    return m ? { core: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] } : null;
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (!pa || !pb) return null;
+  for (let i = 0; i < 3; i++) {
+    if (pa.core[i] !== pb.core[i]) return pa.core[i]! - pb.core[i]!;
+  }
+  if (pa.pre === pb.pre) return 0;
+  if (pa.pre === undefined) return 1; // a release is newer than its prereleases
+  if (pb.pre === undefined) return -1;
+  return pa.pre < pb.pre ? -1 : 1;
 }
 
 // ─── Resumable download ───────────────────────────────────────────────────────
@@ -399,7 +540,7 @@ export async function downloadWithResume(url: string, opts: DownloadOptions = {}
     }
   }
 
-  const reason = lastError instanceof Error ? lastError.message : String(lastError);
+  const reason = describeFetchError(lastError);
   throw new Error(`download of ${url} failed after ${attempts} attempts (${received} bytes received): ${reason}`);
 }
 
@@ -432,25 +573,43 @@ export function sha256Hex(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-async function downloadEngine(dest: string): Promise<void> {
-  const asset = assetName();
-  const tag = await resolveEngineReleaseTag(asset);
-  const baseUrl = `https://github.com/${REPO}/releases/download/${tag}`;
+export interface EngineDownloadOptions {
+  /** Base URL that release files hang off. Default https://github.com/<repo>/releases/download (tests use a local server). */
+  downloadBase?: string;
+  /** Passed through to downloadWithResume. */
+  attempts?: number;
+  backoffMs?: number;
+}
 
-  console.error(`[lelu-mcp] First run: downloading Lelu engine → ${baseUrl}/${asset}`);
+/**
+ * Downloads `asset` from release `tag`, verifies it against the release's
+ * SHA256SUMS.txt and only then writes it to `dest` (atomically, via rename).
+ * Returns the verified SHA-256.
+ */
+export async function downloadEngineRelease(
+  tag: string,
+  asset: string,
+  dest: string,
+  opts: EngineDownloadOptions = {},
+): Promise<string> {
+  const downloadBase = (opts.downloadBase ?? `https://github.com/${REPO}/releases/download`).replace(/\/$/, "");
+  const baseUrl = `${downloadBase}/${tag}`;
+  const retry = { attempts: opts.attempts, backoffMs: opts.backoffMs };
+
+  console.error(`[lelu-mcp] Downloading Lelu engine ${tag} → ${baseUrl}/${asset}`);
 
   const onRetry = (attempt: number, err: unknown) =>
-    console.error(`[lelu-mcp] Download interrupted (${err instanceof Error ? err.message : err}); retry ${attempt}…`);
+    console.error(`[lelu-mcp] Download interrupted (${describeFetchError(err)}); retry ${attempt}…`);
 
   // Fetch and verify the checksum BEFORE writing anything to disk — refuse to
   // install an engine binary whose integrity can't be confirmed.
   const checksumsUrl = `${baseUrl}/${CHECKSUMS_FILE}`;
   let checksumsText: string;
   try {
-    checksumsText = (await downloadWithResume(checksumsUrl, { onRetry })).toString("utf8");
+    checksumsText = (await downloadWithResume(checksumsUrl, { ...retry, onRetry })).toString("utf8");
   } catch (err) {
     throw new Error(
-      `Could not download checksums (${err instanceof Error ? err.message : err}) — ` +
+      `Could not download checksums (${describeFetchError(err)}) — ` +
       `refusing to install an unverified engine binary. Set LELU_ENGINE_BINARY to a locally built engine instead.`
     );
   }
@@ -475,10 +634,10 @@ async function downloadEngine(dest: string): Promise<void> {
 
   let buf: Buffer;
   try {
-    buf = await downloadWithResume(`${baseUrl}/${asset}`, { onProgress, onRetry });
+    buf = await downloadWithResume(`${baseUrl}/${asset}`, { ...retry, onProgress, onRetry });
   } catch (err) {
     throw new Error(
-      `Engine download failed: ${err instanceof Error ? err.message : err}. ` +
+      `Engine download failed: ${describeFetchError(err)}. ` +
       `Set LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
     );
   }
@@ -494,21 +653,166 @@ async function downloadEngine(dest: string): Promise<void> {
   await fsp.mkdir(path.dirname(dest), { recursive: true });
   const tmp = `${dest}.download-${process.pid}`;
   await fsp.writeFile(tmp, buf, { mode: 0o755 });
-  await fsp.rename(tmp, dest);
-  console.error(`[lelu-mcp] Engine cached at ${dest} (checksum verified)`);
+  try {
+    await fsp.rename(tmp, dest);
+  } catch (err) {
+    // e.g. Windows refuses to replace an executable another process is running.
+    await fsp.rm(tmp, { force: true });
+    throw err;
+  }
+  console.error(`[lelu-mcp] Engine ${tag} cached at ${dest} (checksum verified)`);
+  return actual;
 }
 
-async function resolveBinary(): Promise<string> {
+// ─── Cached engine version ────────────────────────────────────────────────────
+//
+// The cached binary keeps a fixed name (~/.lelu/bin/lelu-engine-<os>-<arch>)
+// and its release is recorded beside it in <binary>.release.json. Binaries
+// cached by older lelu-mcp versions have no such record; their version is
+// unknown and they are treated as needing a check.
+
+interface CachedEngineRecord {
+  tag: string;
+  sha256?: string;
+  installedAt?: string;
+}
+
+function cacheRecordPath(binary: string): string {
+  return `${binary}.release.json`;
+}
+
+/** The release tag recorded for the cached binary, or null when unknown. */
+export function readCachedEngineTag(binary: string): string | null {
+  try {
+    const rec = JSON.parse(fs.readFileSync(cacheRecordPath(binary), "utf8")) as Partial<CachedEngineRecord>;
+    return typeof rec.tag === "string" && rec.tag.startsWith(ENGINE_RELEASE_TAG_PREFIX) ? rec.tag : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedEngineRecord(binary: string, rec: CachedEngineRecord): Promise<void> {
+  const file = cacheRecordPath(binary);
+  const tmp = `${file}.tmp-${process.pid}`;
+  await fsp.writeFile(tmp, `${JSON.stringify(rec)}\n`, "utf8");
+  await fsp.rename(tmp, file);
+}
+
+/** Where engine releases come from. Injectable so the upgrade logic can be tested offline. */
+export interface EngineReleaseSource {
+  /** Tag of the newest usable engine release. Throws when it can't be determined. */
+  latestTag(asset: string): Promise<string>;
+  /** Downloads and checksum-verifies `tag`'s `asset` into `dest`; returns its SHA-256. */
+  download(tag: string, asset: string, dest: string): Promise<string>;
+}
+
+export const githubReleaseSource: EngineReleaseSource = {
+  latestTag: (asset) => findLatestEngineRelease(asset),
+  download: (tag, asset, dest) => downloadEngineRelease(tag, asset, dest),
+};
+
+export interface EnsureEngineOptions {
+  /** Path of the cached binary. */
+  dest: string;
+  asset: string;
+  /** LELU_ENGINE_VERSION, if set. */
+  pinnedVersion?: string;
+  source?: EngineReleaseSource;
+  log?: (message: string) => void;
+}
+
+/**
+ * Makes sure `dest` holds the engine to run and returns its release tag
+ * (null when it is a legacy cached binary of unknown version that could not
+ * be replaced).
+ *
+ * - Pinned (LELU_ENGINE_VERSION): the cached binary is used only if it is
+ *   that release; otherwise the pinned release is downloaded. No release
+ *   lookup is made, so a pin works without api.github.com.
+ * - Unpinned: the newest engine release is looked up and downloaded when it
+ *   is newer than the cached one (or the cached one's version is unknown).
+ *   If the lookup or the download fails, the cached binary keeps working
+ *   offline and a notice says so.
+ *
+ * Every download is checksum-verified before it replaces the cached binary.
+ */
+export async function ensureEngineBinary(opts: EnsureEngineOptions): Promise<string | null> {
+  const { dest, asset } = opts;
+  const source = opts.source ?? githubReleaseSource;
+  const log = opts.log ?? ((m: string) => console.error(`[lelu-mcp] ${m}`));
+  const cached = fs.existsSync(dest);
+  const cachedTag = cached ? readCachedEngineTag(dest) : null;
+  const cachedName = cachedTag ?? "a cached engine of unknown version";
+
+  const install = async (tag: string): Promise<string> => {
+    const sha256 = await source.download(tag, asset, dest);
+    await writeCachedEngineRecord(dest, { tag, sha256, installedAt: new Date().toISOString() });
+    return tag;
+  };
+
+  const pinned = opts.pinnedVersion?.trim();
+  if (pinned) {
+    const want = engineTagForVersion(pinned);
+    if (cached && cachedTag === want) return want;
+    if (cached) log(`LELU_ENGINE_VERSION asks for ${want}; replacing ${cachedName}.`);
+    try {
+      return await install(want);
+    } catch (err) {
+      if (cached && cachedTag === null) {
+        // A legacy cache may well be the pinned release; it is better than nothing offline.
+        log(`Could not download ${want} (${errorText(err)}). Using ${cachedName} instead.`);
+        return null;
+      }
+      if (cached) {
+        throw new Error(
+          `Could not download ${want}, which LELU_ENGINE_VERSION asks for (${errorText(err)}). ` +
+          `The cached engine is ${cachedTag}; unset LELU_ENGINE_VERSION to run it.`
+        );
+      }
+      throw err;
+    }
+  }
+
+  let latest: string;
+  try {
+    latest = await source.latestTag(asset);
+  } catch (err) {
+    if (!cached) throw err;
+    log(`Could not check for a newer engine: ${errorText(err)}`);
+    log(`Continuing offline with ${cachedName}.`);
+    return cachedTag;
+  }
+
+  if (cached && cachedTag) {
+    const cmp = compareEngineTags(latest, cachedTag);
+    if (cmp === 0 || (cmp !== null && cmp < 0)) return cachedTag; // up to date (or newer, e.g. pinned before)
+  }
+  if (cached) log(`Upgrading ${cachedName} to ${latest}.`);
+  try {
+    return await install(latest);
+  } catch (err) {
+    if (!cached) throw err;
+    log(`Could not download ${latest} (${errorText(err)}). Continuing with ${cachedName}.`);
+    return cachedTag;
+  }
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function resolveBinary(): Promise<{ path: string; tag: string | null }> {
   const explicit = process.env["LELU_ENGINE_BINARY"];
   if (explicit) {
     if (!fs.existsSync(explicit)) {
       throw new Error(`LELU_ENGINE_BINARY points to a missing file: ${explicit}`);
     }
-    return explicit;
+    return { path: explicit, tag: null };
   }
-  const cached = path.join(leluHome(), "bin", assetName());
-  if (!fs.existsSync(cached)) await downloadEngine(cached);
-  return cached;
+  const asset = assetName();
+  const dest = path.join(leluHome(), "bin", asset);
+  const tag = await ensureEngineBinary({ dest, asset, pinnedVersion: process.env["LELU_ENGINE_VERSION"] });
+  return { path: dest, tag };
 }
 
 // Each preset gets its own default file, so switching presets never silently
@@ -549,7 +853,8 @@ function freePort(): Promise<number> {
   });
 }
 
-async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000): Promise<void> {
+/** Waits for /healthz to answer and returns the version it reports, if any. */
+async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000): Promise<string | undefined> {
   const deadline = Date.now() + timeoutMs;
   let exited = false;
   child.once("exit", () => { exited = true; });
@@ -557,7 +862,10 @@ async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000)
     if (exited) throw new Error("Lelu engine exited during startup — see log lines above.");
     try {
       const res = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(1_000) });
-      if (res.ok) return;
+      if (res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { version?: unknown };
+        return typeof body.version === "string" ? body.version : undefined;
+      }
     } catch {
       // not up yet
     }
@@ -572,16 +880,17 @@ async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000)
  */
 export async function startLocalEngine(opts: { preset?: string } = {}): Promise<LocalEngine> {
   const preset = resolvePreset(opts.preset);
-  const [bin, policyPath, apiKey] = await Promise.all([
+  const [bin, policyPath, secrets] = await Promise.all([
     resolveBinary(),
     ensurePolicy(preset),
-    ensureLocalApiKey(),
+    ensureLocalSecrets(),
   ]);
+  const { apiKey } = secrets;
   const home = leluHome();
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
 
-  const child = spawn(bin, [], {
+  const child = spawn(bin.path, [], {
     env: {
       // Dev-mode confidence defaults: MCP hosts cannot produce verified
       // provider signals (logprobs/entropy), so accept self-reported
@@ -589,6 +898,10 @@ export async function startLocalEngine(opts: { preset?: string } = {}): Promise<
       // hard-denying. Listed before the spread so your env vars override them.
       CONFIDENCE_ALLOW_UNVERIFIED: "true",
       CONFIDENCE_MISSING_MODE: "review",
+      // Per-install secrets instead of the engine's published defaults. Also
+      // before the spread, so a JWT_SIGNING_KEY / VAULT_KEY you set wins.
+      JWT_SIGNING_KEY: secrets.signingKey,
+      VAULT_KEY: secrets.vaultKey,
       ...process.env,
       LISTEN_ADDR: `127.0.0.1:${port}`,
       POLICY_PATH: policyPath,
@@ -635,14 +948,22 @@ export async function startLocalEngine(opts: { preset?: string } = {}): Promise<
   process.on("SIGINT", () => { stop(); process.exit(130); });
   process.on("SIGTERM", () => { stop(); process.exit(143); });
 
+  let reported: string | undefined;
   try {
-    await waitHealthy(url, child);
+    reported = await waitHealthy(url, child);
     await writeRuntimeFile();
   } catch (err) {
     stop();
     throw err;
   }
 
-  console.error(`[lelu-mcp] Local Lelu engine ready on ${url} (policy: ${policyPath})`);
-  return { url, apiKey, stop };
+  // Say which engine is running: the version it reports, and where it came from.
+  const version = reported ?? (bin.tag ? bin.tag.slice(ENGINE_RELEASE_TAG_PREFIX.length) : undefined);
+  const origin = process.env["LELU_ENGINE_BINARY"] ? "LELU_ENGINE_BINARY"
+    : bin.tag ? `release ${bin.tag}`
+    : "cached binary of unrecorded release";
+  console.error(`[lelu-mcp] Local Lelu engine ${version ?? "(version not reported)"} ready on ${url}`);
+  console.error(`[lelu-mcp]   Engine binary : ${bin.path} (${origin})`);
+  console.error(`[lelu-mcp]   Policy        : ${policyPath}`);
+  return { url, apiKey, version, stop };
 }

@@ -197,9 +197,13 @@ const CLI_TABS = ["Cursor", "Claude Code", "Open Code", "Manual"] as const;
 type CliTab = (typeof CLI_TABS)[number];
 
 const CLI_COMMANDS: Record<CliTab, string> = {
-  Cursor: "npx lelu-mcp add --cursor",
+  // `add` prints a stdio config running the same command as the Claude Code
+  // tab; --write adds it to the project's config file, keeping other servers.
+  Cursor: `# Adds lelu to .cursor/mcp.json in this project (drop --write to only print it)
+npx lelu-mcp add --cursor --write`,
   "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
-  "Open Code": "npx lelu-mcp add --open-code",
+  "Open Code": `# Adds lelu to ./opencode.json (drop --write to only print it)
+npx lelu-mcp add --open-code --write`,
   Manual: "npx lelu-mcp start --transport stdio",
 };
 

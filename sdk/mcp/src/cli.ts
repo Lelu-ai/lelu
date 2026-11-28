@@ -17,6 +17,9 @@
  *   --no-local            Never spawn a local engine; use http://localhost:8082
  *   --preset      <name>  Starter policy preset: general | coding-agent (default: general)
  *
+ * If the local engine can't start, lelu-mcp exits; it only uses another
+ * engine when asked to (--engine-url, LELU_ENGINE_URL or --no-local).
+ *
  * Environment variables:
  *   LELU_ENGINE_URL      Lelu Engine base URL (disables local mode)
  *   LELU_API_KEY         Lelu Engine API key
@@ -68,10 +71,14 @@ Options:
   --timeout    <ms>     Request timeout in ms  (default: 10000)
   --transport  <mode>   Transport mode: stdio | http  (default: stdio)
   --port       <port>   HTTP port when --transport=http  (default: 3001)
-  --no-local            Never spawn a local engine; expect one on localhost:8082
+  --no-local            Never spawn a local engine; use the one on localhost:8082
   --preset     <name>   Starter policy preset: general | coding-agent  (default: general)
                         coding-agent allows edit/test/build, sends installs, pushes
                         and deploys to human review; written to ~/.lelu/policy.coding-agent.yaml
+
+If the local engine can't be started, lelu-mcp exits with the reason. It only
+talks to an engine elsewhere when you ask for one (--engine-url, LELU_ENGINE_URL
+or --no-local).
 
 Add command options:
   --cursor             Print Cursor MCP config snippet
@@ -226,7 +233,8 @@ async function main() {
     return;
   }
 
-  const explicitUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
+  // An empty LELU_ENGINE_URL counts as unset, not as a URL.
+  const explicitUrl = flags["engine-url"] || process.env["LELU_ENGINE_URL"] || undefined;
   let engineUrl     = explicitUrl ?? "http://localhost:8082";
   let apiKey       = flags["api-key"]    ?? process.env["LELU_API_KEY"];
   const timeoutMs  = flags["timeout"]    ? parseInt(flags["timeout"], 10) : 10_000;
@@ -250,27 +258,27 @@ async function main() {
   let localEngine: LocalEngine | undefined;
   if (!explicitUrl && flags["no-local"] !== "true") {
     try {
-      const local = await startLocalEngine({ preset: flags["preset"] });
-      localEngine = local;
-      engineUrl = local.url;
+      localEngine = await startLocalEngine({ preset: flags["preset"] });
+      engineUrl = localEngine.url;
       // The launcher starts the engine with a generated per-install key —
       // use it unless the user supplied their own.
-      apiKey = apiKey ?? local.apiKey;
+      apiKey = apiKey ?? localEngine.apiKey;
     } catch (err) {
+      // No fallback to whatever happens to answer on localhost:8082: that
+      // would send authorization decisions to an engine the user never chose
+      // (with a policy and key they never set), noted only on stderr. Using
+      // another engine takes an explicit --engine-url / LELU_ENGINE_URL or
+      // --no-local. Exit so the MCP host shows the failure.
       console.error(`[lelu-mcp] Could not start a local engine: ${err instanceof Error ? err.message : err}`);
-      // Fall back only to an engine that is actually there. Serving MCP tools
-      // with nothing behind them looks healthy to the host while every
-      // authorize call fails, so exit instead and let the host show the error.
-      if (await engineIsHealthy(engineUrl)) {
-        console.error(`[lelu-mcp] Using the engine already running at ${engineUrl}.`);
-      } else {
-        console.error(
-          `[lelu-mcp] No engine is running at ${engineUrl} either, so there is nothing to authorize against. ` +
-          `Fix the error above, or pass --engine-url for an engine you run yourself.`
-        );
-        process.exit(1);
-      }
+      console.error(
+        `[lelu-mcp] Exiting. Fix the error above, or to use an engine you run yourself pass ` +
+        `--engine-url <url> --api-key <key> (or set LELU_ENGINE_URL / LELU_API_KEY).`
+      );
+      process.exit(1);
     }
+  } else if (!explicitUrl && !(await engineIsHealthy(engineUrl))) {
+    // --no-local: the user asked for the engine on localhost:8082.
+    console.error(`[lelu-mcp] --no-local was given but no engine answers at ${engineUrl}/healthz; tool calls will fail until one does.`);
   }
 
   // Log to stderr so it doesn't pollute the MCP stdio stream

@@ -12,7 +12,7 @@ npx -y lelu-mcp start
 
 On first run this downloads the Lelu engine binary (cached in `~/.lelu/bin`), writes a starter policy to `~/.lelu/policy.yaml`, starts the engine locally, and serves MCP over stdio. Everything runs on your machine.
 
-The download comes from the newest engine release that has a binary for your platform and a `SHA256SUMS.txt`; it is checksum-verified before it is written to disk, and resumes if the connection drops. If no engine can be started and none is already running on `localhost:8082`, `lelu-mcp` exits with the reason instead of serving tools with nothing behind them.
+The download comes from the newest engine release that has a binary for your platform and a `SHA256SUMS.txt`; it is checksum-verified before it is written to disk, and resumes if the connection drops. If the local engine can't be started, `lelu-mcp` exits with the reason instead of serving tools with nothing behind them. It never quietly switches to some other engine (such as whatever answers on `localhost:8082`); it only uses an engine you name with `--engine-url` / `LELU_ENGINE_URL` (or `--no-local` for `localhost:8082`).
 
 **Claude Code:**
 

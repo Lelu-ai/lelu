@@ -16,6 +16,7 @@
   <a href="https://pypi.org/project/lelu-agent-auth-sdk/"><img src="https://img.shields.io/pypi/v/lelu-agent-auth-sdk?style=flat-square&label=PyPI" alt="PyPI" /></a>
   <a href="https://www.npmjs.com/package/lelu-agent-auth"><img src="https://img.shields.io/npm/v/lelu-agent-auth?style=flat-square&label=npm" alt="npm" /></a>
   <a href="https://lelu-ai.com/sandbox"><img src="https://img.shields.io/badge/try%20it-sandbox-10b981?style=flat-square" alt="Sandbox" /></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/Lelu-ai/lelu"><img src="https://api.scorecard.dev/projects/github.com/Lelu-ai/lelu/badge?style=flat-square" alt="OpenSSF Scorecard" /></a>
 </p>
 
 <p align="center">
@@ -25,6 +26,8 @@
   <a href="examples/"><b>Examples</b></a> ·
   <a href="sdk/mcp"><b>MCP Server</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
+  <a href="GOVERNANCE.md"><b>Governance</b></a> ·
+  <a href="docs/SECURITY_ROADMAP.md"><b>Security Roadmap</b></a> ·
   <a href="https://github.com/lelu-ai/lelu/discussions"><b>Discussions</b></a>
 </p>
 
@@ -85,7 +88,7 @@ Read this before you depend on Lelu. These limits come from an independent audit
 - **Single process.** The engine stores state in SQLite and process memory. Do not run more than one replica.
 - **Set `JWT_SIGNING_KEY` and `VAULT_KEY`** to random values. The defaults are public.
 
-Found something else? See [SECURITY.md](SECURITY.md).
+All 17 findings from that audit are closed. What we are fixing next, and in what order, is in the [security roadmap](docs/SECURITY_ROADMAP.md). Found something else? See [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -107,14 +110,14 @@ Your agent gets a `lelu_agent_authorize` tool using the **coding-agent** preset:
 
 ### Claude Code plugin — no tool-calling required
 
-The MCP server above gives your agent a tool it can *choose* to call. The Claude Code plugin goes further: it hooks directly into every `Bash`, `Edit`, and `Write` call via Claude Code's own `PreToolUse` hook, so protection doesn't depend on the agent remembering to ask.
+The MCP server above gives your agent a tool it can *choose* to call. The Claude Code plugin goes further: it hooks directly into every tool call via Claude Code's own `PreToolUse` hook, so protection doesn't depend on the agent remembering to ask.
 
-```bash
-git clone https://github.com/lelu-ai/lelu.git && cd lelu
-claude plugin marketplace add ./
-claude plugin install lelu@lelu
-./plugin-claude-code/install.sh
 ```
+/plugin marketplace add Lelu-ai/lelu
+/plugin install lelu@lelu
+```
+
+On first use the plugin downloads its 1.5 MB checker for your platform in the background from this repo's GitHub release and checks it against the release checksums; [what it downloads and why](plugin-claude-code/README.md#what-the-plugin-downloads).
 
 Expansion-aware — `rm -rf ~/`, `rm -rf $HOME`, and reversed/separated/long-form flag variants are all caught, where a regex on the raw command text [catches 7/10 and false-positives on 4/4 benign commands](plugin-claude-code/benchmarks/report.md) — plus retry-storm detection and a session budget for runaway unattended sessions. **Shadow mode by default**, nothing blocks until you ask it to. Full docs → [plugin-claude-code](plugin-claude-code)
 
@@ -198,7 +201,7 @@ Self-hosting: `npx -y lelu-mcp start` runs the real engine with no build step, o
 <details>
 <summary><b>Is it really free?</b></summary>
 
-Yes — the engine, SDKs, MCP server, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start`, or build the engine yourself from source. The hosted sandbox at lelu-ai.com is just a convenience.
+Yes — the engine, SDKs, MCP server, plugins, and dashboard are MIT licensed. Self-host everything with `npx -y lelu-mcp start`, or build the engine yourself from source. lelu-ai.com also offers a hosted version with paid plans; those pay for hosting, call volume and support, never for security features. The project's commitments on this are in [GOVERNANCE.md](GOVERNANCE.md#open-source-and-the-hosted-service).
 </details>
 
 <details>
@@ -228,6 +231,53 @@ Contributions of every size are welcome — from a typo fix to a new framework i
 Pick up a [`good first issue`](https://github.com/lelu-ai/lelu/labels/good%20first%20issue), grab a [`help wanted`](https://github.com/lelu-ai/lelu/labels/help%20wanted) task, or start a thread in [Discussions](https://github.com/lelu-ai/lelu/discussions). Setup and guidelines → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 **If Lelu is useful to you, [a ⭐ star](https://github.com/lelu-ai/lelu/stargazers) helps more people find it — and tells us to keep going.**
+
+## Contributors
+
+Thanks to everyone who has helped build Lelu. Code, docs, examples, design and security reports all count ([emoji key](https://allcontributors.org/docs/en/emoji-key)). Had a pull request merged and you're not here? Open an issue or mention it in your next PR.
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Abenezer0923"><img src="https://avatars.githubusercontent.com/Abenezer0923?s=100" width="100px;" alt="Abenezer Getachew"/><br /><sub><b>Abenezer Getachew</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Abenezer0923" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=Abenezer0923" title="Documentation">📖</a> <a href="#infra-Abenezer0923" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-Abenezer0923" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Akuna444"><img src="https://avatars.githubusercontent.com/u/56131204?s=100" width="100px;" alt="Aklil Solomon"/><br /><sub><b>Aklil Solomon</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Akuna444" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Amanuelawol"><img src="https://avatars.githubusercontent.com/u/162971910?s=100" width="100px;" alt="Amanuelawol"/><br /><sub><b>Amanuelawol</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Amanuelawol" title="Code">💻</a> <a href="#security-Amanuelawol" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/avp9-nexus"><img src="https://avatars.githubusercontent.com/u/282341195?s=100" width="100px;" alt="Avp9"/><br /><sub><b>Avp9</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=avp9-nexus" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=avp9-nexus" title="Documentation">📖</a> <a href="#security-avp9-nexus" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/back-y"><img src="https://avatars.githubusercontent.com/u/133120241?s=100" width="100px;" alt="Bereket Gezha"/><br /><sub><b>Bereket Gezha</b></sub></a><br /><a href="#design-back-y" title="Design">🎨</a> <a href="https://github.com/lelu-ai/lelu/commits?author=back-y" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/bfs2021"><img src="https://avatars.githubusercontent.com/u/101915083?s=100" width="100px;" alt="zgy"/><br /><sub><b>zgy</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=bfs2021" title="Code">💻</a> <a href="#security-bfs2021" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Emanuel-js"><img src="https://avatars.githubusercontent.com/u/57919304?s=100" width="100px;" alt="Emanuel"/><br /><sub><b>Emanuel</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Emanuel-js" title="Code">💻</a> <a href="#security-Emanuel-js" title="Security">🛡️</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Eshetugirma"><img src="https://avatars.githubusercontent.com/u/115847211?s=100" width="100px;" alt="Eshetu Girma"/><br /><sub><b>Eshetu Girma</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Eshetugirma" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/khoap1220-hue"><img src="https://avatars.githubusercontent.com/u/233728558?s=100" width="100px;" alt="Khoa Phan"/><br /><sub><b>Khoa Phan</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=khoap1220-hue" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=khoap1220-hue" title="Tests">⚠️</a> <a href="https://github.com/lelu-ai/lelu/commits?author=khoap1220-hue" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/KunjMaheshwari"><img src="https://avatars.githubusercontent.com/u/93459418?s=100" width="100px;" alt="Kunj Maheshwari"/><br /><sub><b>Kunj Maheshwari</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=KunjMaheshwari" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=KunjMaheshwari" title="Tests">⚠️</a> <a href="#security-KunjMaheshwari" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/leemeo3"><img src="https://avatars.githubusercontent.com/u/117142323?s=100" width="100px;" alt="Lee Sang Hoon"/><br /><sub><b>Lee Sang Hoon</b></sub></a><br /><a href="#example-leemeo3" title="Examples">💡</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/mafujahmedridoy22-commits"><img src="https://avatars.githubusercontent.com/u/314548970?s=100" width="100px;" alt="mafujahmedridoy22-commits"/><br /><sub><b>mafujahmedridoy22-commits</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=mafujahmedridoy22-commits" title="Code">💻</a> <a href="#content-mafujahmedridoy22-commits" title="Content">🖋</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/mahirhir"><img src="https://avatars.githubusercontent.com/u/246701683?s=100" width="100px;" alt="Arne Rei"/><br /><sub><b>Arne Rei</b></sub></a><br /><a href="#example-mahirhir" title="Examples">💡</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/nischala755"><img src="https://avatars.githubusercontent.com/u/139974840?s=100" width="100px;" alt="Nischala G.S"/><br /><sub><b>Nischala G.S</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=nischala755" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/reflectme-source"><img src="https://avatars.githubusercontent.com/u/250825036?s=100" width="100px;" alt="reflectme-source"/><br /><sub><b>reflectme-source</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=reflectme-source" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Santoshkumarpuppala"><img src="https://avatars.githubusercontent.com/u/24365101?s=100" width="100px;" alt="Santosh Kumar Puppala"/><br /><sub><b>Santosh Kumar Puppala</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Santoshkumarpuppala" title="Code">💻</a> <a href="#security-Santoshkumarpuppala" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/simonether"><img src="https://avatars.githubusercontent.com/u/68971770?s=100" width="100px;" alt="Simon Sudarushkin"/><br /><sub><b>Simon Sudarushkin</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=simonether" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/sronix"><img src="https://avatars.githubusercontent.com/u/22137411?s=100" width="100px;" alt="Thomas Thomsen"/><br /><sub><b>Thomas Thomsen</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=sronix" title="Code">💻</a> <a href="#security-sronix" title="Security">🛡️</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/tyza66"><img src="https://avatars.githubusercontent.com/u/83948628?s=100" width="100px;" alt="孙达明"/><br /><sub><b>孙达明</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=tyza66" title="Code">💻</a> <a href="#security-tyza66" title="Security">🛡️</a> <a href="https://github.com/lelu-ai/lelu/commits?author=tyza66" title="Documentation">📖</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/urumb"><img src="https://avatars.githubusercontent.com/u/174009811?s=100" width="100px;" alt="Noel Jacob Antony"/><br /><sub><b>Noel Jacob Antony</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=urumb" title="Code">💻</a> <a href="#content-urumb" title="Content">🖋</a></td>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/Vedikajawaria"><img src="https://avatars.githubusercontent.com/u/144482494?s=100" width="100px;" alt="Vedikajawaria"/><br /><sub><b>Vedikajawaria</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=Vedikajawaria" title="Documentation">📖</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.29%"><a href="https://github.com/wdwd200"><img src="https://avatars.githubusercontent.com/u/183635770?s=100" width="100px;" alt="wdwd200"/><br /><sub><b>wdwd200</b></sub></a><br /><a href="https://github.com/lelu-ai/lelu/commits?author=wdwd200" title="Code">💻</a> <a href="https://github.com/lelu-ai/lelu/commits?author=wdwd200" title="Tests">⚠️</a> <a href="#security-wdwd200" title="Security">🛡️</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ---
 

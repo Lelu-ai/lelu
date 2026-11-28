@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/apikeys";
 import { listAuditEvents } from "@/lib/audit";
+import { PLANS } from "@/lib/billing/plans";
+import { getUserPlan } from "@/lib/quota";
 
 export async function GET(req: NextRequest) {
   // --- Auth ---
@@ -33,9 +35,14 @@ export async function GET(req: NextRequest) {
   const decision = searchParams.get("decision") ?? undefined;
 
   // --- Fetch ---
+  // A sandbox key (the public demo key) sees only the shared sandbox's events,
+  // never any account's. An account key sees its own, within its plan's
+  // audit history.
   try {
+    const sinceDays = userId ? PLANS[await getUserPlan(userId)].auditRetentionDays : null;
     const events = await listAuditEvents({
-      userId: userId ?? undefined,
+      ...(isSandbox ? { sandbox: true } : { userId }),
+      sinceDays,
       actor,
       action,
       decision,
@@ -47,7 +54,9 @@ export async function GET(req: NextRequest) {
       count: events.length,
       limit,
       cursor: 0,
-      next_cursor: events.length === limit ? (events[events.length - 1]?.id ?? 0) : 0,
+      // ids are BIGSERIAL, which the Postgres driver returns as strings; the
+      // SDKs' types (and docs) say this is a number.
+      next_cursor: events.length === limit ? Number(events[events.length - 1]?.id ?? 0) : 0,
     });
   } catch (err) {
     console.error("[api/v1/audit]", err);

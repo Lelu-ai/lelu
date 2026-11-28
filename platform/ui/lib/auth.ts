@@ -1,6 +1,7 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { db, ensureSchema } from "./db";
+import { decideOAuthLink, OAUTH_EMAIL_UNVERIFIED } from "./oauth-link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,12 +20,18 @@ export interface SessionPayload {
   email: string;
   name: string;
   emailVerified: boolean;
+  /** Random session id; the session is valid only while lelu_sessions has it. */
+  sid?: string;
   iat: number;
   exp: number;
 }
 
 export const SESSION_COOKIE = "lelu_session";
-const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
+export const SESSION_TTL = 60 * 60 * 24 * 7; // 7 days
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 // ── JWT (zero-dependency, Node.js crypto) ─────────────────────────────────────
 
@@ -38,6 +45,8 @@ function getSecret(): string {
   return s;
 }
 
+// Prefer createSession: a token signed here without a stored session id is
+// rejected by getCurrentUser.
 export function signJWT(payload: Omit<SessionPayload, "iat" | "exp">): string {
   const secret = getSecret();
   const now = Math.floor(Date.now() / 1000);
@@ -155,12 +164,16 @@ export interface OAuthProfileInput {
   emailVerified: boolean;
 }
 
-// Finds the user for an OAuth login, linking or creating as needed:
+// Finds the user for an OAuth login, linking or creating as needed. What is
+// allowed is decided by decideOAuthLink (lib/oauth-link.ts):
 //   1. This (provider, provider_account_id) already linked → that user.
-//   2. Not linked, but a user with this email already exists (password
-//      signup, or a different provider) → link this provider to it.
-//   3. Neither → create a new, password-less user (trusts the provider's own
-//      email verification instead of running our own verification flow).
+//   2. The provider has not verified the email → refused (throws
+//      OAUTH_EMAIL_UNVERIFIED). An unverified address proves nothing about
+//      who owns the matching Lelu account.
+//   3. A user with this email exists → link this provider to it. If that
+//      account never verified its email, its password is cleared and the
+//      email marked verified, since the provider has now proved ownership.
+//   4. Neither → create a new, password-less, verified user.
 export async function findOrCreateOAuthUser(
   provider: OAuthProviderName,
   profile: OAuthProfileInput
@@ -175,7 +188,17 @@ export async function findOrCreateOAuthUser(
     JOIN lelu_users u ON u.id = o.user_id
     WHERE o.provider = ${provider} AND o.provider_account_id = ${profile.providerAccountId}
   `;
-  if (linked.length > 0) {
+  const existing = linked.length > 0 ? null : await findUserByEmail(norm);
+
+  const decision = decideOAuthLink({
+    alreadyLinked: linked.length > 0,
+    providerEmailVerified: profile.emailVerified,
+    existing: existing
+      ? { emailVerified: existing.emailVerified, hasPassword: Boolean(existing.passwordHash) }
+      : null,
+  });
+
+  if (decision.kind === "use-linked") {
     const r = linked[0];
     return {
       id: r.id as string,
@@ -187,13 +210,23 @@ export async function findOrCreateOAuthUser(
     };
   }
 
-  const existing = await findUserByEmail(norm);
-  if (existing) {
+  if (decision.kind === "reject-unverified") throw new Error(OAUTH_EMAIL_UNVERIFIED);
+
+  if (decision.kind === "link-existing" && existing) {
+    if (decision.clearPassword) {
+      await sql`UPDATE lelu_users SET email_verified = TRUE, password_hash = NULL WHERE id = ${existing.id}`;
+    } else if (decision.markVerified) {
+      await sql`UPDATE lelu_users SET email_verified = TRUE WHERE id = ${existing.id}`;
+    }
     await sql`
       INSERT INTO lelu_oauth_accounts (id, user_id, provider, provider_account_id)
       VALUES (${randomBytes(16).toString("hex")}, ${existing.id}, ${provider}, ${profile.providerAccountId})
     `;
-    return existing;
+    return {
+      ...existing,
+      emailVerified: true,
+      passwordHash: decision.clearPassword ? null : existing.passwordHash,
+    };
   }
 
   const user: User = {
@@ -201,7 +234,7 @@ export async function findOrCreateOAuthUser(
     name: profile.name.trim(),
     email: norm,
     passwordHash: null,
-    emailVerified: profile.emailVerified,
+    emailVerified: true,
     createdAt: new Date().toISOString(),
   };
   await sql`
@@ -225,7 +258,11 @@ export async function recordLogin(userId: string): Promise<void> {
   await sql`UPDATE lelu_users SET last_login_at = NOW() WHERE id = ${userId}`;
 }
 
-// ── Email verification tokens ─────────────────────────────────────────────────
+// ── Email verification and password reset tokens ──────────────────────────────
+// The emailed link carries the raw token; the database stores only its
+// SHA-256, so a copy of the database can't be used to verify or reset
+// accounts. A token is used up by a single DELETE ... RETURNING, so two
+// requests racing with the same link can't both succeed.
 
 export async function createVerificationToken(userId: string): Promise<string> {
   await ensureSchema();
@@ -237,7 +274,7 @@ export async function createVerificationToken(userId: string): Promise<string> {
   await sql`DELETE FROM lelu_email_tokens WHERE user_id = ${userId}`;
   await sql`
     INSERT INTO lelu_email_tokens (token, user_id, expires_at, created_at)
-    VALUES (${token}, ${userId}, ${expiresAt.toISOString()}, NOW())
+    VALUES (${sha256(token)}, ${userId}, ${expiresAt.toISOString()}, NOW())
   `;
 
   return token;
@@ -248,21 +285,13 @@ export async function consumeVerificationToken(
 ): Promise<{ userId: string } | null> {
   const sql = db();
   const rows = await sql`
-    SELECT user_id, expires_at FROM lelu_email_tokens WHERE token = ${token}
+    DELETE FROM lelu_email_tokens WHERE token = ${sha256(token)}
+    RETURNING user_id, expires_at
   `;
   if (rows.length === 0) return null;
-
-  const row = rows[0];
-  if (new Date(row.expires_at as string) < new Date()) {
-    await sql`DELETE FROM lelu_email_tokens WHERE token = ${token}`;
-    return null;
-  }
-
-  await sql`DELETE FROM lelu_email_tokens WHERE token = ${token}`;
-  return { userId: row.user_id as string };
+  if (new Date(rows[0].expires_at as string) < new Date()) return null;
+  return { userId: rows[0].user_id as string };
 }
-
-// ── Password reset tokens ─────────────────────────────────────────────────────
 
 export async function createPasswordResetToken(userId: string): Promise<string> {
   await ensureSchema();
@@ -274,7 +303,7 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
   await sql`DELETE FROM lelu_password_reset_tokens WHERE user_id = ${userId}`;
   await sql`
     INSERT INTO lelu_password_reset_tokens (token, user_id, expires_at, created_at)
-    VALUES (${token}, ${userId}, ${expiresAt.toISOString()}, NOW())
+    VALUES (${sha256(token)}, ${userId}, ${expiresAt.toISOString()}, NOW())
   `;
 
   return token;
@@ -285,23 +314,21 @@ export async function consumePasswordResetToken(
 ): Promise<{ userId: string } | null> {
   const sql = db();
   const rows = await sql`
-    SELECT user_id, expires_at FROM lelu_password_reset_tokens WHERE token = ${token}
+    DELETE FROM lelu_password_reset_tokens WHERE token = ${sha256(token)}
+    RETURNING user_id, expires_at
   `;
   if (rows.length === 0) return null;
-
-  const row = rows[0];
-  if (new Date(row.expires_at as string) < new Date()) {
-    await sql`DELETE FROM lelu_password_reset_tokens WHERE token = ${token}`;
-    return null;
-  }
-
-  await sql`DELETE FROM lelu_password_reset_tokens WHERE token = ${token}`;
-  return { userId: row.user_id as string };
+  if (new Date(rows[0].expires_at as string) < new Date()) return null;
+  return { userId: rows[0].user_id as string };
 }
 
+/** Sets a new password and signs the user out everywhere. */
 export async function updateUserPassword(userId: string, newPassword: string): Promise<void> {
   const sql = db();
   await sql`UPDATE lelu_users SET password_hash = ${hashPassword(newPassword)} WHERE id = ${userId}`;
+  // A reset is often how someone recovers a compromised account: any session
+  // opened before it, including an attacker's, must stop working.
+  await endAllSessions(userId);
 }
 
 // ── Session helpers ───────────────────────────────────────────────────────────
@@ -316,12 +343,76 @@ export function cookieOptions(maxAge: number) {
   };
 }
 
+/**
+ * Starts a session for a user who just proved who they are, and returns the
+ * signed token to put in the session cookie. The token carries a random
+ * session id; the session lasts only while its row in lelu_sessions does.
+ */
+export async function createSession(user: {
+  id: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+}): Promise<string> {
+  await ensureSchema();
+  const sql = db();
+  const sid = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + SESSION_TTL * 1000);
+  // Housekeeping: drop this user's expired sessions.
+  await sql`DELETE FROM lelu_sessions WHERE user_id = ${user.id} AND expires_at < NOW()`;
+  await sql`
+    INSERT INTO lelu_sessions (id_hash, user_id, expires_at)
+    VALUES (${sha256(sid)}, ${user.id}, ${expiresAt.toISOString()})
+  `;
+  return signJWT({ userId: user.id, email: user.email, name: user.name, emailVerified: user.emailVerified, sid });
+}
+
+/** Ends the session a cookie token belongs to (logout). Safe to call with any value. */
+export async function endSession(token: string | undefined): Promise<void> {
+  const payload = token ? verifyJWT(token) : null;
+  if (!payload?.sid) return;
+  const sql = db();
+  await sql`DELETE FROM lelu_sessions WHERE id_hash = ${sha256(payload.sid)}`;
+}
+
+/** Ends every session a user has, on every device. */
+export async function endAllSessions(userId: string): Promise<void> {
+  const sql = db();
+  await sql`DELETE FROM lelu_sessions WHERE user_id = ${userId}`;
+}
+
+/**
+ * The signed-in user, or null. Besides checking the token's signature and
+ * expiry, the session must still exist on the server, so a logged-out,
+ * reset or deleted session stops working at once. Name, email and verified
+ * status come from the database, not from the token, so they are current.
+ * Tokens issued before server-side sessions existed carry no session id and
+ * are no longer accepted.
+ */
 export async function getCurrentUser(): Promise<SessionPayload | null> {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE)?.value;
     if (!token) return null;
-    return verifyJWT(token);
+    const payload = verifyJWT(token);
+    if (!payload?.sid) return null;
+
+    await ensureSchema();
+    const sql = db();
+    const rows = await sql`
+      SELECT u.id, u.email, u.name, u.email_verified
+      FROM lelu_sessions s
+      JOIN lelu_users u ON u.id = s.user_id
+      WHERE s.id_hash = ${sha256(payload.sid)} AND s.expires_at > NOW()
+    `;
+    if (rows.length === 0 || rows[0].id !== payload.userId) return null;
+    const r = rows[0];
+    return {
+      ...payload,
+      email: r.email as string,
+      name: r.name as string,
+      emailVerified: r.email_verified as boolean,
+    };
   } catch {
     return null;
   }

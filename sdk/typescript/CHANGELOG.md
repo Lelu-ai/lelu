@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-**Requires the next engine release (after 0.2.1).** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
+**Requires engine 0.3.0 or later.** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
 
 ### Breaking
 
@@ -15,6 +15,28 @@
 * **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).
 * `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
 * `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
+
+## [0.1.2](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.1...typescript-sdk-v0.1.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* REST accepts context.signal and actor; SDK reports real latencyMs and rule ([07886d3](https://github.com/Lelu-ai/lelu/commit/07886d3a71fda401e140fba3ac62d6cfd400fbff))
+* **sdk-typescript:** report real latencyMs and rule in authorize() ([492f235](https://github.com/Lelu-ai/lelu/commit/492f235b8a0b6c5dc94ace67bd2c48316de54e24))
+
+## [0.1.1](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.0...typescript-sdk-v0.1.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **sdk-typescript:** redeemReview returns refusal result on 403 ([ba6434c](https://github.com/Lelu-ai/lelu/commit/ba6434c408166a382a4dc3ab8c161613b9b094b8))
+* **sdk-typescript:** redeemReview returns refusal result on 403 ([8f00af5](https://github.com/Lelu-ai/lelu/commit/8f00af5ce045b250861334767eaefb57736784ac))
+
+
+### Documentation
+
+* fix the pages Nauro round 2 found still out of date ([ac2d57a](https://github.com/Lelu-ai/lelu/commit/ac2d57ad1c78caa3f55c13b36a6aa93a655b04f0))
+* fix the pages Nauro round 2 found still out of date ([3769938](https://github.com/Lelu-ai/lelu/commit/376993891651fcacf2e7a819461de387599113b5))
 
 ## [0.1.0](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.0.36...typescript-sdk-v0.1.0) (2026-11-12)
 

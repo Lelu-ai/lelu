@@ -63,16 +63,41 @@ export async function logAuditEvent(input: LogAuditEventInput): Promise<void> {
   }
 }
 
+// Whose events a query may return. Exactly one owner, always: a user's own
+// events, or the shared sandbox's (user_id NULL, mode 'sandbox'). There is no
+// "everyone" scope, so a missing user can never widen a query to all tenants.
+export type AuditScope = { userId: string } | { sandbox: true };
+
+function scopeOf(opts: { userId?: string | null; sandbox?: boolean }): AuditScope | null {
+  if (opts.sandbox) return { sandbox: true };
+  if (opts.userId) return { userId: opts.userId };
+  return null;
+}
+
+// Oldest event a plan may see, or null for unlimited history.
+function retentionCutoff(sinceDays: number | null | undefined): Date | null {
+  if (!sinceDays || sinceDays <= 0) return null;
+  return new Date(Date.now() - sinceDays * 86_400_000);
+}
+
 export async function listAuditEvents(opts: {
-  userId?: string;
+  userId?: string | null;
+  /** Read the shared sandbox's events instead of a user's. */
+  sandbox?: boolean;
+  /** Only events from the last N days (the plan's audit history); null = all. */
+  sinceDays?: number | null;
   actor?: string;
   action?: string;
   decision?: string;
   limit?: number;
 }): Promise<AuditEventRow[]> {
+  const scope = scopeOf(opts);
+  if (!scope) return [];
   await ensureSchema();
   const sql = db();
   const limit = Math.min(opts.limit ?? 100, 500);
+  const scopeUser = "userId" in scope ? scope.userId : null;
+  const since = retentionCutoff(opts.sinceDays);
 
   // Build filters dynamically
   const rows = await sql`
@@ -80,7 +105,11 @@ export async function listAuditEvents(opts: {
            policy_name, confidence, latency_ms, mode, input_hash, output_hash, policy_digest, created_at
     FROM lelu_audit_events
     WHERE
-      (${opts.userId ?? null}::text IS NULL OR user_id = ${opts.userId ?? null})
+      (
+        (${scopeUser}::text IS NOT NULL AND user_id = ${scopeUser})
+        OR (${scopeUser}::text IS NULL AND user_id IS NULL AND mode = 'sandbox')
+      )
+      AND (${since}::timestamptz IS NULL OR created_at >= ${since})
       AND (${opts.actor ?? null}::text IS NULL OR actor ILIKE ${'%' + (opts.actor ?? '') + '%'})
       AND (${opts.action ?? null}::text IS NULL OR action ILIKE ${'%' + (opts.action ?? '') + '%'})
       AND (${opts.decision ?? null}::text IS NULL OR decision = ${opts.decision ?? null})
@@ -109,22 +138,27 @@ export async function listAuditEvents(opts: {
   }));
 }
 
-export async function getAuditStats(userId?: string): Promise<{
+// Decision counts for one user's events (within their plan's audit history
+// when sinceDays is set). No user means no rows, never every user's.
+export async function getAuditStats(userId?: string | null, sinceDays?: number | null): Promise<{
   total: number;
   allowed: number;
   denied: number;
   human_review: number;
   compute: number;
 }> {
+  const stats = { total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 };
+  if (!userId) return stats;
   await ensureSchema();
   const sql = db();
+  const since = retentionCutoff(sinceDays);
   const rows = await sql`
     SELECT decision, COUNT(*)::int AS cnt
     FROM lelu_audit_events
-    WHERE (${userId ?? null}::text IS NULL OR user_id = ${userId ?? null})
+    WHERE user_id = ${userId}
+      AND (${since}::timestamptz IS NULL OR created_at >= ${since})
     GROUP BY decision
   `;
-  const stats = { total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 };
   for (const r of rows) {
     const cnt = r.cnt as number;
     stats.total += cnt;

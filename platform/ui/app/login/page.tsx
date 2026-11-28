@@ -34,6 +34,12 @@ function LoginForm() {
       ? "Invalid verification link."
       : queryError === "verification_failed"
       ? "Email verification failed. Please try again."
+      : queryError === "oauth_email_unverified"
+      ? "Your Google or GitHub email address isn't verified. Verify it with them first, or sign in with your password."
+      : queryError === "oauth_expired" || queryError === "oauth_invalid_state" || queryError === "oauth_missing_params"
+      ? "Sign-in took too long or was interrupted. Please try again."
+      : queryError === "oauth_failed"
+      ? "Sign-in with Google or GitHub failed. Please try again."
       : null;
 
   const showResend = notVerified || queryError === "token_expired";

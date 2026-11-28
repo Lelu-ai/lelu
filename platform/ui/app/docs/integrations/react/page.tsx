@@ -75,7 +75,7 @@ export default function DocsIntegrationsReact() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">ApprovalDashboard.tsx</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { LeluApprovalUI } from "lelu/react";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { LeluApprovalUI } from "lelu-agent-auth/react";
 
 export function ApprovalDashboard() {
   return (
@@ -106,7 +106,7 @@ export function ApprovalDashboard() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">AgentStatus.tsx</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { AgentReputationDashboard } from "lelu/react";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { AgentReputationDashboard } from "lelu-agent-auth/react";
 
 export function AgentStatus({ agentId }: { agentId: string }) {
   return (

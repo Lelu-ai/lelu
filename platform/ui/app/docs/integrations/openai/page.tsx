@@ -75,6 +75,16 @@ for (const call of response.choices[0].message.tool_calls ?? []) {
     }
   }
 
+  if (decision.decision === "compute" && decision.safeTool) {
+    // Allowed, but redirected: run the safe tool Lelu chose with its safe
+    // arguments, not the original call.
+    await dispatchTool({
+      ...call,
+      function: { name: decision.safeTool, arguments: JSON.stringify(decision.safeArgs ?? {}) },
+    });
+    continue;
+  }
+
   // safe to execute
   await dispatchTool(call);
 }`}</pre>

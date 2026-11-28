@@ -20,7 +20,24 @@ export function db(): ReturnType<typeof postgres> {
   return _sql;
 }
 
-export async function ensureSchema(): Promise<void> {
+// Run the schema setup once per server instance, not on every request. It is
+// ~29 statements, several of which take an exclusive lock on lelu_users even
+// when there is nothing to change, so running it per request slowed every
+// route and made concurrent requests wait on each other. A failure is not
+// cached: the next call tries again.
+let schemaReady: Promise<void> | undefined;
+
+export function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = applySchema().catch((err) => {
+      schemaReady = undefined;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+
+async function applySchema(): Promise<void> {
   const sql = db();
 
   await sql`
@@ -70,6 +87,29 @@ export async function ensureSchema(): Promise<void> {
       ON lelu_users (billing_provider, billing_customer_id) WHERE billing_customer_id IS NOT NULL
   `;
 
+  // Per-account monthly call volume (Enterprise, or a one-off arrangement).
+  // NULL means the plan's own amount. See lib/billing/plans.ts.
+  await sql`ALTER TABLE lelu_users ADD COLUMN IF NOT EXISTS call_limit_override BIGINT`;
+
+  // One row per account per month of overage billed. The primary key makes
+  // the monthly job safe to re-run: a month is charged at most once, and a
+  // failed charge stays 'failed' until a later run retries it.
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_overage_charges (
+      user_id          TEXT NOT NULL,
+      period_start     DATE NOT NULL,
+      plan             TEXT NOT NULL,
+      included_calls   BIGINT NOT NULL,
+      used_calls       BIGINT NOT NULL,
+      blocks           INTEGER NOT NULL,
+      status           TEXT NOT NULL DEFAULT 'pending',
+      error            TEXT,
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, period_start)
+    )
+  `;
+
   // Backfill for databases created before OAuth-only (no password) users existed.
   await sql`
     ALTER TABLE lelu_users ALTER COLUMN password_hash DROP NOT NULL
@@ -106,6 +146,21 @@ export async function ensureSchema(): Promise<void> {
       expires_at TIMESTAMPTZ NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `;
+
+  // Server-side record of each login. The session cookie carries a random
+  // session id; a session is valid only while its row exists, so logout and
+  // password reset can end it. Only the SHA-256 of the id is stored.
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_sessions (
+      id_hash    TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_sessions_user ON lelu_sessions (user_id)
   `;
 
   await sql`

@@ -5,8 +5,10 @@ from __future__ import annotations
 import math
 import os
 import time
+import warnings
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeGuard
 
 import httpx
 
@@ -16,6 +18,7 @@ from .models import (
     AuthDecision,
     AuthEngineError,
     AuthorizeRequest,
+    ConfidenceSignal,
     DelegateScopeRequest,
     DelegateScopeResult,
     MintTokenRequest,
@@ -77,19 +80,249 @@ def _reviewer_headers(reviewer_key: str | None) -> dict[str, str] | None:
     return {"X-Lelu-Reviewer-Key": reviewer_key} if reviewer_key else None
 
 
-class ConfidenceFrom:
-    """Derives a verified confidence score from an LLM provider response.
+_CONFIDENCE_FROM_DEPRECATION = (
+    "LeluClient.confidence_from is deprecated; use LeluClient.signal_from "
+    "with AgentContext(confidence_signal=...) so the engine extracts the "
+    "score directly."
+)
 
-    Use the result as ``context.confidence`` in authorize calls — never let
-    the agent supply its own confidence value. Mirrors the TypeScript SDK's
-    ``LeluClient.confidenceFrom``.
+
+def _is_finite_number(value: Any) -> TypeGuard[int | float]:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def _extract_openai_logprobs(response: Any) -> list[float] | None:
+    if response is None:
+        return None
+    choices = (
+        response.get("choices")
+        if isinstance(response, Mapping)
+        else getattr(response, "choices", None)
+    )
+    if not choices or not isinstance(choices, Sequence):
+        return None
+    first = choices[0]
+    if first is None:
+        return None
+    logprobs_obj = (
+        first.get("logprobs")
+        if isinstance(first, Mapping)
+        else getattr(first, "logprobs", None)
+    )
+    if logprobs_obj is None:
+        return None
+    content = (
+        logprobs_obj.get("content")
+        if isinstance(logprobs_obj, Mapping)
+        else getattr(logprobs_obj, "content", None)
+    )
+    if not content or not isinstance(content, Sequence):
+        return None
+
+    extracted: list[float] = []
+    for tok in content:
+        lp = tok.get("logprob") if isinstance(tok, Mapping) else getattr(tok, "logprob", None)
+        if not _is_finite_number(lp):
+            return None
+        extracted.append(float(lp))
+    return extracted or None
+
+
+def _extract_bedrock_logprobs(response: Any) -> list[float] | None:
+    if response is None:
+        return None
+    raw_logprobs = (
+        response.get("logprobs")
+        if isinstance(response, Mapping)
+        else getattr(response, "logprobs", None)
+    )
+    if (
+        raw_logprobs
+        and isinstance(raw_logprobs, Sequence)
+        and not isinstance(raw_logprobs, (str, bytes))
+    ):
+        vals: list[float] = []
+        for lp in raw_logprobs:
+            if not _is_finite_number(lp):
+                return None
+            vals.append(float(lp))
+        if vals:
+            return vals
+
+    generations = (
+        response.get("generations")
+        if isinstance(response, Mapping)
+        else getattr(response, "generations", None)
+    )
+    if not generations or not isinstance(generations, Sequence):
+        return None
+    first = generations[0]
+    if first is None:
+        return None
+    likelihoods = (
+        first.get("token_likelihoods")
+        if isinstance(first, Mapping)
+        else getattr(first, "token_likelihoods", None)
+    )
+    if not likelihoods or not isinstance(likelihoods, Sequence):
+        return None
+
+    extracted: list[float] = []
+    for tok in likelihoods:
+        val = (
+            tok.get("likelihood")
+            if isinstance(tok, Mapping)
+            else getattr(tok, "likelihood", None)
+        )
+        if not _is_finite_number(val):
+            return None
+        extracted.append(float(val))
+    return extracted or None
+
+
+def _extract_bedrock_probabilities(response: Any) -> list[float] | None:
+    if response is None:
+        return None
+    raw_probs: Any = None
+    if isinstance(response, Mapping):
+        raw_probs = response.get("token_probabilities")
+        if raw_probs is None:
+            raw_probs = response.get("tokenProbabilities")
+    else:
+        raw_probs = getattr(response, "token_probabilities", None)
+        if raw_probs is None:
+            raw_probs = getattr(response, "tokenProbabilities", None)
+    if not raw_probs or not isinstance(raw_probs, Sequence) or isinstance(raw_probs, (str, bytes)):
+        return None
+
+    vals: list[float] = []
+    for p in raw_probs:
+        if not _is_finite_number(p) or not 0.0 <= float(p) <= 1.0:
+            return None
+        vals.append(float(p))
+    return vals or None
+
+
+class SignalFrom:
+    """Builds a ``ConfidenceSignal`` from an LLM provider response.
+
+    Pass the result as ``AgentContext(confidence_signal=signal)`` in authorize
+    calls — the engine extracts the score from the raw token/entropy data
+    itself, so it works against strict engines where self-reported
+    ``confidence`` is disabled. Mirrors ``LeluClient.signalFrom`` in the
+    TypeScript SDK.
+    """
+
+    @staticmethod
+    def openai(response: Any) -> ConfidenceSignal | None:
+        """OpenAI chat completions with ``logprobs=True``. Returns ``None`` without logprobs."""
+        logprobs = _extract_openai_logprobs(response)
+        if not logprobs:
+            return None
+        return ConfidenceSignal(provider="openai", token_logprobs=logprobs)
+
+    @staticmethod
+    def anthropic(_response: Any) -> None:
+        """Anthropic does not expose token-level log-probs — always returns ``None``.
+
+        Omit ``confidence_signal`` and let the engine's ``MissingSignalMode`` decide.
+        """
+        return None
+
+    @staticmethod
+    def bedrock(response: Any) -> ConfidenceSignal | None:
+        """Amazon Bedrock model families that expose token-level data (e.g. Cohere
+        ``token_likelihoods``, a raw ``logprobs`` list, or ``token_probabilities``).
+
+        Returns ``None`` when the model exposes none (notably Anthropic Claude on Bedrock).
+        """
+        logprobs = _extract_bedrock_logprobs(response)
+        if logprobs:
+            return ConfidenceSignal(provider="bedrock", token_logprobs=logprobs)
+        probs = _extract_bedrock_probabilities(response)
+        if probs:
+            return ConfidenceSignal(provider="bedrock", token_probabilities=probs)
+        return None
+
+    @staticmethod
+    def local(
+        data: Mapping[str, Any] | None = None,
+        *,
+        token_probabilities: Sequence[float] | None = None,
+        entropy: float | None = None,
+        entropy_max: float | None = None,
+    ) -> ConfidenceSignal | None:
+        """Local models: pass ``token_probabilities`` in ``[0, 1]``, or ``entropy`` (+ ``entropy_max``).
+
+        Accepts either keyword arguments or a dict matching the TypeScript SDK
+        (``{"tokenProbabilities": [...]}`` / ``{"entropy": ..., "entropyMax": ...}``).
+        """
+        probs_in: Any = token_probabilities
+        ent_in: Any = entropy
+        ent_max_in: Any = entropy_max
+
+        if data is not None:
+            if not isinstance(data, Mapping):
+                return None
+            if probs_in is None:
+                probs_in = (
+                    data.get("token_probabilities")
+                    if "token_probabilities" in data
+                    else data.get("tokenProbabilities")
+                )
+            if ent_in is None:
+                ent_in = data.get("entropy")
+            if ent_max_in is None:
+                ent_max_in = (
+                    data.get("entropy_max")
+                    if "entropy_max" in data
+                    else data.get("entropyMax")
+                )
+
+        if probs_in is not None:
+            if (
+                not isinstance(probs_in, Sequence)
+                or isinstance(probs_in, (str, bytes))
+                or not probs_in
+            ):
+                return None
+            clean_probs: list[float] = []
+            for p in probs_in:
+                if not _is_finite_number(p) or not 0.0 <= float(p) <= 1.0:
+                    return None
+                clean_probs.append(float(p))
+            return ConfidenceSignal(provider="local", token_probabilities=clean_probs)
+
+        if ent_in is not None:
+            if not _is_finite_number(ent_in) or float(ent_in) < 0.0:
+                return None
+            clean_max: float | None = None
+            if ent_max_in is not None:
+                if not _is_finite_number(ent_max_in) or float(ent_max_in) <= 0.0:
+                    return None
+                clean_max = float(ent_max_in)
+            return ConfidenceSignal(
+                provider="local",
+                entropy=float(ent_in),
+                entropy_max=clean_max,
+            )
+
+        return None
+
+
+class ConfidenceFrom:
+    """Deprecated scalar confidence helper — prefer :class:`SignalFrom` (``LeluClient.signal_from``).
+
+    Self-reported ``context.confidence`` is ignored by engines running with the
+    default ``CONFIDENCE_ALLOW_UNVERIFIED=false``. Build a ``ConfidenceSignal``
+    with ``LeluClient.signal_from`` and pass ``AgentContext(confidence_signal=...)``
+    instead.
     """
 
     @staticmethod
     def openai(response: Any) -> float | None:
-        """Derive confidence from OpenAI chat-completion logprobs (requires
-        ``logprobs=True`` in the API call). Returns ``None`` when logprobs are
-        absent — never returns a fabricated default."""
+        """Deprecated: use ``LeluClient.signal_from.openai(response)`` instead."""
+        warnings.warn(_CONFIDENCE_FROM_DEPRECATION, DeprecationWarning, stacklevel=2)
         try:
             tokens = response.choices[0].logprobs.content
         except (AttributeError, IndexError, TypeError):
@@ -101,18 +334,14 @@ class ConfidenceFrom:
 
     @staticmethod
     def anthropic(_response: Any) -> None:
-        """Anthropic does not expose token-level log-probs.
-        Always returns ``None`` — use a judge-model scorer instead."""
+        """Deprecated: use ``LeluClient.signal_from.anthropic(response)`` instead."""
+        warnings.warn(_CONFIDENCE_FROM_DEPRECATION, DeprecationWarning, stacklevel=2)
         return None
 
     @staticmethod
     def bedrock(response: Any) -> float | None:
-        """Derive confidence from an Amazon Bedrock model response, for model
-        families that expose token-level data — e.g. Cohere
-        ``token_likelihoods``, or a raw ``logprobs`` list. Returns ``None``
-        when no token signal is present (notably Anthropic Claude on Bedrock,
-        which has no log-probs): omit the signal and let the engine's
-        ``MissingSignalMode`` decide rather than fabricating a value."""
+        """Deprecated: use ``LeluClient.signal_from.bedrock(response)`` instead."""
+        warnings.warn(_CONFIDENCE_FROM_DEPRECATION, DeprecationWarning, stacklevel=2)
         logprobs: list[float] | None = None
         if isinstance(response, dict):
             logprobs = response.get("logprobs")
@@ -155,8 +384,11 @@ class LeluClient:
         await lelu.aclose()
     """
 
-    #: Derives a verified confidence score from an LLM provider response —
-    #: e.g. ``LeluClient.confidence_from.openai(response)``.
+    #: Builds a ``ConfidenceSignal`` from an LLM provider response —
+    #: e.g. ``LeluClient.signal_from.openai(response)``.
+    signal_from = SignalFrom
+
+    #: Deprecated: use :attr:`signal_from` instead.
     confidence_from = ConfidenceFrom
 
     def __init__(
@@ -225,6 +457,8 @@ class LeluClient:
             body["actor"] = req.actor
         ctx = req.context
         if ctx is not None:
+            if ctx.confidence_signal is not None:
+                body["confidence_signal"] = ctx.confidence_signal.to_wire_dict()
             if ctx.confidence is not None:
                 body["confidence"] = ctx.confidence
             if ctx.acting_for:
@@ -578,7 +812,7 @@ class LeluClient:
     async def simulator_replay(self, req: SimulatorReplayRequest) -> SimulatorReplayResponse:
         """Replay historical traces against a proposed policy to preview its
         impact before promoting it live."""
-        data = await self._post("/v1/simulator/replay", req.model_dump())
+        data = await self._post("/v1/simulator/replay", req.model_dump(exclude_none=True))
         return SimulatorReplayResponse(**data)
 
     # ── Engine status ──────────────────────────────────────────────────────────

@@ -12,17 +12,18 @@ export default function DocsConceptCli() {
 
   const quickAddCommands: Record<typeof quickTab, string> = {
     Cursor: "npx lelu-mcp add --cursor",
-    "Claude Code": "npx lelu-mcp add --claude",
+    "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
     "Open Code": "npx lelu-mcp add --open-code",
     Manual:
-      "npx lelu-mcp start --transport stdio --engine-url https://lelu-ai.com --api-key YOUR_API_KEY",
+      "npx lelu-mcp start --transport stdio --engine-url http://localhost:8083 --api-key YOUR_API_KEY",
   };
 
   const configSnippets: Record<typeof configTab, string> = {
     "SSE (Docker)": `{
   "mcpServers": {
     "lelu": {
-      "url": "http://localhost:3003/sse"
+      "url": "http://localhost:3003/sse",
+      "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
     }
   }
 }`,
@@ -30,15 +31,14 @@ export default function DocsConceptCli() {
   "mcpServers": {
     "lelu": {
       "command": "npx",
-      "args": ["lelu-mcp", "start", "--transport", "stdio"],
+      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"],
       "env": {
-        "LELU_API_KEY": "your_key_here",
-        "LELU_API_KEY": "YOUR_API_KEY"
+        "LELU_API_KEY": "your_key_here"
       }
     }
   }
 }`,
-    "Claude Code": "claude mcp add --transport http lelu http://localhost:3003/sse",
+    "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
   };
 
   return (

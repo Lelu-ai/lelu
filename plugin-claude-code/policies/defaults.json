@@ -118,6 +118,17 @@
       ]
     }
   ],
+  "guarded_paths": [
+    {
+      "contains": ".lelu/"
+    },
+    {
+      "contains": ".claude/plugins/"
+    },
+    {
+      "contains": ".claude/settings"
+    }
+  ],
   "remote_script_pipe": {
     "enabled": true,
     "downloaders": [
@@ -137,6 +148,55 @@
       "perl",
       "ruby",
       "node"
+    ]
+  },
+  "tools": {
+    "allow": [
+      "Glob",
+      "Grep",
+      "LS",
+      "NotebookRead",
+      "WebSearch",
+      "TodoRead",
+      "TodoWrite",
+      "Task",
+      "Agent",
+      "TaskOutput",
+      "TaskStop",
+      "BashOutput",
+      "KillShell",
+      "KillBash",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "AskUserQuestion",
+      "Skill",
+      "SlashCommand",
+      "ToolSearch",
+      "ListMcpResourcesTool",
+      "ReadMcpResourceTool",
+      "TaskCreate",
+      "TaskGet",
+      "TaskList",
+      "TaskUpdate",
+      "SendMessage",
+      "ListAgents",
+      "CronList",
+      "LSP"
+    ],
+    "web_fetch_allowed_hosts": [
+      "github.com",
+      "raw.githubusercontent.com",
+      "docs.github.com",
+      "developer.mozilla.org",
+      "go.dev",
+      "pkg.go.dev",
+      "docs.python.org",
+      "pypi.org",
+      "npmjs.com",
+      "docs.rs",
+      "crates.io",
+      "code.claude.com",
+      "docs.claude.com"
     ]
   },
   "loop_detection": {

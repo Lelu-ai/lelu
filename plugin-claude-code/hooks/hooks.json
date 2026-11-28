@@ -1,12 +1,24 @@
 {
   "hooks": {
-    "PreToolUse": [
+    "SessionStart": [
       {
-        "matcher": "Bash|Edit|Write|mcp__.*",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook"
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\" session",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/lelu-hook.sh\"",
+            "timeout": 600
           }
         ]
       }

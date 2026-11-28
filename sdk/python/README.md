@@ -70,6 +70,36 @@ auth = lelu(
 `LeluClient(...)` from earlier versions keeps working unchanged — `auth.api`
 is that same client.
 
+## Confidence signals
+
+Engines in their default configuration reject bare self-reported `confidence`
+numbers (`CONFIDENCE_ALLOW_UNVERIFIED=false`). Build a `ConfidenceSignal` from
+your LLM provider's response with `LeluClient.signal_from` (`.openai`,
+`.bedrock`, `.local`; `.anthropic` always returns `None`) so the engine extracts
+the score from the token/entropy data directly:
+
+```python
+from lelu import AgentContext, LeluClient, lelu
+
+auth = lelu(actor="invoice_bot")
+
+resp = await openai_client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=messages,
+    logprobs=True,
+)
+signal = LeluClient.signal_from.openai(resp)  # None if logprobs are absent
+
+result = await auth.authorize(
+    tool="refund:process",
+    context=AgentContext(confidence_signal=signal) if signal else None,
+)
+```
+
+When `signal` is `None` (for example, Anthropic models that expose no token
+log-probs), omit `confidence_signal` so the engine's `MissingSignalMode`
+decides rather than inventing a default score.
+
 ## Mounting the approval handler (optional)
 
 `auth.handler` is an ASGI app that exposes the engine's authorize and review

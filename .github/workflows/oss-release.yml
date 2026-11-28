@@ -5,10 +5,16 @@ on:
     tags:
       - "v*"
 
+# Read-only by default; jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 jobs:
   release-engine:
     name: Release engine binaries
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # create the GitHub release
 
     steps:
       - uses: actions/checkout@v4

@@ -351,6 +351,7 @@ export class LeluClient {
   async authorize(req: AuthorizeRequest): Promise<AuthDecision> {
     const validated = AuthorizeRequestSchema.parse(req);
     const body = this.authorizeBody(validated);
+    const started = Date.now();
 
     const data = await this.post<{
       allowed: boolean;
@@ -375,12 +376,17 @@ export class LeluClient {
                                    "deny";
 
     return {
+      // The engine's trace id, which is also the id the hosted audit log
+      // records for this call.
       requestId: data.trace_id,
       tool:      validated.tool,
       decision,
       reason:    data.reason,
-      rule:      "",
-      latencyMs: 0,
+      // Every decision here comes from the engine's pipeline, as REST's live
+      // calls report it; the matching policy rule isn't returned by the engine.
+      rule:      "engine",
+      // Round trip as the caller saw it, including the network.
+      latencyMs: Date.now() - started,
       mode:      "live",
       timestamp: new Date().toISOString(),
       allowed:   data.allowed,

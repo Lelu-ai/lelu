@@ -1,5 +1,7 @@
 import { listAuditEvents, getAuditStats, type AuditEventRow } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
+import { PLANS } from "@/lib/billing/plans";
+import { getUserPlan } from "@/lib/quota";
 import { AuditTable } from "@/components/AuditTable";
 import LeluFooter from "@/components/LeluFooter";
 
@@ -45,16 +47,19 @@ export default async function AuditPage({
 }) {
   const params = await searchParams;
   const user = await getCurrentUser();
+  // Free shows its last 30 days of history; paid plans show all of it.
+  const sinceDays = user ? PLANS[await getUserPlan(user.userId).catch(() => "free" as const)].auditRetentionDays : null;
 
   const [events, stats] = await Promise.all([
     listAuditEvents({
       userId: user?.userId,
+      sinceDays,
       actor: params.actor,
       action: params.action,
       decision: params.decision,
       limit: 100,
     }).catch(() => []),
-    getAuditStats(user?.userId).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 })),
+    getAuditStats(user?.userId, sinceDays).catch(() => ({ total: 0, allowed: 0, denied: 0, human_review: 0, compute: 0 })),
   ]);
 
   const safeEvents = Array.isArray(events) ? events : [];
@@ -74,7 +79,7 @@ export default async function AuditPage({
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Audit Log</h1>
-            <p className="text-zinc-600 dark:text-zinc-400">SOC 2-ready immutable event trail</p>
+            <p className="text-zinc-600 dark:text-zinc-400">Hash-chained, signed event trail</p>
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-900 dark:text-zinc-200 rounded-md text-sm font-medium transition-colors">

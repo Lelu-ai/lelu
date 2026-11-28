@@ -1,14 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { PriceIds, SelfServePlan } from "./plans";
 
 // Paddle Billing helpers. Everything in this file is pure (no network, no
 // database) so it can be unit tested; the routes under app/api/billing/paddle
 // do the I/O.
 //
 // Paddle is a merchant of record: it sells to the customer, collects tax and
-// handles chargebacks. Lelu only needs to know "is this user paying right now",
-// which is what `planForStatus` answers.
+// handles chargebacks. Lelu only needs to know "which plan is this user paying
+// for right now": `isPayingStatus` answers whether, and the subscription's
+// price answers which.
 
-export type Plan = "free" | "paid";
+export type Plan = "free" | SelfServePlan;
 
 // How far a webhook's signed timestamp may be from our clock. Paddle's SDK
 // helpers default to 5 seconds; serverless clocks and retries make that too
@@ -20,18 +22,18 @@ export interface PaddleConfig {
   environment: "sandbox" | "production";
   /** Public client-side token (Paddle.js). Safe to send to the browser. */
   clientToken: string;
-  /** Price ID (pri_...) of the paid plan. */
-  priceId: string;
+  /** Price ids (pri_...) of each plan, and of overage. */
+  prices: PriceIds;
 }
 
 // Returns null when billing is not configured, so callers can answer 503 and
-// the dashboard can simply hide the upgrade button.
-export function paddleConfig(env: NodeJS.ProcessEnv = process.env): PaddleConfig | null {
+// the dashboard can simply hide the upgrade button. `prices` comes from
+// priceIdsFromEnv in ./plans (passed in to keep this file import-free).
+export function paddleConfig(prices: PriceIds | null, env: NodeJS.ProcessEnv = process.env): PaddleConfig | null {
   const clientToken = env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-  const priceId = env.PADDLE_PRICE_ID;
-  if (!clientToken || !priceId) return null;
+  if (!clientToken || !prices) return null;
   const environment = env.PADDLE_ENVIRONMENT === "production" ? "production" : "sandbox";
-  return { environment, clientToken, priceId };
+  return { environment, clientToken, prices };
 }
 
 export function paddleApiBase(env: NodeJS.ProcessEnv = process.env): string {
@@ -83,15 +85,21 @@ export function verifyPaddleSignature(
 // while, and dropping a customer to the free tier on the first failed charge
 // is both harsh and noisy. When retries run out Paddle moves the subscription
 // to canceled (or paused), and that event flips the user to free.
-export function planForStatus(status: string | undefined | null): Plan {
-  switch (status) {
-    case "active":
-    case "trialing":
-    case "past_due":
-      return "paid";
-    default:
-      return "free";
+export function isPayingStatus(status: string | undefined | null): boolean {
+  return status === "active" || status === "trialing" || status === "past_due";
+}
+
+// The price ids on a subscription payload's items, in order.
+function itemPriceIds(sub: Record<string, unknown>): string[] {
+  if (!Array.isArray(sub.items)) return [];
+  const ids: string[] = [];
+  for (const item of sub.items) {
+    if (!item || typeof item !== "object") continue;
+    const price = (item as Record<string, unknown>).price;
+    const id = price && typeof price === "object" ? (price as Record<string, unknown>).id : null;
+    if (typeof id === "string" && id) ids.push(id);
   }
+  return ids;
 }
 
 export interface PlanChange {
@@ -122,8 +130,13 @@ function str(v: unknown): string | null {
 }
 
 // Turns a webhook body into a plan change, or null for events we do not act on
-// (transactions, customers, malformed payloads). Never throws on bad input.
-export function planChangeFromEvent(body: unknown): PlanChange | null {
+// (transactions, customers, malformed payloads, and paying subscriptions to a
+// price that is not one of our plans). Never throws on bad input.
+// `planForPrice` maps a price id to a plan (planForPriceId in ./plans).
+export function planChangeFromEvent(
+  body: unknown,
+  planForPrice: (priceId: string) => SelfServePlan | null,
+): PlanChange | null {
   if (!body || typeof body !== "object") return null;
   const event = body as Record<string, unknown>;
   const eventType = str(event.event_type);
@@ -140,9 +153,18 @@ export function planChangeFromEvent(body: unknown): PlanChange | null {
   const customData = sub.custom_data && typeof sub.custom_data === "object" ? (sub.custom_data as Record<string, unknown>) : {};
 
   // `canceled` and `paused` events always mean "not paying", whatever the
-  // status field says; everything else is decided by the status.
-  const plan: Plan =
-    eventType === "subscription.canceled" || eventType === "subscription.paused" ? "free" : planForStatus(str(sub.status));
+  // status field says; otherwise the status decides whether, and the price
+  // decides which plan. A paying subscription with no known price grants
+  // nothing: it is ignored rather than guessed.
+  let plan: Plan = "free";
+  const stopped = eventType === "subscription.canceled" || eventType === "subscription.paused";
+  if (!stopped && isPayingStatus(str(sub.status))) {
+    const known = itemPriceIds(sub)
+      .map((id) => planForPrice(id))
+      .find((p): p is SelfServePlan => p !== null);
+    if (!known) return null;
+    plan = known;
+  }
 
   return {
     userId: str(customData.user_id),
@@ -151,5 +173,29 @@ export function planChangeFromEvent(body: unknown): PlanChange | null {
     plan,
     occurredAt,
     eventType,
+  };
+}
+
+// ── API request bodies ───────────────────────────────────────────────────────
+
+// Body for PATCH /subscriptions/{id} when a subscriber switches plans.
+// Upgrades take effect now and charge the prorated difference straight away;
+// downgrades also switch now, and the unused part of the higher price is
+// credited on the next bill instead of being refunded. The plan in our
+// database follows from the subscription.updated webhook, not from this call.
+export function changePlanRequest(priceId: string, upgrade: boolean) {
+  return {
+    items: [{ price_id: priceId, quantity: 1 }],
+    proration_billing_mode: upgrade ? "prorated_immediately" : "prorated_next_billing_period",
+  };
+}
+
+// Body for POST /subscriptions/{id}/charge: one-time overage charge added to
+// the subscriber's next renewal invoice. `blocks` is the number of overage
+// blocks (see overageBlocks in ./plans), the quantity of the overage price.
+export function overageChargeRequest(priceId: string, blocks: number) {
+  return {
+    effective_from: "next_billing_period",
+    items: [{ price_id: priceId, quantity: blocks }],
   };
 }

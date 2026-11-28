@@ -1,0 +1,64 @@
+# Fails when the newest engine release is missing files.
+#
+# `npx lelu-mcp start` downloads the engine binary and SHA256SUMS.txt from the
+# newest engine-v* release. engine-v0.3.0 was published with no files at all
+# (the build workflow never ran), and nothing noticed: every new install
+# failed for over a week. This check makes that failure visible.
+#
+# It runs after each engine-release run, daily, and on demand. A release
+# younger than two hours is skipped, since its build may still be running.
+
+name: release-assets-check
+
+on:
+  workflow_run:
+    workflows: [engine-release]
+    types: [completed]
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Newest engine release has every binary and its checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUIRED: >-
+            lelu-engine-linux-amd64
+            lelu-engine-linux-arm64
+            lelu-engine-darwin-amd64
+            lelu-engine-darwin-arm64
+            lelu-engine-windows-amd64.exe
+            SHA256SUMS.txt
+        run: |
+          set -euo pipefail
+          release=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" \
+            --jq '[.[] | select(.draft | not) | select(.tag_name | startswith("engine-v"))][0]')
+          if [ -z "$release" ] || [ "$release" = "null" ]; then
+            echo "::error::No published engine-v* release found."
+            exit 1
+          fi
+
+          tag=$(jq -r .tag_name <<<"$release")
+          published=$(jq -r .published_at <<<"$release")
+          age=$(( $(date +%s) - $(date -d "$published" +%s) ))
+          if [ "$age" -lt 7200 ]; then
+            echo "$tag was published $((age / 60)) minutes ago; its build may still be running. Skipping."
+            exit 0
+          fi
+
+          missing=()
+          for name in $REQUIRED; do
+            jq -e --arg n "$name" '.assets | any(.name == $n)' <<<"$release" >/dev/null || missing+=("$name")
+          done
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::$tag is missing: ${missing[*]}. New 'npx lelu-mcp start' installs skip this release. Fix: gh workflow run engine-release.yml --ref $tag"
+            exit 1
+          fi
+          echo "$tag has all ${REQUIRED// /, }."

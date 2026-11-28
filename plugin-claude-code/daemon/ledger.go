@@ -15,6 +15,7 @@ type LedgerEntry struct {
 	Tool      string  `json:"tool"`
 	Command   string  `json:"command,omitempty"`
 	FilePath  string  `json:"file_path,omitempty"`
+	URL       string  `json:"url,omitempty"`
 	Cwd       string  `json:"cwd,omitempty"`
 	Outcome   Outcome `json:"outcome"`
 	Rule      string  `json:"rule,omitempty"`

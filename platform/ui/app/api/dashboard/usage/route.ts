@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { checkQuota } from "@/lib/quota";
+import { monthRange, overageUsd, PLANS } from "@/lib/billing/plans";
 
 export async function GET() {
   const session = await getCurrentUser();
@@ -10,15 +11,18 @@ export async function GET() {
 
   try {
     const quota = await checkQuota(session.userId);
-
-    const now = new Date();
-    const resetDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const plan = PLANS[quota.plan];
 
     return NextResponse.json({
       plan: quota.plan,
+      planName: plan.name,
       authRequests: quota.used,
       authQuota: quota.limit,
-      resetDate: resetDate.toISOString(),
+      // Paid plans keep running past authQuota; these say what that costs.
+      overage: plan.overage,
+      overageCalls: quota.overageCalls,
+      overageUsd: overageUsd(quota.overageCalls),
+      resetDate: monthRange(new Date()).end.toISOString(),
     });
   } catch (error) {
     console.error("Failed to fetch usage stats:", error);

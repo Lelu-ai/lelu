@@ -14,20 +14,24 @@ import {
   Lock,
   ArrowUpRight,
   RefreshCw,
+  AlertTriangle,
+  Search,
 } from "lucide-react";
 import FlowBackground from "@/components/modern/FlowBackground";
 
+// Every section can be null: the API loads each one on its own and reports a
+// failed section in `errors` instead of failing the whole page.
 interface Stats {
   generatedAt: string;
-  users: { total: number; verified: number; new24h: number; new7d: number; new30d: number };
-  active: { d1: number; d7: number; d30: number };
+  users: { total: number; verified: number; unverified: number; new24h: number; new7d: number; new30d: number } | null;
+  active: { d1: number; d7: number; d30: number } | null;
   resources: {
     activeKeys: number;
     totalKeys: number;
     activeAgents: number;
     totalAgents: number;
     activePolicies: number;
-  };
+  } | null;
   decisions: {
     total: number;
     total24h: number;
@@ -35,11 +39,18 @@ interface Stats {
     denied: number;
     humanReview: number;
     compute: number;
-  };
-  signupTrend: { day: string; count: number }[];
-  recentSignups: { name: string; email: string; emailVerified: boolean; createdAt: string; lastLoginAt: string | null }[];
-  topActive: { email: string; name: string; events: number }[];
+    sandbox: number;
+  } | null;
+  signupTrend: { day: string; count: number }[] | null;
+  userList:
+    | { name: string; email: string; emailVerified: boolean; plan: string; createdAt: string; lastLoginAt: string | null }[]
+    | null;
+  userListLimit: number;
+  topActive: { email: string; name: string; events: number }[] | null;
+  errors: Record<string, string>;
 }
+
+type UserFilter = "all" | "verified" | "unverified";
 
 const cardCls =
   "p-4 sm:p-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm";
@@ -64,6 +75,8 @@ export default function AdminPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState("");
+  const [userFilter, setUserFilter] = useState<UserFilter>("all");
+  const [query, setQuery] = useState("");
 
   async function load(isRefresh = false) {
     if (isRefresh) setRefreshing(true);
@@ -73,12 +86,18 @@ export default function AdminPage() {
         setForbidden(true);
         return;
       }
-      if (!res.ok) throw new Error("Failed to load");
+      if (!res.ok) {
+        // Show what the server said, not a generic message, so the cause can
+        // be tracked down (a 504 here means the request timed out).
+        const body = await res.json().catch(() => null);
+        const detail = body && typeof body.error === "string" ? body.error : res.statusText || "no details";
+        throw new Error(`HTTP ${res.status}: ${detail}`);
+      }
       setStats(await res.json());
       setForbidden(false);
       setError("");
-    } catch {
-      setError("Failed to load analytics. Please refresh.");
+    } catch (err) {
+      setError(`Failed to load analytics (${err instanceof Error ? err.message : String(err)}).`);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,44 +138,65 @@ export default function AdminPage() {
     );
   }
 
-  const maxSignup = Math.max(1, ...(stats?.signupTrend.map((d) => d.count) ?? [1]));
+  const users = stats?.users ?? null;
+  const active = stats?.active ?? null;
+  const decisions = stats?.decisions ?? null;
+  const resources = stats?.resources ?? null;
+  const signupTrend = stats?.signupTrend ?? null;
+  const userList = stats?.userList ?? null;
+  const topActive = stats?.topActive ?? null;
+  const sectionErrors = Object.entries(stats?.errors ?? {});
+
+  const maxSignup = Math.max(1, ...(signupTrend?.map((d) => d.count) ?? [1]));
 
   const primaryStats = [
     {
       label: "Total Users",
-      value: stats ? fmt(stats.users.total) : "—",
-      sub: stats ? `${fmt(stats.users.verified)} verified` : "",
+      value: users ? fmt(users.total) : "—",
+      sub: users ? `${fmt(users.verified)} verified · ${fmt(users.unverified)} unverified` : "",
       icon: <Users className="w-5 h-5 text-blue-500" />,
     },
     {
       label: "Active · 24h",
-      value: stats ? fmt(stats.active.d1) : "—",
-      sub: stats ? `${fmt(stats.active.d7)} in 7d` : "",
+      value: active ? fmt(active.d1) : "—",
+      sub: active ? `${fmt(active.d7)} in 7d` : "",
       icon: <Activity className="w-5 h-5 text-emerald-500" />,
     },
     {
       label: "New · 7d",
-      value: stats ? fmt(stats.users.new7d) : "—",
-      sub: stats ? `${fmt(stats.users.new24h)} today` : "",
+      value: users ? fmt(users.new7d) : "—",
+      sub: users ? `${fmt(users.new24h)} today` : "",
       icon: <UserPlus className="w-5 h-5 text-violet-500" />,
     },
     {
       label: "Auth Decisions",
-      value: stats ? fmt(stats.decisions.total) : "—",
-      sub: stats ? `${fmt(stats.decisions.total24h)} in 24h` : "",
+      value: decisions ? fmt(decisions.total) : "—",
+      sub: decisions ? `${fmt(decisions.total24h)} in 24h · live calls only` : "",
       icon: <Shield className="w-5 h-5 text-amber-500" />,
     },
   ];
 
-  const decisionRows = stats
+  const decisionRows = decisions
     ? [
-        { label: "Allowed", value: stats.decisions.allowed, icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />, color: "bg-emerald-500" },
-        { label: "Denied", value: stats.decisions.denied, icon: <ShieldX className="w-4 h-4 text-red-500" />, color: "bg-red-500" },
-        { label: "Human review", value: stats.decisions.humanReview, icon: <Users className="w-4 h-4 text-amber-500" />, color: "bg-amber-500" },
-        { label: "Compute", value: stats.decisions.compute, icon: <Activity className="w-4 h-4 text-blue-500" />, color: "bg-blue-500" },
+        { label: "Allowed", value: decisions.allowed, icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />, color: "bg-emerald-500" },
+        { label: "Denied", value: decisions.denied, icon: <ShieldX className="w-4 h-4 text-red-500" />, color: "bg-red-500" },
+        { label: "Human review", value: decisions.humanReview, icon: <Users className="w-4 h-4 text-amber-500" />, color: "bg-amber-500" },
+        { label: "Compute", value: decisions.compute, icon: <Activity className="w-4 h-4 text-blue-500" />, color: "bg-blue-500" },
       ]
     : [];
-  const decisionTotal = stats ? Math.max(1, stats.decisions.total) : 1;
+  const decisionTotal = decisions ? Math.max(1, decisions.total) : 1;
+
+  const q = query.trim().toLowerCase();
+  const filteredUsers = (userList ?? []).filter((u) => {
+    if (userFilter === "verified" && !u.emailVerified) return false;
+    if (userFilter === "unverified" && u.emailVerified) return false;
+    return !q || u.email.toLowerCase().includes(q) || u.name.toLowerCase().includes(q);
+  });
+  const listCounts = {
+    all: userList?.length ?? 0,
+    verified: userList?.filter((u) => u.emailVerified).length ?? 0,
+    unverified: userList?.filter((u) => !u.emailVerified).length ?? 0,
+  };
 
   return (
     <div className="relative min-h-screen">
@@ -188,7 +228,22 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {error && <div className="mb-6 text-sm text-red-500">{error}</div>}
+        {error && <div className="mb-6 text-sm text-red-500 break-words">{error}</div>}
+
+        {sectionErrors.length > 0 && (
+          <div className="mb-6 p-4 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50/70 dark:bg-red-500/10 text-sm">
+            <p className="flex items-center gap-2 font-bold text-red-600 dark:text-red-400 mb-2">
+              <AlertTriangle className="w-4 h-4" /> Some sections could not load
+            </p>
+            <ul className="space-y-1 text-red-600/90 dark:text-red-300/90 font-mono text-xs">
+              {sectionErrors.map(([name, msg]) => (
+                <li key={name} className="break-words">
+                  <span className="font-bold">{name}:</span> {msg}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Primary stat cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
@@ -213,9 +268,9 @@ export default function AdminPage() {
               <UserPlus className="w-5 h-5 text-violet-500" />
               <h2 className="text-base font-bold">Signups · last 14 days</h2>
             </div>
-            {stats && stats.signupTrend.length > 0 ? (
+            {signupTrend && signupTrend.length > 0 ? (
               <div className="flex items-end gap-1 h-32">
-                {stats.signupTrend.map((d) => (
+                {signupTrend.map((d) => (
                   <div key={d.day} className="flex-1 flex flex-col items-center gap-1 group">
                     <div className="w-full flex items-end h-full">
                       <div
@@ -229,7 +284,9 @@ export default function AdminPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-zinc-500 py-8 text-center">No signups yet.</p>
+              <p className="text-sm text-zinc-500 py-8 text-center">
+                {signupTrend ? "No signups yet." : "Not available."}
+              </p>
             )}
           </div>
 
@@ -256,20 +313,26 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))}
-              {stats && stats.decisions.total === 0 && (
-                <p className="text-sm text-zinc-500 py-4 text-center">No decisions recorded yet.</p>
+              {decisions && decisions.total === 0 && (
+                <p className="text-sm text-zinc-500 py-4 text-center">No live decisions recorded yet.</p>
+              )}
+              {!decisions && <p className="text-sm text-zinc-500 py-4 text-center">Not available.</p>}
+              {decisions && (
+                <p className="text-xs text-zinc-500">
+                  Live API calls only. {fmt(decisions.sandbox)} sandbox demo calls are not counted.
+                </p>
               )}
             </div>
           </div>
         </div>
 
         {/* Resource counts */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
-          {stats &&
-            [
-              { label: "Active API Keys", value: stats.resources.activeKeys, sub: `${fmt(stats.resources.totalKeys)} total`, icon: <Key className="w-5 h-5 text-amber-500" /> },
-              { label: "Active Agents", value: stats.resources.activeAgents, sub: `${fmt(stats.resources.totalAgents)} total`, icon: <Bot className="w-5 h-5 text-violet-500" /> },
-              { label: "Active Policies", value: stats.resources.activePolicies, sub: " ", icon: <Shield className="w-5 h-5 text-emerald-500" /> },
+        {resources && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
+            {[
+              { label: "Active API Keys", value: resources.activeKeys, sub: `${fmt(resources.totalKeys)} total`, icon: <Key className="w-5 h-5 text-amber-500" /> },
+              { label: "Active Agents", value: resources.activeAgents, sub: `${fmt(resources.totalAgents)} total`, icon: <Bot className="w-5 h-5 text-violet-500" /> },
+              { label: "Active Policies", value: resources.activePolicies, sub: " ", icon: <Shield className="w-5 h-5 text-emerald-500" /> },
             ].map((s) => (
               <div key={s.label} className={cardCls}>
                 <div className="flex items-center gap-2 mb-2">
@@ -282,66 +345,107 @@ export default function AdminPage() {
                 <p className="text-xs text-zinc-500 mt-1">{s.sub}</p>
               </div>
             ))}
-        </div>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-          {/* Recent signups */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-zinc-200 dark:border-white/10 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-violet-500" />
-              <h2 className="text-sm font-bold">Recent signups</h2>
-            </div>
-            <div className="divide-y divide-zinc-100 dark:divide-white/5">
-              {stats && stats.recentSignups.length > 0 ? (
-                stats.recentSignups.map((u) => (
-                  <div key={u.email} className="px-5 py-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{u.name || "—"}</p>
-                      <p className="text-xs text-zinc-500 truncate">{u.email}</p>
-                      <p className="text-[11px] text-zinc-400 truncate">
-                        {u.lastLoginAt ? `Last login ${timeAgo(u.lastLoginAt)}` : "Never logged in"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {u.emailVerified ? (
-                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <ShieldX className="w-4 h-4 text-zinc-400" />
-                      )}
-                      <span className="text-xs text-zinc-400">{timeAgo(u.createdAt)}</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="px-5 py-8 text-sm text-zinc-500 text-center">No users yet.</p>
+        {/* All users, verified and unverified */}
+        <div className="mb-8 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-200 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-blue-500" />
+              <h2 className="text-sm font-bold">Users</h2>
+              {userList && stats && userList.length >= stats.userListLimit && (
+                <span className="text-[11px] text-zinc-400">newest {fmt(stats.userListLimit)}</span>
               )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex rounded-lg border border-zinc-200 dark:border-white/10 overflow-hidden text-xs font-medium">
+                {(["all", "verified", "unverified"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setUserFilter(f)}
+                    className={`px-3 py-1.5 capitalize transition-colors ${
+                      userFilter === f
+                        ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+                        : "text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    {f} ({fmt(listCounts[f])})
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/10 text-xs">
+                <Search className="w-3.5 h-3.5 text-zinc-400" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search name or email"
+                  className="bg-transparent outline-none w-full sm:w-44 text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                />
+              </label>
             </div>
           </div>
-
-          {/* Most active */}
-          <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-zinc-200 dark:border-white/10 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-emerald-500" />
-              <h2 className="text-sm font-bold">Most active · 30 days</h2>
-            </div>
-            <div className="divide-y divide-zinc-100 dark:divide-white/5">
-              {stats && stats.topActive.length > 0 ? (
-                stats.topActive.map((u, i) => (
-                  <div key={u.email} className="px-5 py-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs font-mono text-zinc-400 w-4 shrink-0">{i + 1}</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{u.name || u.email}</p>
-                        <p className="text-xs text-zinc-500 truncate">{u.email}</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white shrink-0">{fmt(u.events)}</span>
+          <div className="divide-y divide-zinc-100 dark:divide-white/5 max-h-[520px] overflow-y-auto">
+            {!userList ? (
+              <p className="px-5 py-8 text-sm text-zinc-500 text-center">Not available.</p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-zinc-500 text-center">No users match.</p>
+            ) : (
+              filteredUsers.map((u) => (
+                <div key={u.email} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{u.name || "—"}</p>
+                    <p className="text-xs text-zinc-500 truncate">{u.email}</p>
+                    <p className="text-[11px] text-zinc-400 truncate">
+                      Joined {u.createdAt ? timeAgo(u.createdAt) : "—"} ·{" "}
+                      {u.lastLoginAt ? `last login ${timeAgo(u.lastLoginAt)}` : "never logged in"}
+                    </p>
                   </div>
-                ))
-              ) : (
-                <p className="px-5 py-8 text-sm text-zinc-500 text-center">No activity yet.</p>
-              )}
-            </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] px-2 py-0.5 rounded-full border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-zinc-300 capitalize">
+                      {u.plan}
+                    </span>
+                    {u.emailVerified ? (
+                      <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Verified
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <ShieldX className="w-3.5 h-3.5" /> Unverified
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Most active */}
+        <div className="rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-200 dark:border-white/10 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-emerald-500" />
+            <h2 className="text-sm font-bold">Most active · 30 days</h2>
+          </div>
+          <div className="divide-y divide-zinc-100 dark:divide-white/5">
+            {topActive && topActive.length > 0 ? (
+              topActive.map((u, i) => (
+                <div key={u.email} className="px-5 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xs font-mono text-zinc-400 w-4 shrink-0">{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-zinc-900 dark:text-white truncate">{u.name || u.email}</p>
+                      <p className="text-xs text-zinc-500 truncate">{u.email}</p>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white shrink-0">{fmt(u.events)}</span>
+                </div>
+              ))
+            ) : (
+              <p className="px-5 py-8 text-sm text-zinc-500 text-center">
+                {topActive ? "No live activity yet." : "Not available."}
+              </p>
+            )}
           </div>
         </div>
       </main>

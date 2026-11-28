@@ -1,13 +1,13 @@
 {
   "name": "lelu",
-  "owner": { "name": "Lelu", "email": "abenezergetachew1990@gmail.com" },
+  "owner": { "name": "Lelu", "email": "abenezer.getachew@lelu-ai.com" },
   "description": "Lelu — runtime authorization for Claude Code",
   "plugins": [
     {
       "name": "lelu",
       "source": "./plugin-claude-code",
-      "description": "Expansion-aware policy checks before every Bash, Edit, Write, and MCP tool call. Shadow mode by default.",
-      "version": "0.1.0",
+      "description": "Guardrails for Claude Code: catches destructive commands, protected-file edits and secret reads before they run. Starts in shadow mode. Local, no account.",
+      "version": "0.3.0",
       "author": { "name": "Lelu" },
       "homepage": "https://lelu-ai.com",
       "license": "MIT",

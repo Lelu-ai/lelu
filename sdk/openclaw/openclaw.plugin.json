@@ -1,0 +1,44 @@
+{
+  "id": "lelu",
+  "name": "Lelu",
+  "description": "Blocks dangerous tool calls (like rm -rf ~) and asks you before risky ones (sudo, force-push, sending email, publishing).",
+  "categories": ["security"],
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "disableRules": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Ids of built-in Lelu rules to switch off, for example lelu.sudo."
+      },
+      "rules": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "tools", "verdict", "reason"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "tools": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+            "verdict": { "type": "string", "enum": ["deny", "review"] },
+            "reason": { "type": "string", "minLength": 1 },
+            "command": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "minLength": 1 },
+            "exceptActions": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "description": "Your own rules, checked together with the built-in ones."
+      },
+      "approvalTimeoutSeconds": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 3600,
+        "description": "How long an approval request waits before it counts as denied."
+      }
+    }
+  }
+}

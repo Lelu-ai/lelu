@@ -31,6 +31,35 @@ the same content instead. Either route reaches the maintainers privately; do
 not open a public issue for a security finding.
 
 Include what you'd include in any report: affected component and version,
-reproduction steps, and impact. We'll acknowledge new reports and keep you
-updated as we investigate and fix confirmed issues; credit is given in the
-advisory and changelog unless you'd prefer otherwise.
+reproduction steps, and impact. Credit is given in the advisory and changelog
+unless you'd prefer otherwise.
+
+## What happens after you report
+
+| Step | Target |
+|---|---|
+| Acknowledge the report | within 3 business days |
+| First assessment (confirmed or not, and severity) | within 7 days |
+| Fix released for a confirmed critical or high finding | within 30 days |
+| Public GitHub security advisory | when the fix is released |
+
+These are targets for a small team, not contractual guarantees. If one will be
+missed, we tell you why and when to expect an update.
+
+## Verifying a release
+
+- **npm packages** (`lelu-agent-auth`, `lelu-mcp`, `lelu-openclaw`) are
+  published from CI with npm provenance. Check with `npm audit signatures`
+  in a project that installs them.
+- **Engine and Claude Code plugin binaries** on GitHub Releases come with a
+  `SHA256SUMS.txt` file and a GitHub build provenance attestation:
+
+  ```bash
+  sha256sum --check --ignore-missing SHA256SUMS.txt
+  gh attestation verify lelu-engine-linux-amd64 -R Lelu-ai/lelu
+  ```
+
+## Planned security work
+
+What we are fixing next, and in what order, is in
+[docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md).

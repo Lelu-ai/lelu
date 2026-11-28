@@ -198,21 +198,31 @@ type CliTab = (typeof CLI_TABS)[number];
 
 const CLI_COMMANDS: Record<CliTab, string> = {
   Cursor: "npx lelu-mcp add --cursor",
-  "Claude Code": "npx lelu-mcp add --claude",
+  "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
   "Open Code": "npx lelu-mcp add --open-code",
   Manual: "npx lelu-mcp start --transport stdio",
 };
 
-const MANUAL_TABS = ["Claude Code", "Open Code", "JSON"] as const;
+const MANUAL_TABS = ["Claude Code", "JSON (stdio)", "JSON (HTTP)"] as const;
 type ManualTab = (typeof MANUAL_TABS)[number];
 
 const MANUAL_COMMANDS: Record<ManualTab, string> = {
-  "Claude Code": "claude mcp add --transport http lelu http://localhost:3001/sse",
-  "Open Code": "open-code mcp add --transport http lelu http://localhost:3001/sse",
-  JSON: `{
+  "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
+  "JSON (stdio)": `{
   "mcpServers": {
     "lelu": {
-      "url": "http://localhost:3001/sse"
+      "command": "npx",
+      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"]
+    }
+  }
+}`,
+  // The HTTP transport serves SSE and refuses requests without the token the
+  // server was started with (MCP_AUTH_TOKEN). Docker Compose publishes it on 3003.
+  "JSON (HTTP)": `{
+  "mcpServers": {
+    "lelu": {
+      "url": "http://localhost:3003/sse",
+      "headers": { "Authorization": "Bearer <MCP_AUTH_TOKEN>" }
     }
   }
 }`,

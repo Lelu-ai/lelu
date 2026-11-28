@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { applyPlanChange } from "@/lib/billing/plan";
 import { planChangeFromEvent, verifyPaddleSignature } from "@/lib/billing/paddle";
+import { planForPriceId, priceIdsFromEnv } from "@/lib/billing/plans";
 
 // Paddle's source of truth for plan changes. The checkout overlay closing only
 // tells the browser it finished; this route is what flips `plan`.
@@ -29,9 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Events we do not act on (transactions, customers, ...) are acknowledged so
-  // Paddle does not keep retrying them.
-  const change = planChangeFromEvent(body);
+  // Events we do not act on (transactions, customers, subscriptions to a price
+  // that is not one of our plans, ...) are acknowledged so Paddle does not
+  // keep retrying them.
+  const prices = priceIdsFromEnv();
+  const change = planChangeFromEvent(body, (priceId) => planForPriceId(priceId, prices));
   if (!change) return NextResponse.json({ received: true, ignored: true });
 
   try {

@@ -28,7 +28,7 @@
  */
 
 import { runStdio, runHttp } from "./server.js";
-import { startLocalEngine } from "./local-engine.js";
+import { engineIsHealthy, startLocalEngine } from "./local-engine.js";
 
 // ─── Minimal arg parser ───────────────────────────────────────────────────────
 
@@ -256,7 +256,18 @@ async function main() {
       apiKey = apiKey ?? local.apiKey;
     } catch (err) {
       console.error(`[lelu-mcp] Could not start a local engine: ${err instanceof Error ? err.message : err}`);
-      console.error(`[lelu-mcp] Falling back to ${engineUrl} — start an engine there or pass --engine-url.`);
+      // Fall back only to an engine that is actually there. Serving MCP tools
+      // with nothing behind them looks healthy to the host while every
+      // authorize call fails, so exit instead and let the host show the error.
+      if (await engineIsHealthy(engineUrl)) {
+        console.error(`[lelu-mcp] Using the engine already running at ${engineUrl}.`);
+      } else {
+        console.error(
+          `[lelu-mcp] No engine is running at ${engineUrl} either, so there is nothing to authorize against. ` +
+          `Fix the error above, or pass --engine-url for an engine you run yourself.`
+        );
+        process.exit(1);
+      }
     }
   }
 

@@ -122,3 +122,33 @@ func TestEvaluate_ProcessSubstitution(t *testing.T) {
 		})
 	}
 }
+
+func TestMerge_LocalProtectedPathIsEnforced(t *testing.T) {
+	ps := loadTestPolicy(t)
+	a := AnalyzeCommand("rm -rf prod-db", "/home/testuser/project", testEnv("/home/testuser"))
+	if d := ps.Evaluate(a, "/home/testuser"); d.Outcome == OutcomeDeny {
+		t.Fatalf("precondition: prod-db should not be protected by the defaults; decision=%+v", d)
+	}
+
+	ps.Merge(&PolicySet{ProtectedPaths: []protectedPathRule{{Contains: "prod-db"}}})
+
+	if d := ps.Evaluate(a, "/home/testuser"); d.Outcome != OutcomeDeny {
+		t.Errorf("outcome = %q, want deny once prod-db is a local protected path; decision=%+v", d.Outcome, d)
+	}
+}
+
+func TestMerge_KeepsDefaultsAndTheirSettings(t *testing.T) {
+	ps := loadTestPolicy(t)
+	before := len(ps.ProtectedPaths)
+	loop := ps.LoopDetection
+
+	// A local file that sets other fields must not change them.
+	ps.Merge(&PolicySet{ProtectedPaths: []protectedPathRule{{Contains: "x"}}, LoopDetection: LoopConfig{}})
+
+	if got := len(ps.ProtectedPaths); got != before+1 {
+		t.Errorf("protected paths = %d, want %d (defaults plus one)", got, before+1)
+	}
+	if ps.LoopDetection != loop {
+		t.Errorf("loop detection changed by merge: got %+v, want %+v", ps.LoopDetection, loop)
+	}
+}

@@ -53,7 +53,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
           <LeluMark size={20} />
           <span className="text-sm font-semibold text-[#0A0A0A] dark:text-white" style={{ letterSpacing: "-0.02em" }}>lelu</span>
           <span className="text-sm text-zinc-400 dark:text-zinc-500 ml-2">
-            © {new Date().getFullYear()} Lelu Security
+            © {new Date().getFullYear()} Lelu
           </span>
         </div>
 
@@ -65,6 +65,7 @@ const LeluFooter = ({ showCTA: manualShowCTA }: { showCTA?: boolean }) => {
             { label: "About", href: "/about" },
             { label: "Terms", href: "/terms" },
             { label: "Privacy", href: "/privacy" },
+            { label: "Refunds", href: "/refund-policy" },
             { label: "GitHub", href: "https://github.com/lelu-ai/lelu", external: true },
           ].map((l) => (
             <li key={l.label}>

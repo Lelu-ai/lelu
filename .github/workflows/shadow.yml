@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Read-only by default; jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 jobs:
   shadow-smoke:
     runs-on: ubuntu-latest

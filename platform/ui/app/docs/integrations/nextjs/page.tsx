@@ -100,7 +100,7 @@ export async function POST(request: Request) {
               <span className="text-xs text-zinc-500 font-mono">app/admin/approvals/page.tsx</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`"use client";
-import { LeluApprovalUI } from "lelu/react";
+import { LeluApprovalUI } from "lelu-agent-auth/react";
 
 export default function ApprovalsPage() {
   return (

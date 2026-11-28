@@ -645,6 +645,9 @@ export default function HomePage() {
                   <li><Link href="/about" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">About</Link></li>
                   <li><a href="https://github.com/lelu-ai/lelu" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">GitHub</a></li>
                   <li><a href="https://github.com/lelu-ai/lelu/discussions" target="_blank" rel="noreferrer" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Discussions</a></li>
+                  <li><Link href="/terms" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Terms</Link></li>
+                  <li><Link href="/privacy" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Privacy</Link></li>
+                  <li><Link href="/refund-policy" className="hover:text-[#0A0A0A] dark:hover:text-white transition-colors">Refund Policy</Link></li>
                 </ul>
               </div>
               <div>

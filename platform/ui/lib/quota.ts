@@ -1,40 +1,15 @@
 import { db, ensureSchema } from "./db";
+import { decideQuota, monthRange, normalizePlan, type PlanId, type QuotaDecision } from "./billing/plans";
 
-// Authorize calls per calendar month, by plan. Tune freely — not load-bearing
-// on any architecture, just the free/paid split shown on /pricing.
-export const PLAN_LIMITS = {
-  free: 1_000,
-  paid: 100_000,
-} as const;
+// Monthly authorize-call quotas. The numbers live in lib/billing/plans.ts.
+// Free stops at its limit; paid plans keep going and the extra calls are
+// billed at the end of the month (lib/billing/overage.ts). Agents and team
+// members are unlimited on every plan: pricing is per call, not per seat.
 
-export type Plan = keyof typeof PLAN_LIMITS;
-
-// Registered agents (the agent registry / NHI inventory), by plan. Revoked
-// agents do not count, so a free user can free a slot by revoking one.
-export const PLAN_AGENT_LIMITS = {
-  free: 3,
-  paid: 50,
-} as const;
-
-function agentLimitForPlan(plan: string): number {
-  return PLAN_AGENT_LIMITS[plan as Plan] ?? PLAN_AGENT_LIMITS.free;
-}
-
-function limitForPlan(plan: string): number {
-  return PLAN_LIMITS[plan as Plan] ?? PLAN_LIMITS.free;
-}
-
-export interface QuotaStatus {
-  plan: string;
-  limit: number;
-  used: number;
-  allowed: boolean;
-}
-
-// Current calendar-month count of live (non-sandbox) authorize calls for a
-// user, computed on demand from lelu_audit_events rather than a separate
-// counter table — avoids write-amplification on the hot authorize path.
-export async function getMonthlyUsage(userId: string): Promise<number> {
+// Count of live (non-sandbox) authorize calls a user made in [from, to),
+// computed on demand from lelu_audit_events rather than a separate counter
+// table, which avoids write-amplification on the hot authorize path.
+export async function countLiveCalls(userId: string, from: Date, to: Date): Promise<number> {
   await ensureSchema();
   const sql = db();
   const rows = await sql`
@@ -42,44 +17,45 @@ export async function getMonthlyUsage(userId: string): Promise<number> {
     FROM lelu_audit_events
     WHERE user_id = ${userId}
       AND mode = 'live'
-      AND created_at >= date_trunc('month', NOW())
+      AND created_at >= ${from}
+      AND created_at < ${to}
   `;
   return Number(rows[0]?.count ?? 0);
 }
 
-export async function getUserPlan(userId: string): Promise<string> {
-  await ensureSchema();
-  const sql = db();
-  const rows = await sql`SELECT plan FROM lelu_users WHERE id = ${userId}`;
-  return (rows[0]?.plan as string | undefined) ?? "free";
+// Current calendar-month (UTC) count of live authorize calls for a user.
+export async function getMonthlyUsage(userId: string): Promise<number> {
+  const { start, end } = monthRange(new Date());
+  return countLiveCalls(userId, start, end);
 }
 
-// Checks whether a user has quota remaining this month. Call before proxying
-// a request to the engine — never after, since the point is to avoid billing
-// (and engine load) for requests that shouldn't happen.
+export interface UserPlan {
+  plan: PlanId;
+  /** Per-account monthly call volume, or null for the plan's own amount. */
+  callLimitOverride: number | null;
+}
+
+export async function getUserPlanInfo(userId: string): Promise<UserPlan> {
+  await ensureSchema();
+  const sql = db();
+  const rows = await sql`SELECT plan, call_limit_override FROM lelu_users WHERE id = ${userId}`;
+  const override = rows[0]?.call_limit_override;
+  return {
+    plan: normalizePlan(rows[0]?.plan as string | undefined),
+    callLimitOverride: override === null || override === undefined ? null : Number(override),
+  };
+}
+
+export async function getUserPlan(userId: string): Promise<PlanId> {
+  return (await getUserPlanInfo(userId)).plan;
+}
+
+export type QuotaStatus = QuotaDecision;
+
+// Checks whether a user may make another authorize call this month. Call
+// before proxying a request to the engine, never after, since the point is to
+// avoid engine load for requests that shouldn't happen.
 export async function checkQuota(userId: string): Promise<QuotaStatus> {
-  const [plan, used] = await Promise.all([getUserPlan(userId), getMonthlyUsage(userId)]);
-  const limit = limitForPlan(plan);
-  return { plan, limit, used, allowed: used < limit };
-}
-
-export interface AgentLimitStatus {
-  plan: string;
-  limit: number;
-  count: number;
-  allowed: boolean;
-}
-
-// Whether the user may register another agent on their plan. Call before
-// createAgent().
-export async function checkAgentLimit(userId: string): Promise<AgentLimitStatus> {
-  await ensureSchema();
-  const sql = db();
-  const [plan, rows] = await Promise.all([
-    getUserPlan(userId),
-    sql`SELECT COUNT(*) AS count FROM lelu_agents WHERE user_id = ${userId} AND status <> 'revoked'`,
-  ]);
-  const count = Number(rows[0]?.count ?? 0);
-  const limit = agentLimitForPlan(plan);
-  return { plan, limit, count, allowed: count < limit };
+  const [info, used] = await Promise.all([getUserPlanInfo(userId), getMonthlyUsage(userId)]);
+  return decideQuota(info.plan, used, info.callLimitOverride);
 }

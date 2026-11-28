@@ -193,8 +193,8 @@ export default function DocsQuickStart() {
 {`import { lelu } from "lelu-agent-auth";
 
 // Zero-config: discovers the engine \`npx lelu-mcp start\` is running.
-// For a Docker or self-hosted engine, pass its URL and API key explicitly
-// (the SDK does not pick up LELU_API_KEY on its own), e.g.:
+// For a Docker or self-hosted engine, pass its URL (an API key alone does not
+// select one); the key falls back to LELU_API_KEY if you omit it, e.g.:
 //   lelu({ baseUrl: "http://localhost:8083", apiKey: process.env.LELU_API_KEY })
 const auth = lelu();
 

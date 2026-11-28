@@ -1,0 +1,62 @@
+# Weekly dependency updates, one grouped pull request per ecosystem and
+# directory set, so the queue stays reviewable. Security updates are separate:
+# turn on "Dependabot security updates" in Settings > Code security.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directories:
+      - /engine
+      - /plugin-claude-code/daemon
+      - /sdk/go
+    schedule:
+      interval: weekly
+    groups:
+      go:
+        patterns: ["*"]
+
+  # platform/ vendors its Go dependencies.
+  - package-ecosystem: gomod
+    directory: /platform
+    vendor: true
+    schedule:
+      interval: weekly
+    groups:
+      go-platform:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories:
+      - /sdk/typescript
+      - /sdk/mcp
+      - /sdk/openclaw
+      - /platform/ui
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /sdk/python
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /engine
+      - /sdk/mcp
+    schedule:
+      interval: weekly

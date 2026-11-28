@@ -2,10 +2,22 @@
 
 ## Unreleased
 
+### Features
+
+* **Send `confidence_signal` and add `LeluClient.signal_from` builders** (#121): `AgentContext` and `SimulatorTraceItem` now accept `confidence_signal: ConfidenceSignal | None` (with `signal=` accepted as a validation alias for TypeScript parity), serialized onto `confidence_signal` for both `POST /v1/agent/authorize` and `POST /v1/queue/{id}/redeem` so approval payload fingerprints stay identical against engines in default strict mode (`CONFIDENCE_ALLOW_UNVERIFIED=false`). Added `LeluClient.signal_from` (`.openai`, `.bedrock`, `.local`, `.anthropic`) mirroring the TypeScript SDK, and marked `LeluClient.confidence_from` as deprecated in favor of `signal_from`.
+
 ### Fixes
 
 * **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.
 * **`__version__` comes from the installed package metadata.** It was a hard-coded `0.4.3` while the package was `0.4.41`. Reported in the Nauro pilot.
+
+## [0.4.43](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.42...python-sdk-v0.4.43) (2026-11-27)
+
+
+### Features
+
+* **sdk-python:** send confidence_signal and add signal_from builders ([ebbdf8e](https://github.com/Lelu-ai/lelu/commit/ebbdf8e12c90e62e716535c80ece36ce2e4de541))
+* **sdk-python:** send confidence_signal and add signal_from builders ([#121](https://github.com/Lelu-ai/lelu/issues/121)) ([6876a18](https://github.com/Lelu-ai/lelu/commit/6876a1858224abbdbad83fa0014c7fe0306f5eb4))
 
 ## [0.4.42](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.41...python-sdk-v0.4.42) (2026-11-12)
 

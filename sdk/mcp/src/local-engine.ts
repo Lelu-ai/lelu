@@ -227,15 +227,42 @@ function assetName(): string {
 }
 
 const ENGINE_RELEASE_TAG_PREFIX = "engine-v";
+const CHECKSUMS_FILE = "SHA256SUMS.txt";
+
+/** The fields of a GitHub release (from the list-releases API) this module reads. */
+export interface EngineReleaseInfo {
+  tag_name?: string;
+  draft?: boolean;
+  assets?: Array<{ name?: string }>;
+}
+
+/**
+ * Returns the tag of the newest engine release that actually ships `asset`
+ * and a checksums file, or null if none does. `releases` is newest first, as
+ * GitHub's list-releases API returns it.
+ *
+ * A release can exist without its files: release-please creates the release,
+ * and the binaries are attached by a separate workflow that may not have run
+ * yet (or failed). Picking such a release breaks every fresh install, so it
+ * is skipped rather than trusted.
+ */
+export function pickEngineRelease(releases: EngineReleaseInfo[], asset: string): string | null {
+  for (const release of releases) {
+    if (release.draft || !release.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX)) continue;
+    const names = new Set((release.assets ?? []).map((a) => a.name));
+    if (names.has(asset) && names.has(CHECKSUMS_FILE)) return release.tag_name;
+  }
+  return null;
+}
 
 // Resolves the release tag to download from. Pinned versions go straight to
 // their tag (no network call). Unpinned installs must NOT use GitHub's
 // generic `releases/latest` — a second, separate workflow (oss-release.yml)
 // also publishes `lelu-engine-*` binaries under a `v*` tag but without a
 // checksums file, and "latest" can resolve to either. Querying the release
-// list and filtering by prefix guarantees we always land on a release that
-// has a matching SHA256SUMS.txt.
-async function resolveEngineReleaseTag(): Promise<string> {
+// list and filtering by prefix and attached files guarantees we always land
+// on a release that has this platform's binary and a matching SHA256SUMS.txt.
+async function resolveEngineReleaseTag(asset: string): Promise<string> {
   const pinned = process.env["LELU_ENGINE_VERSION"];
   if (pinned) return `${ENGINE_RELEASE_TAG_PREFIX}${pinned}`;
 
@@ -248,15 +275,142 @@ async function resolveEngineReleaseTag(): Promise<string> {
       `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
     );
   }
-  const releases = (await res.json()) as Array<{ tag_name?: string }>;
-  const engineRelease = releases.find((r) => r.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX));
-  if (!engineRelease?.tag_name) {
+  const releases = (await res.json()) as EngineReleaseInfo[];
+  const tag = pickEngineRelease(releases, asset);
+  if (!tag) {
     throw new Error(
-      `No "${ENGINE_RELEASE_TAG_PREFIX}*" release found for ${REPO}. ` +
+      `No "${ENGINE_RELEASE_TAG_PREFIX}*" release of ${REPO} has both ${asset} and ${CHECKSUMS_FILE} attached. ` +
       `Set LELU_ENGINE_VERSION to pin a version, LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
     );
   }
-  return engineRelease.tag_name;
+  const newest = releases.find((r) => !r.draft && r.tag_name?.startsWith(ENGINE_RELEASE_TAG_PREFIX))?.tag_name;
+  if (newest && newest !== tag) {
+    console.error(`[lelu-mcp] ${newest} has no ${asset} attached yet; using ${tag} instead.`);
+  }
+  return tag;
+}
+
+// ─── Resumable download ───────────────────────────────────────────────────────
+
+/** An HTTP status that retrying will not fix (404, 403, ...). */
+export class DownloadHttpError extends Error {
+  constructor(readonly status: number, url: string) {
+    super(`HTTP ${status} from ${url}`);
+    this.name = "DownloadHttpError";
+  }
+}
+
+export interface DownloadOptions {
+  /** Total tries, including the first. Default 8. */
+  attempts?: number;
+  /** Abort a try when no bytes arrive for this long. Default 30s. */
+  stallMs?: number;
+  /**
+   * Delay before the first retry; doubles each retry, capped at 30s. Default 1s.
+   * With the default 8 tries that waits about 1.5 minutes in total, enough to
+   * ride out a short network outage instead of giving up after seconds.
+   */
+  backoffMs?: number;
+  /** Called as bytes arrive. `total` is null when the server doesn't say. */
+  onProgress?: (received: number, total: number | null) => void;
+  /** Called before each retry. */
+  onRetry?: (attempt: number, error: unknown) => void;
+}
+
+function isRetryableStatus(status: number): boolean {
+  return status >= 500 || status === 408 || status === 429;
+}
+
+/**
+ * Downloads `url` into memory. A dropped or stalled connection is retried,
+ * resuming from the bytes already received with an HTTP Range request (and
+ * starting over if the server ignores the range). There is no limit on total
+ * time, only on silence, so slow connections still finish.
+ */
+export async function downloadWithResume(url: string, opts: DownloadOptions = {}): Promise<Buffer> {
+  const attempts = opts.attempts ?? 8;
+  const stallMs = opts.stallMs ?? 30_000;
+  const backoffMs = opts.backoffMs ?? 1_000;
+
+  let chunks: Buffer[] = [];
+  let received = 0;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const controller = new AbortController();
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    const armStallTimer = () => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(
+        () => controller.abort(new Error(`no data received for ${stallMs / 1000}s`)),
+        stallMs,
+      );
+    };
+
+    try {
+      armStallTimer();
+      const headers: Record<string, string> = { "User-Agent": "lelu-mcp" };
+      if (received > 0) headers["Range"] = `bytes=${received}-`;
+      const res = await fetch(url, { headers, signal: controller.signal });
+
+      let total: number | null;
+      if (res.status === 206) {
+        // Resumed: "Content-Range: bytes 1000-2999/3000" carries the full size.
+        const m = res.headers.get("content-range")?.match(/\/(\d+)$/);
+        total = m ? Number(m[1]) : null;
+      } else if (res.ok) {
+        // A full response. If we asked for a range, the server ignored it.
+        chunks = [];
+        received = 0;
+        const len = res.headers.get("content-length");
+        total = len ? Number(len) : null;
+      } else if (res.status === 416) {
+        // Our range no longer fits the file (it changed upstream): start over.
+        chunks = [];
+        received = 0;
+        throw new Error("server rejected the resume range");
+      } else if (isRetryableStatus(res.status)) {
+        throw new Error(`HTTP ${res.status}`);
+      } else {
+        throw new DownloadHttpError(res.status, url);
+      }
+
+      if (!res.body) throw new Error("response has no body");
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        armStallTimer();
+        const buf = Buffer.from(chunk);
+        chunks.push(buf);
+        received += buf.length;
+        opts.onProgress?.(received, total);
+      }
+      if (total !== null && received !== total) {
+        throw new Error(`connection closed after ${received} of ${total} bytes`);
+      }
+      return Buffer.concat(chunks, received);
+    } catch (err) {
+      if (err instanceof DownloadHttpError) throw err;
+      lastError = controller.signal.aborted ? controller.signal.reason : err;
+      if (attempt < attempts) {
+        opts.onRetry?.(attempt, lastError);
+        await new Promise((r) => setTimeout(r, Math.min(backoffMs * 2 ** (attempt - 1), 30_000)));
+      }
+    } finally {
+      clearTimeout(stallTimer);
+    }
+  }
+
+  const reason = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`download of ${url} failed after ${attempts} attempts (${received} bytes received): ${reason}`);
+}
+
+/** True when an engine answers GET /healthz at `url` within `timeoutMs`. */
+export async function engineIsHealthy(url: string, timeoutMs = 2_000): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(timeoutMs) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Parses `sha256sum`-style checksum output ("<hex digest>  <filename>" per
@@ -280,36 +434,54 @@ export function sha256Hex(buf: Buffer): string {
 
 async function downloadEngine(dest: string): Promise<void> {
   const asset = assetName();
-  const tag = await resolveEngineReleaseTag();
+  const tag = await resolveEngineReleaseTag(asset);
   const baseUrl = `https://github.com/${REPO}/releases/download/${tag}`;
 
   console.error(`[lelu-mcp] First run: downloading Lelu engine → ${baseUrl}/${asset}`);
 
+  const onRetry = (attempt: number, err: unknown) =>
+    console.error(`[lelu-mcp] Download interrupted (${err instanceof Error ? err.message : err}); retry ${attempt}…`);
+
   // Fetch and verify the checksum BEFORE writing anything to disk — refuse to
   // install an engine binary whose integrity can't be confirmed.
-  const checksumsUrl = `${baseUrl}/SHA256SUMS.txt`;
-  const checksumsRes = await fetch(checksumsUrl);
-  if (!checksumsRes.ok) {
+  const checksumsUrl = `${baseUrl}/${CHECKSUMS_FILE}`;
+  let checksumsText: string;
+  try {
+    checksumsText = (await downloadWithResume(checksumsUrl, { onRetry })).toString("utf8");
+  } catch (err) {
     throw new Error(
-      `Could not download checksums (HTTP ${checksumsRes.status}) from ${checksumsUrl} — ` +
+      `Could not download checksums (${err instanceof Error ? err.message : err}) — ` +
       `refusing to install an unverified engine binary. Set LELU_ENGINE_BINARY to a locally built engine instead.`
     );
   }
-  const expected = findChecksum(await checksumsRes.text(), asset);
+  const expected = findChecksum(checksumsText, asset);
   if (!expected) {
     throw new Error(
       `No checksum entry for "${asset}" in ${checksumsUrl} — refusing to install an unverified engine binary.`
     );
   }
 
-  const res = await fetch(`${baseUrl}/${asset}`);
-  if (!res.ok) {
+  // Progress in 10% steps, so a slow first download doesn't look hung.
+  let lastStep = 0;
+  const onProgress = (received: number, total: number | null) => {
+    if (!total) return;
+    const step = Math.floor((received / total) * 10);
+    if (step > lastStep) {
+      lastStep = step;
+      const mb = (n: number) => (n / 1_048_576).toFixed(1);
+      console.error(`[lelu-mcp] Downloading engine… ${step * 10}% (${mb(received)}/${mb(total)} MB)`);
+    }
+  };
+
+  let buf: Buffer;
+  try {
+    buf = await downloadWithResume(`${baseUrl}/${asset}`, { onProgress, onRetry });
+  } catch (err) {
     throw new Error(
-      `Engine download failed (HTTP ${res.status}) from ${baseUrl}/${asset}. ` +
+      `Engine download failed: ${err instanceof Error ? err.message : err}. ` +
       `Set LELU_ENGINE_BINARY to a locally built engine, or LELU_ENGINE_URL to a running one.`
     );
   }
-  const buf = Buffer.from(await res.arrayBuffer());
 
   const actual = sha256Hex(buf);
   if (actual !== expected) {

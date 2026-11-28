@@ -14,10 +14,10 @@ bypassed.
 - Python: `pip install lelu-agent-auth-sdk strands-agents`
 - TypeScript: `npm install lelu-agent-auth @strands-agents/sdk`
 
-The Python package will also offer a `strands` extra
-(`pip install "lelu-agent-auth-sdk[strands]"`) from its next release; the
-currently published package doesn't have it yet, so install `strands-agents`
-alongside it as above.
+From Python SDK 0.4.42 the package also offers a `strands` extra
+(`pip install "lelu-agent-auth-sdk[strands]"`) that installs `strands-agents`
+for you. Older releases do not have it, so install `strands-agents` alongside
+the SDK as above.
 
 ## How it maps onto Strands
 

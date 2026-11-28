@@ -6,8 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
@@ -17,6 +16,8 @@ jobs:
       pull-requests: write
       # npm --provenance signs the package with this run's OIDC identity.
       id-token: write
+      # Starts engine-release for a new engine tag (see "Build engine binaries").
+      actions: write
     steps:
       - name: Resolve release-please token
         id: rp_token
@@ -61,7 +62,7 @@ jobs:
         if: ${{ steps.rp_token.outputs.source == 'github_token' }}
         shell: bash
         run: |
-          echo "::warning::Release Please is using GITHUB_TOKEN. If PR creation fails, add RELEASE_PLEASE_TOKEN with repo contents+pull-requests write permissions."
+          echo "::warning::Release Please is using GITHUB_TOKEN. It can only open release PRs if Settings > Actions > General > 'Allow GitHub Actions to create and approve pull requests' is on; otherwise add a RELEASE_PLEASE_TOKEN secret with contents and pull-requests write access."
 
       - uses: googleapis/release-please-action@v4
         id: release
@@ -70,40 +71,57 @@ jobs:
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
 
+      # A tag pushed with GITHUB_TOKEN does not trigger other workflows, so
+      # engine-release never ran for engine-v0.3.0 and that release shipped
+      # with no binaries. workflow_dispatch is the documented exception, so
+      # start it here. With RELEASE_PLEASE_TOKEN (a PAT) the tag push already
+      # triggers it, and dispatching too would build and publish twice.
+      - name: Build engine binaries
+        if: ${{ steps.release.outputs['engine--release_created'] && steps.rp_token.outputs.source == 'github_token' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs['engine--tag_name'] }}
+        run: |
+          gh workflow run engine-release.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+          echo "Started engine-release for $TAG"
+
       - name: Checkout
         if: ${{ steps.release.outputs.releases_created == 'true' }}
         uses: actions/checkout@v4
 
-      # Publish TypeScript SDK to npm
+      # ── npm packages: lelu-agent-auth (sdk/typescript) and lelu-mcp (sdk/mcp) ──
+      #
+      # Trusted publishing first: with a Trusted Publisher configured for this
+      # workflow on npmjs.com, npm (11.5.1+) authenticates with this run's
+      # OIDC identity (id-token: write above). There is no token to expire,
+      # 2FA does not block it, and provenance is attached automatically.
+      # NPM_TOKEN is only a fallback, and must be a granular token with
+      # "bypass two-factor authentication": a token that needs an
+      # authenticator code cannot publish from CI.
       - name: Setup Node.js
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '22'
+          # No registry-url: it writes an .npmrc expecting NODE_AUTH_TOKEN,
+          # which gets in the way of trusted publishing.
 
-      - name: Resolve npm token
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
-        id: npm_token
+      - name: Use an npm that supports trusted publishing
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
+        run: npm install -g npm@^11.5.1 && npm --version
+
+      - name: Configure npm token fallback
+        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
         shell: bash
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
         run: |
           if [ -n "$NPM_TOKEN" ]; then
-            echo "token=$NPM_TOKEN" >> "$GITHUB_OUTPUT"
-          elif [ -n "$NODE_AUTH_TOKEN" ]; then
-            echo "token=$NODE_AUTH_TOKEN" >> "$GITHUB_OUTPUT"
+            printf "//registry.npmjs.org/:_authToken=%s\n" "$NPM_TOKEN" > "$HOME/.npmrc"
+            echo "NPM_TOKEN is set; npm uses it only if trusted publishing is not configured."
           else
-            echo "::error::Missing npm secret. Set NPM_TOKEN (or NODE_AUTH_TOKEN) in repo Actions secrets."
-            exit 1
+            echo "No NPM_TOKEN; publishing relies on trusted publishing."
           fi
-
-      - name: Configure npm auth
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
-        shell: bash
-        run: |
-          printf "//registry.npmjs.org/:_authToken=%s\n" "${{ steps.npm_token.outputs.token }}" > "$HOME/.npmrc"
 
       - name: Build and Publish TypeScript SDK
         if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
@@ -113,7 +131,7 @@ jobs:
           NAME=$(node -p "require('./package.json').name")
           # npm refuses to publish a version twice. If this version is already
           # on the registry (e.g. published by hand), skip instead of failing,
-          # so the Python and Go steps below still run.
+          # so the steps below still run.
           if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
             echo "::warning::$NAME@$VERSION is already on npm; skipping publish."
             exit 0
@@ -121,8 +139,35 @@ jobs:
           npm ci
           npm run build
           npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ steps.npm_token.outputs.token }}
+
+      - name: Build and Publish MCP server
+        if: ${{ steps.release.outputs['sdk/mcp--release_created'] }}
+        working-directory: sdk/mcp
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::warning::$NAME@$VERSION is already on npm; skipping publish."
+            exit 0
+          fi
+          npm ci
+          npm test
+          # prepublishOnly builds and checks server.json matches package.json.
+          npm publish --access public --provenance
+
+      - name: Build and Publish OpenClaw plugin
+        if: ${{ steps.release.outputs['sdk/openclaw--release_created'] }}
+        working-directory: sdk/openclaw
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+            echo "::warning::$NAME@$VERSION is already on npm; skipping publish."
+            exit 0
+          fi
+          npm ci
+          # prepublishOnly type-checks, tests and builds.
+          npm publish --access public --provenance
 
       # Publish Python SDK to PyPI
       - name: Setup Python

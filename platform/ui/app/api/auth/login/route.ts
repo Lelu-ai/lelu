@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findUserByEmail, verifyPassword, signJWT, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
+import { findUserByEmail, verifyPassword, createSession, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
 
 // Constant-time dummy hash to prevent timing-based email enumeration
 const DUMMY_HASH =
@@ -55,12 +55,7 @@ export async function POST(req: NextRequest) {
       console.error("[auth/login] recordLogin failed", err);
     }
 
-    const jwt = signJWT({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      emailVerified: user.emailVerified,
-    });
+    const jwt = await createSession(user);
 
     const res = NextResponse.json({
       ok: true,

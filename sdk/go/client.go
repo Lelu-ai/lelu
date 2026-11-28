@@ -16,7 +16,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// LeluCloudURL is the default Lelu cloud endpoint.
+// LeluCloudURL is the Lelu cloud endpoint. It is never used by default: an API
+// key alone does not select the cloud. Pass it as ClientConfig.BaseURL to opt in.
 const LeluCloudURL = "https://lelu-ai.com"
 
 // ClientConfig configures the Lelu client.
@@ -36,10 +37,10 @@ type Client struct {
 
 // NewClient constructs a new Lelu SDK client.
 func NewClient(cfg ClientConfig) *Client {
+	// Sending actions and context to a hosted service because a key happens to
+	// be set would be a silent data-flow decision, so the default is always the
+	// local engine. To use the cloud, set BaseURL (e.g. LeluCloudURL).
 	defaultURL := "http://localhost:8080"
-	if cfg.APIKey != "" {
-		defaultURL = LeluCloudURL
-	}
 
 	baseURL := strings.TrimSuffix(cfg.BaseURL, "/")
 	if baseURL == "" {

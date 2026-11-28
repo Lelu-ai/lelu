@@ -190,7 +190,7 @@ Also in the box: stable agent identity with RS256 workload JWTs and MCP OAuth 2.
 - [bedrock](examples/bedrock) — gate Amazon Bedrock agents on the model's reported confidence (offline demo with a mock response)
 - [agentgateway](examples/agentgateway) — Lelu as the decision brain behind agentgateway (ext-authz PEP)
 
-SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp)
+SDKs: [TypeScript](sdk/typescript) · [Python](sdk/python) · [Go](sdk/go) · [MCP server](sdk/mcp) — which engine and SDK versions go together: [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)
 
 Self-hosting: `npx -y lelu-mcp start` runs the real engine with no build step, or build it yourself from source — `go build ./cmd/engine` or `docker build -f engine/Dockerfile .` — full options in [examples/quickstart](examples/quickstart).
 

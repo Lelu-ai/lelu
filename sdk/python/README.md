@@ -13,6 +13,8 @@ pip install lelu-agent-auth-sdk
 
 Requires Python 3.11+.
 
+Which engine and SDK versions go together: [docs/COMPATIBILITY.md](../../docs/COMPATIBILITY.md).
+
 ## Quick start
 
 ### Option 1: Zero-config local (recommended)

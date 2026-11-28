@@ -4,6 +4,11 @@
   "description": "Model Context Protocol (MCP) server for Lelu — gives AI agents secure, policy-gated access to your infrastructure",
   "author": "Abenezer",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Lelu-ai/lelu.git",
+    "directory": "sdk/mcp"
+  },
   "mcpName": "io.github.Lelu-ai/lelu-mcp",
   "type": "module",
   "bin": {

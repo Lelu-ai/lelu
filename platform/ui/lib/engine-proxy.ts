@@ -44,10 +44,20 @@ function numberArray(v: unknown): number[] | null {
   return v.every(isFiniteNumber) ? (v as number[]) : null;
 }
 
+/**
+ * How long the cloud waits for the engine. It answers in well under a second
+ * when healthy; keeping this below the SDKs' 5-second default means an
+ * unreachable engine reaches SDK users as a clear 503, not as their own
+ * client timeout.
+ */
+export const ENGINE_TIMEOUT_MS = 4_000;
+
 // Copies only the fields of confidence.Signal (engine/internal/confidence/
 // extract.go). The engine does the real validation and scoring; this only
 // stops unexpected keys and types from being forwarded.
-function cleanSignal(v: unknown): { ok: true; signal: Record<string, unknown> } | { ok: false; error: string } {
+export function cleanConfidenceSignal(
+  v: unknown,
+): { ok: true; signal: Record<string, unknown> } | { ok: false; error: string } {
   if (!isPlainObject(v)) return { ok: false, error: "'confidence_signal' must be an object." };
   if (typeof v.provider !== "string" || !v.provider) {
     return { ok: false, error: "'confidence_signal.provider' is required." };
@@ -97,7 +107,7 @@ export function buildEngineAuthorizeBody(input: unknown, userId: string): BuildR
   }
 
   if (input.confidence_signal !== undefined && input.confidence_signal !== null) {
-    const sig = cleanSignal(input.confidence_signal);
+    const sig = cleanConfidenceSignal(input.confidence_signal);
     if (!sig.ok) return sig;
     body.confidence_signal = sig.signal;
   }

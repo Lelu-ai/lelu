@@ -54,7 +54,9 @@ export async function GET(req: NextRequest) {
       count: events.length,
       limit,
       cursor: 0,
-      next_cursor: events.length === limit ? (events[events.length - 1]?.id ?? 0) : 0,
+      // ids are BIGSERIAL, which the Postgres driver returns as strings; the
+      // SDKs' types (and docs) say this is a number.
+      next_cursor: events.length === limit ? Number(events[events.length - 1]?.id ?? 0) : 0,
     });
   } catch (err) {
     console.error("[api/v1/audit]", err);

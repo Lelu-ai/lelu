@@ -1,6 +1,6 @@
 {
   "name": "lelu-openclaw",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Lelu guard for OpenClaw: blocks dangerous tool calls (rm -rf ~, disk wipes) and asks you before risky ones (sudo, force-push, sending email, publishing).",
   "author": "Abenezer Getachew",
   "license": "MIT",

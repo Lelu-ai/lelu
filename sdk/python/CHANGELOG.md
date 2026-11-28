@@ -6,6 +6,26 @@
 
 * **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision="deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing. `safe_tool` and `safe_args` are now set only on a compute decision; the engine can echo a rule's `safe_tool` on a deny or a review, and the Strands guard read that as a redirect.
 
+## [0.4.44](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.43...python-sdk-v0.4.44) (2026-11-28)
+
+
+### Bug Fixes
+
+* install.sh finds the engine release and verifies it; changelog cleanup ([b6bf7c6](https://github.com/Lelu-ai/lelu/commit/b6bf7c6a63eb8ddea8babc13d70223f64747ccf2))
+* **sdk-python:** treat a compute decision without a safe tool as deny ([fedfc69](https://github.com/Lelu-ai/lelu/commit/fedfc6941bf9d945c13a8ca7739b3590b0851e3c))
+* **sdk:** compute is not allowed; timed-out waits return pending; docs examples branch on the decision ([1908045](https://github.com/Lelu-ai/lelu/commit/19080452e316b40717a8b98942f4c47311926f16))
+
+
+### Documentation
+
+* **changelog:** file shipped notes under their releases and drop doubled entries ([89ce782](https://github.com/Lelu-ai/lelu/commit/89ce782c00fce3661c11c8b5a999a3764868fb2c))
+
+
+### Miscellaneous
+
+* release main ([7525ffc](https://github.com/Lelu-ai/lelu/commit/7525ffcd32533148cc80287067fb8ab069e87b6e))
+* release main ([eb34e88](https://github.com/Lelu-ai/lelu/commit/eb34e88db06535f4d6ba4ded83e87913fe928e58))
+
 ## [0.4.43](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.42...python-sdk-v0.4.43) (2026-11-27)
 
 

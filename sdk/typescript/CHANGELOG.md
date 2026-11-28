@@ -12,6 +12,31 @@
 * **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
 * The React `useAgentPermission` hook reports `decision: "compute"` (with `canExecute: false`) for a compute decision.
 
+## [0.2.0](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.2...typescript-sdk-v0.2.0) (2026-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **sdk-typescript:** AuthDecision.allowed is false for a compute decision (it was true, copied from the engine), and a compute decision without a safe tool is returned as a deny. Branch on `decision` (or `computed`) to run safeTool with safeArgs.
+
+### Bug Fixes
+
+* install.sh finds the engine release and verifies it; changelog cleanup ([b6bf7c6](https://github.com/Lelu-ai/lelu/commit/b6bf7c6a63eb8ddea8babc13d70223f64747ccf2))
+* **sdk-typescript:** report allowed: false on a compute decision ([ed8954f](https://github.com/Lelu-ai/lelu/commit/ed8954f3768e0a1a52e64c289d9c29c421593d2c))
+* **sdk-typescript:** return pending instead of throwing when a review wait times out ([70bbb26](https://github.com/Lelu-ai/lelu/commit/70bbb265abeb4b879636a6fc04e06b95c9ca40dd))
+* **sdk:** compute is not allowed; timed-out waits return pending; docs examples branch on the decision ([1908045](https://github.com/Lelu-ai/lelu/commit/19080452e316b40717a8b98942f4c47311926f16))
+
+
+### Documentation
+
+* **changelog:** file shipped notes under their releases and drop doubled entries ([89ce782](https://github.com/Lelu-ai/lelu/commit/89ce782c00fce3661c11c8b5a999a3764868fb2c))
+
+
+### Miscellaneous
+
+* release main ([7525ffc](https://github.com/Lelu-ai/lelu/commit/7525ffcd32533148cc80287067fb8ab069e87b6e))
+* release main ([eb34e88](https://github.com/Lelu-ai/lelu/commit/eb34e88db06535f4d6ba4ded83e87913fe928e58))
+
 ## [0.1.2](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.1...typescript-sdk-v0.1.2) (2026-11-28)
 
 

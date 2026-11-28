@@ -175,7 +175,12 @@ export async function POST(req: NextRequest) {
   // A verified signal from the model provider. The engine extracts the
   // confidence from it; a bare `confidence` number is ignored by an engine
   // that does not accept unverified confidence.
-  const signalInput = raw.confidence_signal ?? ctxObj?.confidence_signal;
+  // `signal` is the TypeScript SDK's name for the same object.
+  const signalInput = raw.confidence_signal ?? raw.signal ?? ctxObj?.confidence_signal ?? ctxObj?.signal;
+  // Optional agent name, shown in the audit log only (a label; the engine
+  // evaluates every cloud call as cloud_customer, and the key is in key_id).
+  const actorInput = raw.actor ?? ctxObj?.actor;
+  const actorLabel = typeof actorInput === "string" ? actorInput.trim().slice(0, 128) : "";
   let confidenceSignal: Record<string, unknown> | undefined;
   if (signalInput !== undefined && signalInput !== null) {
     const cleaned = cleanConfidenceSignal(signalInput);
@@ -318,7 +323,7 @@ export async function POST(req: NextRequest) {
     traceId: requestId,
     userId,
     keyId,
-    actor: isSandbox ? "sandbox" : (keyId ?? "unknown"),
+    actor: isSandbox ? "sandbox" : actorLabel || (keyId ?? "unknown"),
     action: tool.trim(),
     decision: decisionMapped,
     reason: result.reason,

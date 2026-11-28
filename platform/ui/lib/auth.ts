@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { db, ensureSchema } from "./db";
+import { decideOAuthLink, OAUTH_EMAIL_UNVERIFIED } from "./oauth-link";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -163,12 +164,16 @@ export interface OAuthProfileInput {
   emailVerified: boolean;
 }
 
-// Finds the user for an OAuth login, linking or creating as needed:
+// Finds the user for an OAuth login, linking or creating as needed. What is
+// allowed is decided by decideOAuthLink (lib/oauth-link.ts):
 //   1. This (provider, provider_account_id) already linked → that user.
-//   2. Not linked, but a user with this email already exists (password
-//      signup, or a different provider) → link this provider to it.
-//   3. Neither → create a new, password-less user (trusts the provider's own
-//      email verification instead of running our own verification flow).
+//   2. The provider has not verified the email → refused (throws
+//      OAUTH_EMAIL_UNVERIFIED). An unverified address proves nothing about
+//      who owns the matching Lelu account.
+//   3. A user with this email exists → link this provider to it. If that
+//      account never verified its email, its password is cleared and the
+//      email marked verified, since the provider has now proved ownership.
+//   4. Neither → create a new, password-less, verified user.
 export async function findOrCreateOAuthUser(
   provider: OAuthProviderName,
   profile: OAuthProfileInput
@@ -183,7 +188,17 @@ export async function findOrCreateOAuthUser(
     JOIN lelu_users u ON u.id = o.user_id
     WHERE o.provider = ${provider} AND o.provider_account_id = ${profile.providerAccountId}
   `;
-  if (linked.length > 0) {
+  const existing = linked.length > 0 ? null : await findUserByEmail(norm);
+
+  const decision = decideOAuthLink({
+    alreadyLinked: linked.length > 0,
+    providerEmailVerified: profile.emailVerified,
+    existing: existing
+      ? { emailVerified: existing.emailVerified, hasPassword: Boolean(existing.passwordHash) }
+      : null,
+  });
+
+  if (decision.kind === "use-linked") {
     const r = linked[0];
     return {
       id: r.id as string,
@@ -195,13 +210,23 @@ export async function findOrCreateOAuthUser(
     };
   }
 
-  const existing = await findUserByEmail(norm);
-  if (existing) {
+  if (decision.kind === "reject-unverified") throw new Error(OAUTH_EMAIL_UNVERIFIED);
+
+  if (decision.kind === "link-existing" && existing) {
+    if (decision.clearPassword) {
+      await sql`UPDATE lelu_users SET email_verified = TRUE, password_hash = NULL WHERE id = ${existing.id}`;
+    } else if (decision.markVerified) {
+      await sql`UPDATE lelu_users SET email_verified = TRUE WHERE id = ${existing.id}`;
+    }
     await sql`
       INSERT INTO lelu_oauth_accounts (id, user_id, provider, provider_account_id)
       VALUES (${randomBytes(16).toString("hex")}, ${existing.id}, ${provider}, ${profile.providerAccountId})
     `;
-    return existing;
+    return {
+      ...existing,
+      emailVerified: true,
+      passwordHash: decision.clearPassword ? null : existing.passwordHash,
+    };
   }
 
   const user: User = {
@@ -209,7 +234,7 @@ export async function findOrCreateOAuthUser(
     name: profile.name.trim(),
     email: norm,
     passwordHash: null,
-    emailVerified: profile.emailVerified,
+    emailVerified: true,
     createdAt: new Date().toISOString(),
   };
   await sql`

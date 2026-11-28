@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode, fetchProfile } from "@/lib/oauth";
 import { findOrCreateOAuthUser, createSession, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
+import { OAUTH_EMAIL_UNVERIFIED } from "@/lib/oauth-link";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://lelu-ai.com";
 const STATE_COOKIE = "lelu_oauth_state";
@@ -42,6 +43,9 @@ export async function GET(req: NextRequest) {
     res.cookies.delete(STATE_COOKIE);
     return res;
   } catch (err) {
+    if (err instanceof Error && err.message === OAUTH_EMAIL_UNVERIFIED) {
+      return fail("oauth_email_unverified");
+    }
     console.error("[auth/github/callback]", err);
     return fail("oauth_failed");
   }

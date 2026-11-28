@@ -101,6 +101,19 @@ export function formatAgentDecision(d: EngineAgentDecision): Record<string, unkn
   };
 }
 
+/**
+ * Picks the token ID from lelu_revoke_token's arguments. `token_id` is the
+ * name lelu_mint_token returns; `tokenId` is the older name, still accepted.
+ */
+export function resolveTokenIdArg(args: { token_id?: string; tokenId?: string }): string {
+  if (args.token_id && args.tokenId && args.token_id !== args.tokenId) {
+    throw new Error("token_id and tokenId were both given with different values; pass only token_id.");
+  }
+  const id = args.token_id ?? args.tokenId;
+  if (!id) throw new Error("token_id is required: pass the token_id returned by lelu_mint_token.");
+  return id;
+}
+
 // ─── Server factory ───────────────────────────────────────────────────────────
 
 export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
@@ -299,11 +312,17 @@ export function createLeluMcpServer(cfg: LeluMcpConfig = {}): McpServer {
   // ── Tool: revoke_token ─────────────────────────────────────────────────────
   server.tool(
     "lelu_revoke_token",
-    "Immediately revoke a JIT token by its ID. Use this when a task is complete or when suspicious activity is detected.",
+    "Immediately revoke a JIT token by the token_id lelu_mint_token returned. " +
+    "Use this when a task is complete or when suspicious activity is detected.",
     {
-      tokenId: z.string().describe("The token ID returned by lelu_mint_token"),
+      // snake_case on purpose: lelu_mint_token returns "token_id", so a model
+      // passing the value straight back must not fail input validation.
+      // "tokenId" was the original name and stays accepted for existing callers.
+      token_id: z.string().min(1).optional().describe("The token_id returned by lelu_mint_token"),
+      tokenId:  z.string().min(1).optional().describe("Deprecated alias for token_id"),
     },
-    async ({ tokenId }) => {
+    async (args) => {
+      const tokenId = resolveTokenIdArg(args);
       const data = await del<{ success: boolean }>(`/v1/tokens/${encodeURIComponent(tokenId)}`);
 
       return {

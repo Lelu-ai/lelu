@@ -29,13 +29,27 @@ claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-a
   "mcpServers": {
     "lelu": {
       "command": "npx",
-      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio"]
+      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"]
     }
   }
 }
 ```
 
-Or generate the snippet: `npx lelu-mcp add --cursor` (add `--write` to save it).
+Or let the CLI produce it:
+
+```bash
+npx lelu-mcp add --cursor             # print the config above and where it goes
+npx lelu-mcp add --cursor --write     # add it to .cursor/mcp.json in this project
+npx lelu-mcp add --open-code --write  # add it to ./opencode.json (Open Code's format)
+```
+
+`--write` keeps the other servers already in the file, and refuses to touch a file it can't parse (or an `opencode.jsonc`). `--mode sse` targets the Docker Compose HTTP/SSE server instead (`http://localhost:3003/sse`, override with `--url`); that config carries an `Authorization: Bearer <MCP_AUTH_TOKEN>` header for you to fill in.
+
+### Engine version and updates
+
+At each start, `lelu-mcp` prints the engine version it is running and where the binary came from. Without `LELU_ENGINE_VERSION`, it looks up the newest engine release and replaces the cached binary when a newer one exists (the release a binary came from is recorded beside it in `~/.lelu/bin/<binary>.release.json`; a binary cached by an older `lelu-mcp` has no record and is replaced). If GitHub can't be reached, the cached engine keeps running and a notice says why. With `LELU_ENGINE_VERSION` set, that release is used, downloaded if the cached binary is a different one, with no release lookup. Every download is checksum-verified before it replaces the cached binary.
+
+The local engine runs with per-install secrets generated on first run and kept in `~/.lelu` (mode 0600): `engine.key` (the API key), `engine.jwt.key` (`JWT_SIGNING_KEY`, which signs the tokens `lelu_mint_token` returns) and `engine.vault.key` (`VAULT_KEY`). Setting `JWT_SIGNING_KEY` or `VAULT_KEY` yourself overrides them.
 
 ## Change the rules
 
@@ -59,7 +73,7 @@ rules:
 | `lelu_agent_authorize` | Authorize an agent action (confidence-aware). Status is `ALLOWED`, `DENIED`, `REQUIRES_HUMAN_REVIEW` (with `review_id`) or `COMPUTE` (run `safe_tool` with `safe_args` instead of the original action) |
 | `lelu_authorize` | Authorize a human user action |
 | `lelu_mint_token` | Mint a short-lived scoped JWT |
-| `lelu_revoke_token` | Revoke a JIT token immediately |
+| `lelu_revoke_token` | Revoke a JIT token immediately, by the `token_id` `lelu_mint_token` returned |
 | `lelu_get_review` | Read a human-review item's status and note by `review_id` (read-only) |
 | `lelu_health` | Check engine health |
 
@@ -102,7 +116,7 @@ Without `MCP_AUTH_TOKEN` the `mcp` container exits at startup and says why (`doc
 | `LELU_POLICY_PATH` | Policy file for the local engine | `~/.lelu/policy.yaml` (`policy.<preset>.yaml` for a non-general preset) |
 | `LELU_POLICY_PRESET` | Starter policy written on first run: `general` or `coding-agent` | `general` |
 | `LELU_ENGINE_BINARY` | Use a locally built engine binary (skips download) | *(download)* |
-| `LELU_ENGINE_VERSION` | Pin an engine release, e.g. `0.1.0` | latest |
+| `LELU_ENGINE_VERSION` | Pin an engine release, e.g. `0.1.0`; a cached binary of another release is replaced | newest, checked at each start |
 | `MCP_AUTH_TOKEN` | Bearer token HTTP clients must send; required for `--transport http` (16+ chars) | *(none — HTTP won't start)* |
 | `MCP_BIND_ADDR` | Address the HTTP transport listens on | `127.0.0.1` |
 

@@ -47,7 +47,7 @@ export default function DocsMCP() {
   "mcpServers": {
     "lelu": {
       "command": "npx",
-      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio"]
+      "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"]
     }
   }
 }`}</pre>

@@ -30,6 +30,7 @@
  *   LELU_POLICY_PRESET   Starter policy preset: general | coding-agent
  */
 
+import { runAdd } from "./add.js";
 import { runStdio, runHttp } from "./server.js";
 import { engineIsHealthy, startLocalEngine, type LocalEngine } from "./local-engine.js";
 
@@ -80,14 +81,19 @@ If the local engine can't be started, lelu-mcp exits with the reason. It only
 talks to an engine elsewhere when you ask for one (--engine-url, LELU_ENGINE_URL
 or --no-local).
 
-Add command options:
-  --cursor             Print Cursor MCP config snippet
-  --claude             Print Claude Code command
-  --open-code          Print Open Code MCP config snippet
-  --manual             Print a generic mcpServers config snippet
-  --mode <mode>        Connection mode: sse | stdio (default: sse)
-  --url <url>          SSE endpoint URL (default: http://localhost:3001/sse)
-  --write              Write config to a local file for Cursor/Open Code
+Add command options (prints the config; notes on where it goes go to stderr):
+  --cursor             Cursor config (.cursor/mcp.json)
+  --claude             Claude Code command
+  --open-code          Open Code config (opencode.json)
+  --manual             Generic mcpServers config (default)
+  --mode <mode>        stdio | sse  (default: stdio — runs
+                       "npx -y lelu-mcp start --transport stdio --preset coding-agent")
+  --preset <name>      Preset for the stdio command (default: coding-agent)
+  --url <url>          SSE endpoint for --mode sse (default: http://localhost:3003/sse,
+                       the port Docker Compose publishes; the config includes an
+                       "Authorization: Bearer <MCP_AUTH_TOKEN>" header to fill in)
+  --write              Add the server to .cursor/mcp.json or ./opencode.json in the
+                       current directory, keeping the servers already there
 
 Tools exposed to the AI agent:
   lelu_agent_authorize   Authorize an agent action (confidence-aware)
@@ -104,16 +110,12 @@ Examples:
   # Start with a custom Engine URL and API key
   npx lelu-mcp start --engine-url http://lelu.internal:8082 --api-key sk_live_xxx
 
-  # Cursor / Claude Desktop config (settings.json or claude_desktop_config.json):
+  # Cursor / Claude Desktop config (.cursor/mcp.json or claude_desktop_config.json):
   # {
   #   "mcpServers": {
   #     "lelu": {
   #       "command": "npx",
-  #       "args": ["lelu-mcp", "start"],
-  #       "env": {
-  #         "LELU_ENGINE_URL": "http://localhost:8082",
-  #         "LELU_API_KEY": "your_key"
-  #       }
+  #       "args": ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"]
   #     }
   #   }
   # }
@@ -123,91 +125,12 @@ Examples:
   npx lelu-mcp add --claude
   npx lelu-mcp add --open-code
 
-  # Write a Cursor config file in the current project
+  # Add lelu to the Cursor config of the project in the current directory
   npx lelu-mcp add --cursor --write
+
+  # Point Cursor at the Docker Compose HTTP/SSE server instead
+  npx lelu-mcp add --cursor --mode sse
 `);
-}
-
-type AddTarget = "cursor" | "claude" | "open-code" | "manual";
-
-function detectAddTarget(flags: Record<string, string>): AddTarget {
-  if (flags["cursor"] === "true") return "cursor";
-  if (flags["claude"] === "true") return "claude";
-  if (flags["open-code"] === "true") return "open-code";
-  if (flags["manual"] === "true") return "manual";
-  return "manual";
-}
-
-function buildMcpServerConfig(flags: Record<string, string>): Record<string, unknown> {
-  const mode = flags["mode"] ?? "sse";
-  const engineUrl = flags["engine-url"] ?? process.env["LELU_ENGINE_URL"];
-  const apiKey = flags["api-key"] ?? process.env["LELU_API_KEY"];
-  const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
-
-  if (mode === "stdio") {
-    // Only pin env vars the user explicitly provided — with no LELU_ENGINE_URL,
-    // lelu-mcp runs a local engine automatically (zero-config mode).
-    const env: Record<string, string> = {};
-    if (engineUrl) env["LELU_ENGINE_URL"] = engineUrl;
-    if (apiKey) env["LELU_API_KEY"] = apiKey;
-    return {
-      command: "npx",
-      args: ["-y", "lelu-mcp", "start", "--transport", "stdio"],
-      ...(Object.keys(env).length > 0 ? { env } : {}),
-    };
-  }
-
-  return { url: sseUrl };
-}
-
-async function runAdd(flags: Record<string, string>): Promise<void> {
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-
-  const mode = flags["mode"] ?? "sse";
-  if (mode !== "sse" && mode !== "stdio") {
-    console.error(`--mode must be 'sse' or 'stdio', got: ${mode}`);
-    process.exit(1);
-  }
-
-  const target = detectAddTarget(flags);
-  const mcpServerConfig = buildMcpServerConfig(flags);
-  const wrappedConfig = { mcpServers: { lelu: mcpServerConfig } };
-
-  if (target === "claude") {
-    const sseUrl = flags["url"] ?? process.env["LELU_MCP_URL"] ?? "http://localhost:3001/sse";
-    if (mode === "stdio") {
-      // Claude Code is a coding agent: the coding-agent preset allows the
-      // edit/test loop and sends installs, pushes and deploys to a human.
-      console.log("claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent");
-      return;
-    }
-    // The HTTP transport requires MCP_AUTH_TOKEN on the server side, so the
-    // client has to present it too. Without this header the server answers
-    // 401 — which is the point: this port fronts the engine's API key.
-    // "sse", not "http": the server speaks the legacy SSE transport
-    // (GET /sse + POST /messages), not streamable HTTP.
-    console.log(`claude mcp add --transport sse lelu ${sseUrl} --header "Authorization: Bearer $MCP_AUTH_TOKEN"`);
-    return;
-  }
-
-  const output = JSON.stringify(wrappedConfig, null, 2);
-  const shouldWrite = flags["write"] === "true";
-
-  if (!shouldWrite || target === "manual") {
-    console.log(output);
-    return;
-  }
-
-  const cwd = process.cwd();
-  const targetPath = target === "cursor"
-    ? path.join(cwd, ".cursor", "mcp.json")
-    : path.join(cwd, ".opencode", "mcp.json");
-
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, output + "\n", "utf8");
-  console.error(`[lelu-mcp] Wrote ${targetPath}`);
-  console.log(output);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -229,7 +152,12 @@ async function main() {
   const flags = parseArgs(args.slice(1));
 
   if (command === "add") {
-    await runAdd(flags);
+    try {
+      await runAdd(flags);
+    } catch (err) {
+      console.error(`[lelu-mcp] ${err instanceof Error ? err.message : err}`);
+      process.exit(1);
+    }
     return;
   }
 

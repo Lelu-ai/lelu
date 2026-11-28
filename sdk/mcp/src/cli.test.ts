@@ -72,3 +72,30 @@ describe("lelu-mcp start", () => {
     }
   }, 60_000);
 });
+
+describe("lelu-mcp add", () => {
+  it("--cursor prints the stdio config with the coding-agent preset and says where it goes", async () => {
+    const res = await runCli(["add", "--cursor"], {}, dir);
+    expect(res.code).toBe(0);
+    expect(JSON.parse(res.stdout)).toEqual({
+      mcpServers: {
+        lelu: { command: "npx", args: ["-y", "lelu-mcp", "start", "--transport", "stdio", "--preset", "coding-agent"] },
+      },
+    });
+    expect(res.stderr).toMatch(/\.cursor\/mcp\.json/);
+    expect(fs.existsSync(path.join(dir, ".cursor"))).toBe(false);
+  }, 60_000);
+
+  it("--open-code --write creates ./opencode.json", async () => {
+    const res = await runCli(["add", "--open-code", "--write"], {}, dir);
+    expect(res.code).toBe(0);
+    const written = JSON.parse(fs.readFileSync(path.join(dir, "opencode.json"), "utf8"));
+    expect(written.mcp.servers.lelu.command).toContain("coding-agent");
+  }, 60_000);
+
+  it("exits 1 on a bad --mode", async () => {
+    const res = await runCli(["add", "--cursor", "--mode", "http"], {}, dir);
+    expect(res.code).toBe(1);
+    expect(res.stderr).toMatch(/--mode must be 'stdio' or 'sse'/);
+  }, 60_000);
+});

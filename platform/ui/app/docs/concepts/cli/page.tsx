@@ -11,9 +11,13 @@ export default function DocsConceptCli() {
   );
 
   const quickAddCommands: Record<typeof quickTab, string> = {
-    Cursor: "npx lelu-mcp add --cursor",
+    // `add` prints a stdio config running the same command as the Claude Code
+    // tab; --write adds it to the project's config file, keeping other servers.
+    Cursor: `# Adds lelu to .cursor/mcp.json in this project (drop --write to only print it)
+npx lelu-mcp add --cursor --write`,
     "Claude Code": "claude mcp add lelu -- npx -y lelu-mcp start --transport stdio --preset coding-agent",
-    "Open Code": "npx lelu-mcp add --open-code",
+    "Open Code": `# Adds lelu to ./opencode.json (drop --write to only print it)
+npx lelu-mcp add --open-code --write`,
     Manual:
       "npx lelu-mcp start --transport stdio --engine-url http://localhost:8083 --api-key YOUR_API_KEY",
   };
@@ -427,7 +431,7 @@ curl http://localhost:3003/healthz
                   ["lelu_agent_authorize", "Confidence-aware authorization for an AI agent action"],
                   ["lelu_authorize", "Authorize a human user action against the active policy"],
                   ["lelu_mint_token", "Issue a short-lived JIT token for a specific action"],
-                  ["lelu_revoke_token", "Revoke a previously issued token"],
+                  ["lelu_revoke_token", "Revoke a previously issued token by the token_id lelu_mint_token returned"],
                   ["lelu_health", "Check that the Lelu engine is reachable"],
                 ].map(([tool, desc]) => (
                   <tr key={tool}>

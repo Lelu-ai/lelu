@@ -75,6 +75,11 @@ from .observability import (
 LELU_CLOUD_URL = "https://lelu-ai.com"
 
 
+def _reviewer_headers(reviewer_key: str | None) -> dict[str, str] | None:
+    """The engine's reviewer credential header (see ``LELU_REVIEWER_KEYS``)."""
+    return {"X-Lelu-Reviewer-Key": reviewer_key} if reviewer_key else None
+
+
 _CONFIDENCE_FROM_DEPRECATION = (
     "LeluClient.confidence_from is deprecated; use LeluClient.signal_from "
     "with AgentContext(confidence_signal=...) so the engine extracts the "
@@ -608,17 +613,42 @@ class LeluClient:
             await self._raise_for_status(resp)
         return ReviewItem(**resp.json())
 
-    async def approve_review(self, review_id: str, resolved_by: str = "", note: str = "") -> bool:
-        """Approve a paused action; the waiting agent resumes."""
+    async def approve_review(
+        self,
+        review_id: str,
+        resolved_by: str = "",
+        note: str = "",
+        *,
+        reviewer_key: str | None = None,
+    ) -> bool:
+        """Approve a paused action; the waiting agent resumes.
+
+        When the engine sets ``LELU_REVIEWER_KEYS``, pass one of those secrets as
+        ``reviewer_key``: the engine then records the reviewer that key belongs
+        to and ignores ``resolved_by``. Without it the engine refuses with "a
+        valid reviewer credential is required".
+        """
         data = await self._post(
-            f"/v1/queue/{review_id}/approve", {"resolved_by": resolved_by, "note": note}
+            f"/v1/queue/{review_id}/approve",
+            {"resolved_by": resolved_by, "note": note},
+            headers=_reviewer_headers(reviewer_key),
         )
         return bool(data.get("success"))
 
-    async def deny_review(self, review_id: str, resolved_by: str = "", note: str = "") -> bool:
-        """Deny a paused action; the waiting agent receives the denial."""
+    async def deny_review(
+        self,
+        review_id: str,
+        resolved_by: str = "",
+        note: str = "",
+        *,
+        reviewer_key: str | None = None,
+    ) -> bool:
+        """Deny a paused action; the waiting agent receives the denial.
+        See :meth:`approve_review` for ``reviewer_key``."""
         data = await self._post(
-            f"/v1/queue/{review_id}/deny", {"resolved_by": resolved_by, "note": note}
+            f"/v1/queue/{review_id}/deny",
+            {"resolved_by": resolved_by, "note": note},
+            headers=_reviewer_headers(reviewer_key),
         )
         return bool(data.get("success"))
 
@@ -1205,8 +1235,10 @@ class LeluClient:
 
     # ── HTTP helpers ──────────────────────────────────────────────────────────
 
-    async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        resp = await self._client.post(path, json=payload)
+    async def _post(
+        self, path: str, payload: dict[str, Any], headers: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        resp = await self._client.post(path, json=payload, headers=headers)
         await self._raise_for_status(resp)
         return resp.json()  # type: ignore[no-any-return]
 

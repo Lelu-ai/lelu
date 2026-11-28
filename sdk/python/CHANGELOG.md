@@ -8,6 +8,7 @@
 
 ### Fixes
 
+* **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision="deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing. `safe_tool` and `safe_args` are now set only on a compute decision; the engine can echo a rule's `safe_tool` on a deny or a review, and the Strands guard read that as a redirect.
 * **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.
 * **`__version__` comes from the installed package metadata.** It was a hard-coded `0.4.3` while the package was `0.4.41`. Reported in the Nauro pilot.
 

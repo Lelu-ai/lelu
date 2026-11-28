@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { LeluClient, AuthEngineError } from "../src/index.js";
 
 // ── Mock fetch globally ────────────────────────────────────────────────────────
@@ -361,6 +361,68 @@ describe("LeluClient", () => {
       });
       await client.issueAgentToken(agent.id);
       expect(mockFetch.mock.calls[1][0]).toContain("/v1/agents/agent-1/token");
+    });
+  });
+
+  // ── waitForApproval / waitAndRedeem ───────────────────────────────────────
+
+  describe("waiting on a review", () => {
+    // The engine's /wait answers 408 with the item while it is still pending
+    // at the end of the long-poll, and 200 once it is resolved.
+    const pendingItem = { id: "rv-1", status: "pending" };
+
+    function engineStillPending() {
+      mockFetch.mockImplementation(async (url: string) =>
+        String(url).includes("/wait?")
+          ? { ok: false, status: 408, json: async () => pendingItem }
+          : { ok: true, status: 200, json: async () => pendingItem },
+      );
+    }
+
+    afterEach(() => {
+      mockFetch.mockReset();
+    });
+
+    it("waitForApproval returns the pending item when the wait times out (408)", async () => {
+      engineStillPending();
+      const item = await client.waitForApproval("rv-1", { timeoutMs: 30 });
+      expect(item.status).toBe("pending");
+      expect(mockFetch.mock.calls.some(([u]) => String(u).includes("/wait?"))).toBe(true);
+    });
+
+    it("waitAndRedeem returns allowed: false instead of throwing when still pending", async () => {
+      engineStillPending();
+      const result = await client.waitAndRedeem("rv-1", { tool: "wire_transfer" }, { timeoutMs: 30 });
+      expect(result).toEqual({
+        allowed: false,
+        reason: "still pending after 30ms",
+        reviewId: "rv-1",
+      });
+      // Never redeemed: nothing was approved.
+      expect(mockFetch.mock.calls.some(([u]) => String(u).includes("/redeem"))).toBe(false);
+    });
+
+    it("waitForApproval still throws on other HTTP errors from the wait", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: "review not found" }),
+      });
+      await expect(client.waitForApproval("rv-x", { timeoutMs: 30 })).rejects.toBeInstanceOf(
+        AuthEngineError,
+      );
+    });
+
+    it("waitAndRedeem redeems once the wait reports approved", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "rv-1", status: "approved" }),
+      });
+      mockOK({ allowed: true, reason: "approved", review_id: "rv-1" });
+      const result = await client.waitAndRedeem("rv-1", { tool: "wire_transfer" }, { timeoutMs: 30 });
+      expect(result.allowed).toBe(true);
+      expect(mockFetch.mock.calls[1][0]).toContain("/v1/queue/rv-1/redeem");
     });
   });
 

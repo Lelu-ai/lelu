@@ -10,6 +10,7 @@
 
 ### Fixes
 
+* **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
 * **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
 * **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`.
 * **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).

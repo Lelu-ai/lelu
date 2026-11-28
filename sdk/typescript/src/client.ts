@@ -727,8 +727,10 @@ export class LeluClient {
           { method: "GET", headers: this.headers(), signal: ctrl.signal }
         );
 
-        // parseResponse handles 408 (still pending) the same as 200 here.
-        const item = await this.parseResponse<ReviewQueueItem>(res);
+        // The engine answers 408 with the item when it is still pending at the
+        // end of the long-poll. That is an answer, not an error: loop, and the
+        // deadline check above returns the pending item.
+        const item = await this.parseResponse<ReviewQueueItem>(res, [408]);
         if (item.status !== "pending") return item;
         // Still pending — loop and issue the next long-poll.
       }

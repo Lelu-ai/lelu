@@ -22,6 +22,11 @@
  *   LELU_POLICY_PATH     policy file to load (default ~/.lelu/policy.yaml, or
  *                        ~/.lelu/policy.<preset>.yaml for a non-general preset)
  *   LELU_POLICY_PRESET   starter policy preset: general | coding-agent
+ *
+ * Per-install secrets, generated on first run and kept in LELU_HOME (0600):
+ *   engine.key        API_KEY the engine requires from callers
+ *   engine.jwt.key    JWT_SIGNING_KEY for minted tokens (an env var overrides it)
+ *   engine.vault.key  VAULT_KEY for the OAuth token vault (an env var overrides it)
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -45,20 +50,57 @@ export interface LocalEngine {
   stop: () => void;
 }
 
-// The engine requires an API key even locally. Generate one per install and
-// persist it in ~/.lelu so the key is stable across restarts (0600, local only).
-async function ensureLocalApiKey(): Promise<string> {
-  const keyPath = path.join(leluHome(), "engine.key");
+/**
+ * Reads the secret stored in `file`, or generates one with `make` and stores
+ * it (0600, local only) so it stays the same across restarts.
+ */
+export async function ensureLocalSecret(file: string, make: () => string): Promise<string> {
   try {
-    const existing = (await fsp.readFile(keyPath, "utf8")).trim();
+    const existing = (await fsp.readFile(file, "utf8")).trim();
     if (existing) return existing;
   } catch {
     // first run
   }
-  const key = `lelu_local_${randomBytes(24).toString("base64url")}`;
-  await fsp.mkdir(path.dirname(keyPath), { recursive: true });
-  await fsp.writeFile(keyPath, `${key}\n`, { mode: 0o600 });
-  return key;
+  const secret = make();
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  // "wx": if another lelu-mcp started at the same moment and wrote first,
+  // use its secret rather than overwriting it.
+  try {
+    await fsp.writeFile(file, `${secret}\n`, { mode: 0o600, flag: "wx" });
+    return secret;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    const existing = (await fsp.readFile(file, "utf8")).trim();
+    if (existing) return existing;
+    await fsp.writeFile(file, `${secret}\n`, { mode: 0o600 });
+    return secret;
+  }
+}
+
+/** Secrets the local engine is started with, generated once per install. */
+export interface LocalEngineSecrets {
+  /** API_KEY: callers present it as a Bearer token. */
+  apiKey: string;
+  /** JWT_SIGNING_KEY: signs the tokens lelu_mint_token returns. */
+  signingKey: string;
+  /** VAULT_KEY: encrypts the engine's OAuth token vault. */
+  vaultKey: string;
+}
+
+/**
+ * The engine requires an API key even locally, and without JWT_SIGNING_KEY it
+ * signs tokens with a published default that anyone can forge tokens with
+ * (VAULT_KEY falls back to that same default). Each is generated once per
+ * install and kept in LELU_HOME beside the others.
+ */
+export async function ensureLocalSecrets(home = leluHome()): Promise<LocalEngineSecrets> {
+  const random = () => randomBytes(32).toString("base64url");
+  const [apiKey, signingKey, vaultKey] = await Promise.all([
+    ensureLocalSecret(path.join(home, "engine.key"), () => `lelu_local_${randomBytes(24).toString("base64url")}`),
+    ensureLocalSecret(path.join(home, "engine.jwt.key"), random),
+    ensureLocalSecret(path.join(home, "engine.vault.key"), random),
+  ]);
+  return { apiKey, signingKey, vaultKey };
 }
 
 // ─── Starter policies ─────────────────────────────────────────────────────────
@@ -838,11 +880,12 @@ async function waitHealthy(url: string, child: ChildProcess, timeoutMs = 15_000)
  */
 export async function startLocalEngine(opts: { preset?: string } = {}): Promise<LocalEngine> {
   const preset = resolvePreset(opts.preset);
-  const [bin, policyPath, apiKey] = await Promise.all([
+  const [bin, policyPath, secrets] = await Promise.all([
     resolveBinary(),
     ensurePolicy(preset),
-    ensureLocalApiKey(),
+    ensureLocalSecrets(),
   ]);
+  const { apiKey } = secrets;
   const home = leluHome();
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
@@ -855,6 +898,10 @@ export async function startLocalEngine(opts: { preset?: string } = {}): Promise<
       // hard-denying. Listed before the spread so your env vars override them.
       CONFIDENCE_ALLOW_UNVERIFIED: "true",
       CONFIDENCE_MISSING_MODE: "review",
+      // Per-install secrets instead of the engine's published defaults. Also
+      // before the spread, so a JWT_SIGNING_KEY / VAULT_KEY you set wins.
+      JWT_SIGNING_KEY: secrets.signingKey,
+      VAULT_KEY: secrets.vaultKey,
       ...process.env,
       LISTEN_ADDR: `127.0.0.1:${port}`,
       POLICY_PATH: policyPath,

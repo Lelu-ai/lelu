@@ -1,5 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { findChecksum, sha256Hex, starterPolicy, resolvePreset, POLICY_PRESETS } from "./local-engine.js";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  findChecksum, sha256Hex, starterPolicy, resolvePreset, POLICY_PRESETS, ensureLocalSecrets,
+} from "./local-engine.js";
+
+describe("ensureLocalSecrets", () => {
+  it("generates distinct random API, signing and vault keys once, 0600, and reuses them", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "lelu-mcp-secrets-"));
+    try {
+      const first = await ensureLocalSecrets(home);
+      expect(first.apiKey).toMatch(/^lelu_local_/);
+      expect(first.signingKey.length).toBeGreaterThanOrEqual(43); // 32 random bytes
+      expect(first.vaultKey.length).toBeGreaterThanOrEqual(43);
+      expect(new Set([first.apiKey, first.signingKey, first.vaultKey]).size).toBe(3);
+      expect(first.signingKey).not.toMatch(/change-me/);
+
+      for (const file of ["engine.key", "engine.jwt.key", "engine.vault.key"]) {
+        const p = path.join(home, file);
+        expect(fs.existsSync(p), file).toBe(true);
+        if (process.platform !== "win32") expect(fs.statSync(p).mode & 0o777, file).toBe(0o600);
+      }
+
+      expect(await ensureLocalSecrets(home)).toEqual(first);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps an existing API key from an earlier install", async () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "lelu-mcp-secrets-"));
+    try {
+      fs.writeFileSync(path.join(home, "engine.key"), "lelu_local_existing\n", { mode: 0o600 });
+      const s = await ensureLocalSecrets(home);
+      expect(s.apiKey).toBe("lelu_local_existing");
+      expect(fs.existsSync(path.join(home, "engine.jwt.key"))).toBe(true);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("sha256Hex", () => {
   it("matches a known SHA-256 digest", () => {

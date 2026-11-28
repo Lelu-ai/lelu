@@ -4,6 +4,15 @@ on:
   push:
     branches:
       - main
+  # Re-run publishing for versions that are already released (for example
+  # after a failed npm or PyPI upload). Publish steps skip any version that
+  # is already on its registry, so this is safe to repeat.
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Packages to publish: all, or a comma list of typescript, mcp, openclaw, python, go"
+        required: true
+        default: all
 
 permissions:
   contents: read
@@ -65,11 +74,47 @@ jobs:
           echo "::warning::Release Please is using GITHUB_TOKEN. It can only open release PRs if Settings > Actions > General > 'Allow GitHub Actions to create and approve pull requests' is on; otherwise add a RELEASE_PLEASE_TOKEN secret with contents and pull-requests write access."
 
       - uses: googleapis/release-please-action@v4
+        if: ${{ github.event_name == 'push' }}
         id: release
         with:
           token: ${{ steps.rp_token.outputs.token }}
           config-file: .github/release-please-config.json
           manifest-file: .github/release-please-manifest.json
+
+      # What to publish in this run: anything release-please just released,
+      # plus whatever a manual run asked for.
+      - name: Decide what to publish
+        id: want
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REQUESTED: ${{ inputs.publish }}
+          TS: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
+          MCP: ${{ steps.release.outputs['sdk/mcp--release_created'] }}
+          OPENCLAW: ${{ steps.release.outputs['sdk/openclaw--release_created'] }}
+          PYTHON: ${{ steps.release.outputs['sdk/python--release_created'] }}
+          GO: ${{ steps.release.outputs['sdk/go--release_created'] }}
+        run: |
+          requested() {
+            [ "$EVENT" = "workflow_dispatch" ] || return 1
+            case ",$(echo "$REQUESTED" | tr -d ' ')," in
+              *,all,*|*,"$1",*) return 0 ;;
+            esac
+            return 1
+          }
+          any=false; npm=false
+          for pkg in typescript mcp openclaw python go; do
+            case $pkg in
+              typescript) created=$TS ;; mcp) created=$MCP ;; openclaw) created=$OPENCLAW ;;
+              python) created=$PYTHON ;; go) created=$GO ;;
+            esac
+            if [ "$created" = "true" ] || requested "$pkg"; then v=true; any=true; else v=false; fi
+            echo "$pkg=$v" >> "$GITHUB_OUTPUT"
+            case $pkg in typescript|mcp|openclaw) [ "$v" = true ] && npm=true ;; esac
+            echo "$pkg: $v"
+          done
+          echo "npm=$npm" >> "$GITHUB_OUTPUT"
+          echo "any=$any" >> "$GITHUB_OUTPUT"
 
       # A tag pushed with GITHUB_TOKEN does not trigger other workflows, so
       # engine-release never ran for engine-v0.3.0 and that release shipped
@@ -86,8 +131,11 @@ jobs:
           echo "Started engine-release for $TAG"
 
       - name: Checkout
-        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        if: ${{ steps.want.outputs.any == 'true' }}
         uses: actions/checkout@v4
+        with:
+          # Tags, so the Go step can find the release commit.
+          fetch-depth: 0
 
       # ── npm packages: lelu-agent-auth (sdk/typescript) and lelu-mcp (sdk/mcp) ──
       #
@@ -99,7 +147,7 @@ jobs:
       # "bypass two-factor authentication": a token that needs an
       # authenticator code cannot publish from CI.
       - name: Setup Node.js
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
+        if: ${{ steps.want.outputs.npm == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -107,11 +155,11 @@ jobs:
           # which gets in the way of trusted publishing.
 
       - name: Use an npm that supports trusted publishing
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
+        if: ${{ steps.want.outputs.npm == 'true' }}
         run: npm install -g npm@^11.5.1 && npm --version
 
       - name: Configure npm token fallback
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] || steps.release.outputs['sdk/mcp--release_created'] || steps.release.outputs['sdk/openclaw--release_created'] }}
+        if: ${{ steps.want.outputs.npm == 'true' }}
         shell: bash
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
@@ -123,8 +171,41 @@ jobs:
             echo "No NPM_TOKEN; publishing relies on trusted publishing."
           fi
 
+      # Ask npm, the same way npm publish does, whether it trusts this
+      # workflow for each package. A failure here means the Trusted
+      # Publisher on npmjs.com is missing or doesn't match, and npm will fall
+      # back to NPM_TOKEN, which fails with EOTP if that token needs 2FA.
+      - name: Check npm trusted publishing
+        if: ${{ steps.want.outputs.npm == 'true' }}
+        shell: bash
+        env:
+          WANT_TS: ${{ steps.want.outputs.typescript }}
+          WANT_MCP: ${{ steps.want.outputs.mcp }}
+          WANT_OPENCLAW: ${{ steps.want.outputs.openclaw }}
+        run: |
+          id_token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | jq -r '.value // empty')
+          if [ -z "$id_token" ]; then
+            echo "::warning::Could not get a GitHub OIDC token; trusted publishing can't work in this run."
+            exit 0
+          fi
+          check() {
+            code=$(curl -sS -o /tmp/npm-oidc.json -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $id_token" \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$1")
+            if [ "$code" = "201" ] || [ "$code" = "200" ]; then
+              echo "$1: trusted publishing OK"
+            else
+              echo "::warning::$1: npm does not trust this workflow (HTTP $code: $(jq -r '.error // .message // empty' /tmp/npm-oidc.json 2>/dev/null)). On npmjs.com, open $1 > Settings > Trusted Publisher and set GitHub Actions: Lelu-ai / lelu / release-please.yml, no environment."
+            fi
+          }
+          [ "$WANT_TS" = true ] && check lelu-agent-auth
+          [ "$WANT_MCP" = true ] && check lelu-mcp
+          [ "$WANT_OPENCLAW" = true ] && check lelu-openclaw
+          exit 0
+
       - name: Build and Publish TypeScript SDK
-        if: ${{ steps.release.outputs['sdk/typescript--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.typescript == 'true' }}
         working-directory: sdk/typescript
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -141,7 +222,7 @@ jobs:
           npm publish --access public --provenance
 
       - name: Build and Publish MCP server
-        if: ${{ steps.release.outputs['sdk/mcp--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.mcp == 'true' }}
         working-directory: sdk/mcp
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -156,7 +237,7 @@ jobs:
           npm publish --access public --provenance
 
       - name: Build and Publish OpenClaw plugin
-        if: ${{ steps.release.outputs['sdk/openclaw--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.openclaw == 'true' }}
         working-directory: sdk/openclaw
         run: |
           VERSION=$(node -p "require('./package.json').version")
@@ -171,20 +252,20 @@ jobs:
 
       # Publish Python SDK to PyPI
       - name: Setup Python
-        if: ${{ steps.release.outputs['sdk/python--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.python == 'true' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Build Python SDK
-        if: ${{ steps.release.outputs['sdk/python--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.python == 'true' }}
         working-directory: sdk/python
         run: |
           pip install build twine
           python -m build
 
       - name: Publish Python SDK to PyPI
-        if: ${{ steps.release.outputs['sdk/python--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.python == 'true' }}
         working-directory: sdk/python
         env:
           TWINE_USERNAME: __token__
@@ -194,25 +275,45 @@ jobs:
             echo "::error::Missing PyPI secret. Set PYPI_API_TOKEN or PYPI_TOKEN in repo secrets."
             exit 1
           fi
-          twine upload dist/*
+          # --skip-existing: a version already on PyPI is not an error on a re-run.
+          twine upload --skip-existing dist/*
 
-      # Publish Go SDK (module release via git tag)
+      # Publish Go SDK. The module github.com/lelu-ai/lelu/sdk/go lives in a
+      # subdirectory, so Go only sees tags named sdk/go/vX.Y.Z; release-please
+      # creates go-sdk-vX.Y.Z. Add the Go-style tag on the same commit.
       - name: Setup Go
-        if: ${{ steps.release.outputs['sdk/go--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.go == 'true' }}
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version-file: sdk/go/go.mod
 
       - name: Validate Go SDK module
-        if: ${{ steps.release.outputs['sdk/go--release_created'] }}
+        if: ${{ !cancelled() && steps.want.outputs.go == 'true' }}
         working-directory: sdk/go
         run: |
-          go mod tidy
           go test ./...
           go list -m
 
-      - name: Go SDK publish note
-        if: ${{ steps.release.outputs['sdk/go--release_created'] }}
+      - name: Tag Go SDK for the Go module proxy
+        if: ${{ !cancelled() && steps.want.outputs.go == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Go module release created via tag: ${{ steps.release.outputs['sdk/go--tag_name'] }}"
-          echo "Consumers can install with: go get github.com/lelu-ai/lelu/sdk/go@latest"
+          VERSION=$(jq -r '."sdk/go"' .github/release-please-manifest.json)
+          RP_TAG="go-sdk-v$VERSION"
+          GO_TAG="sdk/go/v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$GO_TAG" >/dev/null; then
+            echo "$GO_TAG already exists."
+          else
+            if ! COMMIT=$(git rev-list -n 1 "$RP_TAG" 2>/dev/null); then
+              echo "::error::$RP_TAG not found; can't tell which commit $GO_TAG belongs on."
+              exit 1
+            fi
+            git tag "$GO_TAG" "$COMMIT"
+            git push origin "refs/tags/$GO_TAG"
+            echo "Tagged $GO_TAG on $COMMIT"
+          fi
+          # Ask the proxy to fetch it now, so go get sees it straight away.
+          curl -fsS "https://proxy.golang.org/github.com/lelu-ai/lelu/sdk/go/@v/v$VERSION.info" \
+            || echo "::warning::The Go proxy hasn't picked up v$VERSION yet; it will on the next request."

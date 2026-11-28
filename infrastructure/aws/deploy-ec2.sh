@@ -84,10 +84,16 @@ info "Creating S3 bucket: s3://$S3_BUCKET"
 aws s3 mb "s3://$S3_BUCKET" --region "$REGION" 2>/dev/null \
   || info "Bucket already exists"
 
-info "Packing engine..."
-tar czf dist/engine.tar.gz -C dist engine
+info "Packing engine + policy..."
+# The engine loads its YAML policy from POLICY_PATH (default /etc/lelu/auth.yaml).
+# Without it every agent scope is unknown, including the hosted cloud's
+# cloud_customer, and every authorize call is denied. Ship config/auth.yaml
+# inside the engine bundle; the service unit below points POLICY_PATH at it.
+POLICY_FILE="$ROOT/config/auth.yaml"
+[ -f "$POLICY_FILE" ] || { echo -e "${RED}✘ missing $POLICY_FILE${RESET}"; exit 1; }
+tar czf dist/engine.tar.gz -C dist engine -C "$ROOT/config" auth.yaml
 aws s3 cp dist/engine.tar.gz "s3://$S3_BUCKET/engine.tar.gz" --region "$REGION"
-ok "s3://$S3_BUCKET/engine.tar.gz"
+ok "s3://$S3_BUCKET/engine.tar.gz  (engine + auth.yaml)"
 
 info "Packing platform..."
 tar czf dist/platform.tar.gz -C dist platform
@@ -397,6 +403,7 @@ After=network.target
 [Service]
 ExecStart=/opt/lelu/engine/engine
 Environment=PORT=8080
+Environment=POLICY_PATH=/opt/lelu/engine/auth.yaml
 Environment=LELU_MODE=enforce
 Environment=CONFIDENCE_MISSING_MODE=deny
 Environment=REDIS_ADDR=\${REDIS_ADDR}

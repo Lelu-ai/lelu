@@ -16,6 +16,8 @@ type LedgerEntry struct {
 	Command   string  `json:"command,omitempty"`
 	FilePath  string  `json:"file_path,omitempty"`
 	URL       string  `json:"url,omitempty"`
+	Path      string  `json:"path,omitempty"` // Grep, Glob: folder or file searched
+	Glob      string  `json:"glob,omitempty"` // Grep's glob, Glob's pattern
 	Cwd       string  `json:"cwd,omitempty"`
 	Outcome   Outcome `json:"outcome"`
 	Rule      string  `json:"rule,omitempty"`

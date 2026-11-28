@@ -22,8 +22,9 @@
 # Usage:
 #   lelu-hook.sh            PreToolUse: run lelu-hook (installing if needed)
 #   lelu-hook.sh session    SessionStart: start the download in the background
-#                           if needed, welcome a new user once, and check that
-#                           the plugin's own files are unchanged
+#                           if needed, welcome a new user once, check that
+#                           the plugin's own files are unchanged, and report
+#                           a changed mode file or policy.local.json
 #   lelu-hook.sh download   the background download itself
 #
 # Session start never waits for the download. Until it finishes, tool calls
@@ -51,6 +52,14 @@ lock="$data_dir/bin/.download-$LELU_PLUGIN_VERSION.lock"
 failed="$data_dir/bin/.download-$LELU_PLUGIN_VERSION.failed"
 problem=""
 
+# mode_value prints the mode file's content in lower case with whitespace
+# removed, so "Enforce" and "enforce\n" both print "enforce". It prints
+# nothing if there is no mode file. The daemon reads the file the same way.
+mode_value() {
+  [ -f "$data_dir/mode" ] || return 0
+  tr -d '[:space:]' <"$data_dir/mode" 2>/dev/null | tr '[:upper:]' '[:lower:]'
+}
+
 # fail_closed is true when an action Lelu cannot check should be routed to
 # "ask": LELU_FAIL_CLOSED decides if set, otherwise enforce mode does.
 fail_closed() {
@@ -58,7 +67,7 @@ fail_closed() {
     1 | true) return 0 ;;
     0 | false) return 1 ;;
   esac
-  [ "$(cat "$data_dir/mode" 2>/dev/null)" = "enforce" ]
+  [ "$(mode_value)" = "enforce" ]
 }
 
 # ask routes the current tool call to the user, with $1 as the reason, and
@@ -225,6 +234,33 @@ plugin_files_changed() {
   [ "$(cat "$record")" != "$(printf '%s' "$current")" ]
 }
 
+# changed_data_files prints which of the user's Lelu files, the mode file and
+# policy.local.json, changed since the last session started, and records
+# their current state for the next session. These change for good reasons
+# too (/lelu:enforce, /lelu:shadow, /lelu), so a change is reported once
+# rather than until it is accepted. The first session only records.
+changed_data_files() {
+  record="$data_dir/data-files.sha256"
+  current=""
+  for f in mode policy.local.json; do
+    if [ -f "$data_dir/$f" ]; then
+      h=$(sha256_of "$data_dir/$f") || return 0
+    else
+      h=missing
+    fi
+    current="$current$h  $f
+"
+  done
+  if [ -f "$record" ]; then
+    for f in mode policy.local.json; do
+      old=$(awk -v f="$f" '$2 == f { print $1 }' "$record")
+      new=$(printf '%s' "$current" | awk -v f="$f" '$2 == f { print $1 }')
+      [ "$old" != "$new" ] && printf '%s\n' "$f"
+    done
+  fi
+  mkdir -p "$data_dir" && printf '%s' "$current" >"$record"
+}
+
 local_build=""
 if [ -x "$plugin_root/hooks/lelu-hook" ] && [ -x "$plugin_root/bin/lelu-daemon" ]; then
   # Local build from install.sh. lelu-hook finds the daemon through
@@ -269,6 +305,24 @@ case "$mode" in
         messages="$messages Lelu's own plugin files (hooks.json, lelu-hook.sh or policies/defaults.json) changed since this version was installed. If you did not change them, reinstall the plugin. To accept the change, delete plugin-files-$LELU_PLUGIN_VERSION.sha256 in the Lelu data directory."
       fi
     fi
+    current_mode=$(mode_value)
+    case "$current_mode" in
+      enforce) mode_name="enforce mode" ;;
+      shadow) mode_name="shadow mode" ;;
+      "") mode_name="shadow mode" && [ -f "$data_dir/mode" ] && mode_name="shadow mode, because its mode file is empty" ;;
+      *) mode_name="shadow mode, because its mode file does not say enforce or shadow" ;;
+    esac
+    for f in $(changed_data_files); do
+      case "$f" in
+        mode) messages="$messages Lelu's mode file changed since the last session; Lelu is now in $mode_name. If you did not change it, run /lelu:enforce or /lelu:shadow to set the mode you want." ;;
+        policy.local.json) messages="$messages Your Lelu rules file (policy.local.json in the Lelu data directory) changed since the last session. If you did not change it, check it: a rule there can make Lelu allow more." ;;
+      esac
+    done
+    case "$current_mode" in
+      enforce | shadow) ;;
+      "") [ -f "$data_dir/mode" ] && messages="$messages Lelu's mode file is empty, so Lelu is in shadow mode and blocks nothing. Run /lelu:enforce to turn blocking on, or /lelu:shadow to keep shadow mode." ;;
+      *) messages="$messages Lelu's mode file says neither enforce nor shadow, so Lelu is in shadow mode and blocks nothing. Run /lelu:enforce to turn blocking on, or /lelu:shadow to keep shadow mode." ;;
+    esac
     messages="${messages# }"
     [ -n "$messages" ] && printf '{"systemMessage":"%s"}\n' "$messages"
     exit 0

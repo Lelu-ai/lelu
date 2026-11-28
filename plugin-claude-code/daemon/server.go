@@ -11,12 +11,14 @@ import (
 type Request struct {
 	SessionID      string            `json:"session_id"`
 	Tool           string            `json:"tool"`
-	Command        string            `json:"command,omitempty"`   // Bash
-	FilePath       string            `json:"file_path,omitempty"` // Edit/Write
+	Command        string            `json:"command,omitempty"`    // Bash
+	FilePath       string            `json:"file_path,omitempty"`  // Edit/Write
 	NewString      string            `json:"new_string,omitempty"` // Edit
 	OldString      string            `json:"old_string,omitempty"` // Edit
 	Content        string            `json:"content,omitempty"`    // Write
 	URL            string            `json:"url,omitempty"`        // WebFetch
+	Path           string            `json:"path,omitempty"`       // Grep, Glob: folder or file searched
+	Glob           string            `json:"glob,omitempty"`       // Grep's glob, Glob's pattern
 	Cwd            string            `json:"cwd"`
 	TranscriptPath string            `json:"transcript_path,omitempty"`
 	Env            map[string]string `json:"env,omitempty"`
@@ -29,7 +31,15 @@ type Response struct {
 	Reason  string  `json:"reason,omitempty"`
 	Rule    string  `json:"rule,omitempty"`
 	Shadow  bool    `json:"shadow"`
+
+	// selfProtect is set when the call may change Lelu's own files or
+	// Claude Code's plugin or settings files, whatever rule decided the
+	// outcome.
+	selfProtect bool
 }
+
+// selfProtectionReason explains a self-protection ask.
+const selfProtectionReason = "this changes Lelu's own files or Claude Code's plugin or settings files, which could switch Lelu off; routing to human review"
 
 // Engine ties policy evaluation, the audit ledger, and shadow-mode state
 // together into the single decision path every request goes through.
@@ -80,6 +90,8 @@ func (e *Engine) Decide(req Request) Response {
 		Command:   req.Command,
 		FilePath:  req.FilePath,
 		URL:       req.URL,
+		Path:      req.Path,
+		Glob:      req.Glob,
 		Cwd:       req.Cwd,
 		Outcome:   real.Outcome,
 		Rule:      real.Rule,
@@ -87,6 +99,14 @@ func (e *Engine) Decide(req Request) Response {
 		Shadow:    shadow,
 	})
 
+	// Shadow mode still asks before a change to Lelu's own files: a change
+	// made while Lelu only records would still be in place once enforcement
+	// is turned on, so letting it through would let an agent switch Lelu
+	// off before it ever enforces.
+	if shadow && real.selfProtect {
+		return Response{Outcome: OutcomeAsk, Shadow: true, Rule: "self-protection",
+			Reason: selfProtectionReason + " (asked in shadow mode too)"}
+	}
 	if shadow && real.Outcome != OutcomeAllow {
 		return Response{Outcome: OutcomeAllow, Shadow: true, Rule: real.Rule, Reason: "[shadow mode] would have been " + string(real.Outcome) + ": " + real.Reason}
 	}
@@ -103,6 +123,7 @@ func (e *Engine) decideReal(req Request) Response {
 	hookify := e.decideHookify(req)
 
 	if severityRank(hookify.Outcome) > severityRank(tier1.Outcome) {
+		hookify.selfProtect = tier1.selfProtect
 		return hookify
 	}
 	return tier1
@@ -113,14 +134,21 @@ func (e *Engine) decideTier1(req Request) Response {
 	case "Bash":
 		a := AnalyzeCommand(req.Command, req.Cwd, req.Env)
 		d := e.Policy.Evaluate(a, e.effectiveHome(req))
-		return Response{Outcome: d.Outcome, Reason: d.Reason, Rule: d.Rule}
+		return Response{Outcome: d.Outcome, Reason: d.Reason, Rule: d.Rule, selfProtect: d.SelfProtect}
 
 	case "Edit", "Write", "MultiEdit", "NotebookEdit":
-		if e.Policy.pathIsProtectedContains(req.FilePath) {
-			return Response{Outcome: OutcomeDeny, Reason: "target path matches a protected-path rule", Rule: "protected-path"}
+		guarded := e.Policy.PathIsGuarded(req.FilePath, e.effectiveHome(req))
+		if e.Policy.pathIsProtected(req.FilePath) {
+			return Response{Outcome: OutcomeDeny, Reason: "target path matches a protected-path rule", Rule: "protected-path", selfProtect: guarded}
 		}
-		if e.Policy.PathIsGuarded(req.FilePath, e.effectiveHome(req)) {
-			return Response{Outcome: OutcomeAsk, Reason: "this edit changes Lelu's own files or Claude Code's plugin or settings files, which could switch Lelu off; routing to human review", Rule: "self-protection"}
+		if guarded {
+			return Response{Outcome: OutcomeAsk, Reason: selfProtectionReason, Rule: "self-protection", selfProtect: true}
+		}
+		return Response{Outcome: OutcomeAllow}
+
+	case "Grep", "Glob":
+		if p, ok := e.Policy.searchTouchesSensitive(req.Path, req.Glob, req.Cwd, e.effectiveHome(req)); ok {
+			return Response{Outcome: OutcomeAsk, Reason: "searching a credential, key or env file (" + p + "); routing to human review", Rule: "sensitive-read"}
 		}
 		return Response{Outcome: OutcomeAllow}
 
@@ -232,10 +260,10 @@ func (ps *PolicySet) webFetchHostAllowed(rawURL string) (string, bool) {
 	return host, false
 }
 
-// pathIsProtectedContains checks only the "contains" protected-path rules,
-// since Edit/Write already carry a concrete file path with no shell
-// expansion involved — an exact "$HOME" rule wouldn't be meaningful here.
-func (ps *PolicySet) pathIsProtectedContains(path string) bool {
+// pathIsProtected checks the protected-path rules other than "exact" ones
+// against a file an edit tool changes. An exact "$HOME" or "/" rule guards
+// against deleting a whole folder, which an edit of one file can't do.
+func (ps *PolicySet) pathIsProtected(path string) bool {
 	for _, rule := range ps.ProtectedPaths {
 		if rule.Exact != "" {
 			continue

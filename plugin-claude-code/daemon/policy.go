@@ -7,46 +7,13 @@ import (
 )
 
 type destructiveRule struct {
-	Name            string   `json:"name"`
-	Command         string   `json:"command"`
-	Subcommand      string   `json:"subcommand,omitempty"`
-	RequireFlags    []string `json:"require_flags,omitempty"`
-	RequireAnyFlag  []string `json:"require_any_flag,omitempty"`
-	LongFlags       []string `json:"long_flags,omitempty"`
-	Severity        string   `json:"severity"` // "deny_if_protected" | "ask"
-}
-
-type protectedPathRule struct {
-	Exact    string `json:"exact,omitempty"`
-	Contains string `json:"contains,omitempty"`
-	// Suffix matches the end of the path, e.g. "/.git" for the directory
-	// itself, which "contains: .git/" does not cover.
-	Suffix string `json:"suffix,omitempty"`
-	// Except lists substrings that exempt an otherwise-matching path, e.g.
-	// ".env.example" — a template that is usually committed on purpose.
-	Except []string `json:"except,omitempty"`
-}
-
-// matches reports whether path p hits this rule. home resolves "$HOME".
-func (r protectedPathRule) matches(p, home string) bool {
-	for _, ex := range r.Except {
-		if ex != "" && strings.Contains(p, ex) {
-			return false
-		}
-	}
-	if r.Exact != "" {
-		want := r.Exact
-		if want == "$HOME" {
-			want = home
-		}
-		if want != "" && p == want {
-			return true
-		}
-	}
-	if r.Contains != "" && strings.Contains(p, r.Contains) {
-		return true
-	}
-	return r.Suffix != "" && strings.HasSuffix(p, r.Suffix)
+	Name           string   `json:"name"`
+	Command        string   `json:"command"`
+	Subcommand     string   `json:"subcommand,omitempty"`
+	RequireFlags   []string `json:"require_flags,omitempty"`
+	RequireAnyFlag []string `json:"require_any_flag,omitempty"`
+	LongFlags      []string `json:"long_flags,omitempty"`
+	Severity       string   `json:"severity"` // "deny_if_protected" | "ask"
 }
 
 // remoteScriptRule flags a download piped straight into an interpreter
@@ -67,18 +34,18 @@ type PolicySet struct {
 	// SensitivePaths are credential, key and env-file locations. Any Bash
 	// command naming one as an argument or redirect target — reading,
 	// copying, appending — is routed to human review.
-	SensitivePaths   []protectedPathRule `json:"sensitive_paths,omitempty"`
+	SensitivePaths []protectedPathRule `json:"sensitive_paths,omitempty"`
 	// GuardedPaths are Lelu's own files and Claude Code's plugin and
 	// settings files. Changing one can switch Lelu off or loosen it, so a
 	// change through a file tool or a shell command is routed to human
 	// review. Reading them is not.
-	GuardedPaths []protectedPathRule `json:"guarded_paths,omitempty"`
+	GuardedPaths     []protectedPathRule `json:"guarded_paths,omitempty"`
 	RemoteScriptPipe remoteScriptRule    `json:"remote_script_pipe"`
 	// Tools covers every tool other than Bash, the file-editing tools and
 	// MCP tools: which need no check of their own, and where WebFetch may go.
 	Tools         ToolPolicy          `json:"tools"`
-	LoopDetection      LoopConfig          `json:"loop_detection"`
-	SessionBudget       SessionBudgetConfig `json:"session_budget"`
+	LoopDetection LoopConfig          `json:"loop_detection"`
+	SessionBudget SessionBudgetConfig `json:"session_budget"`
 }
 
 // LoadPolicySet reads and parses a policy file (JSON).
@@ -100,7 +67,7 @@ func (ps *PolicySet) GuardPath(dir string) {
 	if dir == "" {
 		return
 	}
-	ps.GuardedPaths = append(ps.GuardedPaths, protectedPathRule{Contains: dir})
+	ps.GuardedPaths = append(ps.GuardedPaths, protectedPathRule{Under: dir})
 }
 
 // PathIsGuarded reports whether path matches a guarded-path rule.
@@ -191,6 +158,10 @@ type Decision struct {
 	Outcome Outcome `json:"outcome"`
 	Reason  string  `json:"reason,omitempty"`
 	Rule    string  `json:"rule,omitempty"`
+	// SelfProtect is set when the command may change Lelu's own files,
+	// even if a stricter rule decided the outcome. Shadow mode still asks
+	// for these.
+	SelfProtect bool `json:"-"`
 }
 
 // Evaluate applies the policy set to an already-expanded command Analysis.
@@ -217,11 +188,13 @@ func (ps *PolicySet) Evaluate(a Analysis, home string) Decision {
 		}
 	}
 
+	selfProtect := false
 	for _, call := range a.Calls {
 		if d, matched := ps.evaluateCall(call, home); matched {
 			consider(d)
 		}
 		if p, ok := ps.guardedPathIn(call, home); ok {
+			selfProtect = true
 			consider(Decision{Outcome: OutcomeAsk, Rule: "self-protection",
 				Reason: "this command may change Lelu's own files or Claude Code's plugin or settings files (" + p + "), which could switch Lelu off — routed to human review"})
 		}
@@ -235,6 +208,7 @@ func (ps *PolicySet) Evaluate(a Analysis, home string) Decision {
 			Reason: "this command pipes a download straight into an interpreter, so the code that runs is whatever the server sends — routed to human review"})
 	}
 
+	best.SelfProtect = selfProtect
 	return best
 }
 

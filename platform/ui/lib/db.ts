@@ -20,7 +20,24 @@ export function db(): ReturnType<typeof postgres> {
   return _sql;
 }
 
-export async function ensureSchema(): Promise<void> {
+// Run the schema setup once per server instance, not on every request. It is
+// ~29 statements, several of which take an exclusive lock on lelu_users even
+// when there is nothing to change, so running it per request slowed every
+// route and made concurrent requests wait on each other. A failure is not
+// cached: the next call tries again.
+let schemaReady: Promise<void> | undefined;
+
+export function ensureSchema(): Promise<void> {
+  if (!schemaReady) {
+    schemaReady = applySchema().catch((err) => {
+      schemaReady = undefined;
+      throw err;
+    });
+  }
+  return schemaReady;
+}
+
+async function applySchema(): Promise<void> {
   const sql = db();
 
   await sql`

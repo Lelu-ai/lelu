@@ -1,8 +1,8 @@
 {
   "engine": "0.3.2",
-  "sdk/typescript": "0.2.0",
+  "sdk/typescript": "0.2.1",
   "sdk/go": "0.1.10",
   "sdk/python": "0.4.44",
-  "sdk/mcp": "0.0.37",
+  "sdk/mcp": "0.0.38",
   "sdk/openclaw": "0.1.4"
 }

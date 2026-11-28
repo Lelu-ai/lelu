@@ -148,7 +148,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lelu-ai/lelu.git",
+    "url": "git+https://github.com/Lelu-ai/lelu.git",
     "directory": "sdk/typescript"
   },
   "overrides": {

@@ -19,7 +19,11 @@ export interface AgentPermissionState {
   canExecute: boolean;
   loading: boolean;
   reason: string;
-  decision: "allowed" | "denied" | "human_review" | "";
+  /**
+   * "compute" means the engine redirected to a safe alternative tool; the
+   * action asked about must not run, so `canExecute` is false.
+   */
+  decision: "allowed" | "denied" | "human_review" | "compute" | "";
 }
 
 /**
@@ -67,7 +71,10 @@ export function useAgentPermission(
           canExecute: res.allowed,
           loading: false,
           reason: res.reason ?? (res.allowed ? "allowed" : "denied"),
-          decision: res.allowed ? "allowed" : (res.requiresHumanReview ? "human_review" : "denied"),
+          decision: res.allowed ? "allowed"
+            : res.requiresHumanReview ? "human_review"
+            : res.computed ? "compute"
+            : "denied",
         });
       })
       .catch((err: unknown) => {

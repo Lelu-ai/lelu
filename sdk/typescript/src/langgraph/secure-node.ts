@@ -128,8 +128,15 @@ export function secureNode<S extends Record<string, unknown>>(
       } as unknown as Partial<S>;
     }
 
-    if (!decision.allowed) {
-      const message = `Lelu denied action '${action}' for actor '${actor}': ${decision.reason}`;
+    // A scope downgrade (`allowed` is still true) and a compute redirect
+    // (`allowed` is false) both mean "don't run the node as requested." This
+    // node has no way to re-run an arbitrary function under a restricted
+    // scope or a different safe tool, so both are non-executable, same as a
+    // deny. Checked before the deny branch so the message names the redirect.
+    if (decision.downgradedScope || decision.computed) {
+      const message = decision.downgradedScope
+        ? `Lelu downgraded action '${action}' for actor '${actor}' to '${decision.downgradedScope}' scope: ${decision.reason}`
+        : `Lelu redirected action '${action}' for actor '${actor}' to a safe alternative${decision.safeTool ? ` (${decision.safeTool})` : ""}: ${decision.reason}`;
       if (throwOnDeny) throw new LeluDeniedError(message, decision.reason);
       return {
         [LELU_DENIED_KEY]: true,
@@ -138,14 +145,8 @@ export function secureNode<S extends Record<string, unknown>>(
       } as unknown as Partial<S>;
     }
 
-    // `allowed` is also true for a scope downgrade or a compute redirect —
-    // neither means "run the node as requested." This node has no way to
-    // re-run an arbitrary function under a restricted scope or a different
-    // safe tool, so both must be treated as non-executable, same as a deny.
-    if (decision.downgradedScope || decision.computed) {
-      const message = decision.downgradedScope
-        ? `Lelu downgraded action '${action}' for actor '${actor}' to '${decision.downgradedScope}' scope: ${decision.reason}`
-        : `Lelu redirected action '${action}' for actor '${actor}' to a safe alternative${decision.safeTool ? ` (${decision.safeTool})` : ""}: ${decision.reason}`;
+    if (!decision.allowed) {
+      const message = `Lelu denied action '${action}' for actor '${actor}': ${decision.reason}`;
       if (throwOnDeny) throw new LeluDeniedError(message, decision.reason);
       return {
         [LELU_DENIED_KEY]: true,

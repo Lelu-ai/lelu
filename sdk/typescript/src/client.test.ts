@@ -30,7 +30,8 @@ function authorizeResponse(
   reqId = "req-1"
 ) {
   return {
-    allowed: decision === "allow",
+    // The engine sends allowed: true with compute: true.
+    allowed: decision === "allow" || decision === "compute",
     requires_human_review: decision === "human_review",
     compute: decision === "compute",
     reason: decision === "allow" ? "action allowed" : "action denied",
@@ -118,6 +119,58 @@ describe("LeluClient", () => {
       expect(dec.allowed).toBe(false);
       expect(dec.safeTool).toBe("fs.write_file");
       expect(dec.safeArgs).toEqual({ path: "/dev/sandbox/config.yaml" });
+    });
+
+    it("reports allowed: false for compute even though the engine sends allowed: true", async () => {
+      const engine = {
+        ...authorizeResponse("compute", "t-compute"),
+        safe_tool: "refund_sandbox",
+        safe_args: { amount: 0 },
+      };
+      expect(engine.allowed).toBe(true);
+      mockOK(engine);
+      const dec = await client.authorize({ tool: "refund" });
+      expect(dec.decision).toBe("compute");
+      expect(dec.allowed).toBe(false);
+      expect(dec.computed).toBe(true);
+      expect(dec.safeTool).toBe("refund_sandbox");
+      expect(dec.safeArgs).toEqual({ amount: 0 });
+    });
+
+    it.each([
+      ["missing", undefined],
+      ["empty", ""],
+      ["blank", "   "],
+    ])("treats compute with a %s safe tool as deny", async (_label, safeTool) => {
+      mockOK({
+        ...authorizeResponse("compute", "t-nosafe"),
+        reason: "redirect rule matched",
+        ...(safeTool !== undefined ? { safe_tool: safeTool } : {}),
+        safe_args: { amount: 0 },
+      });
+      const dec = await client.authorize({ tool: "refund" });
+      expect(dec.decision).toBe("deny");
+      expect(dec.allowed).toBe(false);
+      expect(dec.computed).toBe(false);
+      expect(dec.reason).toContain("compute decision without a safe tool");
+      expect(dec.reason).toContain("redirect rule matched");
+      expect(dec).not.toHaveProperty("safeTool");
+      expect(dec).not.toHaveProperty("safeArgs");
+    });
+
+    it("does not pass on a safe tool the engine echoes with a deny", async () => {
+      mockOK({ ...authorizeResponse("deny", "t-deny"), safe_tool: "refund_sandbox" });
+      const dec = await client.authorize({ tool: "refund" });
+      expect(dec.decision).toBe("deny");
+      expect(dec).not.toHaveProperty("safeTool");
+    });
+
+    it("agentAuthorize reports allowed: false for compute too", async () => {
+      mockOK({ ...authorizeResponse("compute", "t-ac"), safe_tool: "refund_sandbox" });
+      const dec = await client.agentAuthorize({ actor: "bot", action: "refund", context: {} });
+      expect(dec.decision).toBe("compute");
+      expect(dec.allowed).toBe(false);
+      expect(dec.safeTool).toBe("refund_sandbox");
     });
 
     it("throws AuthEngineError on HTTP error", async () => {

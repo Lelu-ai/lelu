@@ -151,9 +151,9 @@ export function decide(
     };
   }
 
-  // Checked before `allowed`, because the engine reports a compute decision as
-  // not-allowed for the tool that was actually requested. Reading `allowed`
-  // first would turn every redirect into a denial.
+  // Checked before `allowed`, because a compute decision is not-allowed for
+  // the tool that was actually requested. Reading `allowed` first would turn
+  // every redirect into a denial. The client sets safeTool only on compute.
   if (decision.safeTool) {
     return {
       action: "redirect",

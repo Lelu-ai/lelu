@@ -369,11 +369,23 @@ export class LeluClient {
       policy_digest?: string;
     }>("/v1/agent/authorize", body);
 
+    // The engine sends `allowed: true` alongside `compute: true` (the rule
+    // matched, but redirected). `allowed` here means "run the tool you asked
+    // for", so it is true only for a plain allow; a compute decision is not
+    // permission to run the original tool. A compute decision without a safe
+    // tool to run instead has nothing safe to offer, so it is a deny.
+    const hasSafeTool = typeof data.safe_tool === "string" && data.safe_tool.trim() !== "";
+    const computeWithoutSafeTool = !!data.compute && !hasSafeTool;
     const decision: "allow" | "deny" | "human_review" | "compute" =
-      data.compute              ? "compute"      :
+      computeWithoutSafeTool     ? "deny"         :
+      data.compute               ? "compute"      :
       data.requires_human_review ? "human_review" :
       data.allowed               ? "allow"        :
                                    "deny";
+    const isCompute = decision === "compute";
+    const reason = computeWithoutSafeTool
+      ? `compute decision without a safe tool${data.reason ? `: ${data.reason}` : ""}`
+      : data.reason;
 
     return {
       // The engine's trace id, which is also the id the hosted audit log
@@ -381,7 +393,7 @@ export class LeluClient {
       requestId: data.trace_id,
       tool:      validated.tool,
       decision,
-      reason:    data.reason,
+      reason,
       // Every decision here comes from the engine's pipeline, as REST's live
       // calls report it; the matching policy rule isn't returned by the engine.
       rule:      "engine",
@@ -389,10 +401,13 @@ export class LeluClient {
       latencyMs: Date.now() - started,
       mode:      "live",
       timestamp: new Date().toISOString(),
-      allowed:   data.allowed,
-      computed:  !!data.compute,
-      ...(data.safe_tool        !== undefined ? { safeTool:        data.safe_tool        } : {}),
-      ...(data.safe_args        !== undefined ? { safeArgs:        data.safe_args        } : {}),
+      allowed:   decision === "allow",
+      computed:  isCompute,
+      // Only a compute decision carries a safe tool to run; the engine may
+      // echo the rule's safe_tool on a deny or a review, which is not an
+      // instruction to run anything.
+      ...(isCompute                                 ? { safeTool: data.safe_tool as string } : {}),
+      ...(isCompute && data.safe_args !== undefined ? { safeArgs: data.safe_args }           : {}),
       ...(data.downgraded_scope !== undefined ? { downgradedScope: data.downgraded_scope } : {}),
       ...(data.effective_scope  !== undefined ? { effectiveScope:  data.effective_scope  } : {}),
       ...(data.review_id        !== undefined ? { reviewId:        data.review_id        } : {}),

@@ -59,9 +59,9 @@ export function authorize(action: string, opts: AuthorizeOptions = {}): RequestH
         context: { ...(confidence !== undefined ? { confidence } : {}) },
       });
 
-      // `allowed` is also true for a scope downgrade or a compute redirect —
-      // neither means "let the original route handler run unrestricted."
-      // Only a clean allow calls next(); everything else is blocked here.
+      // `allowed` is also true for a scope downgrade, which does not mean
+      // "let the original route handler run unrestricted." Only a clean allow
+      // calls next(); everything else (including compute) is blocked here.
       if (decision.allowed && !decision.downgradedScope && !decision.computed) {
         // Attach decision to request for downstream handlers
         (req as Request & { leluDecision: typeof decision }).leluDecision = decision;

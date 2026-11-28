@@ -6,11 +6,14 @@
 
 ### Breaking
 
+* **`allowed` is `false` on a compute decision.** The engine sends `allowed: true` with `compute: true`, and the SDK passed it through, so code that checked `allowed` first ran the original tool when the engine had redirected it to a safe one. `allowed` is now `true` only when `decision === "allow"`, as in the Python SDK; a compute decision still has `computed: true`, `decision: "compute"`, `safeTool` and `safeArgs`. `safeTool` and `safeArgs` are set only on a compute decision.
+* **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision: "deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing.
 * **`auth.handler` requires an `authenticate` option.** It served authorize, the review queue, approve and deny to any caller, with this instance's engine credentials, and took the resolver from the request body's `resolvedBy`. Now every route except `GET /ok` answers 403 until you pass `authenticate(request)`, which returns the caller (or `null` for 401). Listing, approving and denying need `caller.reviewer`, which is recorded as the resolver; `resolvedBy` in the body is ignored. A new `reviewerKey` option sends one of the engine's `LELU_REVIEWER_KEYS` secrets when resolving. Reported in the Nauro pilot (L-2).
 
 ### Fixes
 
 * **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
+* The React `useAgentPermission` hook reports `decision: "compute"` (with `canExecute: false`) for a compute decision.
 * **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
 * **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`.
 * **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).

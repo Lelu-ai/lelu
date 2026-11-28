@@ -85,10 +85,10 @@ describe("SecureTool", () => {
     expect(toolFn).not.toHaveBeenCalled();
   });
 
-  // `allowed: true` is also how the engine represents a scope downgrade or a
-  // compute redirect — neither means "run the tool as requested." A wrapper
-  // that branches only on `allowed` would run the tool at full, unrestricted
-  // scope in both cases. This is the invariant that matters most: for every
+  // A scope downgrade still carries `allowed: true`, and a compute redirect
+  // means "run the safe tool instead" — neither means "run the tool as
+  // requested." A wrapper that branches only on `allowed` would run the tool
+  // at full, unrestricted scope on a downgrade. This is the invariant that matters most: for every
   // outcome other than a clean allow, the wrapped function must never run.
   it("does NOT run the tool when the engine downgrades the scope", async () => {
     const client = mockClient({
@@ -113,7 +113,8 @@ describe("SecureTool", () => {
 
   it("does NOT run the tool when the engine redirects to a compute alternative", async () => {
     const client = mockClient({
-      allowed: true,
+      allowed: false,
+      decision: "compute",
       computed: true,
       safeTool: "process_refund_sandbox",
       reason: "redirected to sandbox",

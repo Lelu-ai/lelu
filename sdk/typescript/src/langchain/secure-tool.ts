@@ -192,6 +192,7 @@ export class SecureTool {
 
     // Compute — the engine redirected to a safer alternative rather than
     // allowing this exact call. Surface it; never auto-run the original tool.
+    // Checked before the deny branch so the caller sees the redirect reason.
     if (decision.computed) {
       const msg =
         `[Lelu] Action "${this.name}" was redirected to a safe alternative` +

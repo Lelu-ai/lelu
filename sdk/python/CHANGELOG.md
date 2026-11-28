@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+* **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision="deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing. `safe_tool` and `safe_args` are now set only on a compute decision; the engine can echo a rule's `safe_tool` on a deny or a review, and the Strands guard read that as a redirect.
+
 ## [0.4.43](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.42...python-sdk-v0.4.43) (2026-11-27)
 
 

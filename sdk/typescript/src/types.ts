@@ -99,11 +99,15 @@ export interface AuthDecision {
   mode: "live" | "sandbox";
   keyId?: string;
   timestamp: string;
-  /** Convenience shorthand — true when decision === "allow" */
+  /**
+   * True only when decision === "allow": run the tool you asked for. False
+   * for "compute" (run `safeTool` instead), "human_review" and "deny".
+   */
   allowed: boolean;
   /**
-   * Present when decision === "compute".
-   * The safe alternative tool the agent should call instead.
+   * Present when decision === "compute", and only then.
+   * The safe alternative tool the agent should call instead. A compute
+   * decision from the engine with no safe tool is returned as "deny".
    */
   safeTool?: string;
   /**

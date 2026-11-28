@@ -81,9 +81,14 @@ export default function DecisionsPage() {
   context: { confidence: 0.88, amount_usd: 250 },
 });
 
-if (decision.allowed) {
+if (decision.decision === "allow") {
   // proceed — policy returned allow
   await processRefund(orderId);
+
+} else if (decision.decision === "compute") {
+  // redirected — run the safe tool with its safe args, never the original
+  if (!decision.safeTool) throw new Error("Redirected without a safe tool");
+  await runTool(decision.safeTool, decision.safeArgs ?? {});
 
 } else if (decision.requiresHumanReview) {
   // pause — queue the action and wait for human approval

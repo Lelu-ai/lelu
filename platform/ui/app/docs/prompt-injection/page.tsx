@@ -304,7 +304,10 @@ export default function DocsPromptInjection() {
               <pre>
                 <code>{`import { createClient } from 'lelu-agent-auth';
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 // This request will be blocked due to prompt injection
 try {

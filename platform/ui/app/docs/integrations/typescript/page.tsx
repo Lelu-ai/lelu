@@ -33,7 +33,7 @@ export default function DocsTypeScriptSDK() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">agent.ts</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient, LeluClient } from "lelu-agent-auth";
 
 // Point at the engine you run. An API key alone does not select a URL; if you
 // omit apiKey, the client falls back to the LELU_API_KEY environment variable.
@@ -42,17 +42,27 @@ const lelu = createClient({
   apiKey: process.env.LELU_API_KEY,
 });
 
+// A verified confidence signal from the model response that proposed this
+// call (an OpenAI completion requested with logprobs: true). A bare
+// context.confidence number is only honoured by an engine started with
+// CONFIDENCE_ALLOW_UNVERIFIED=true, as \`npx lelu-mcp start\` does.
+const signal = LeluClient.signalFrom.openai(completion);
+
 const request = {
   tool: "delete_records",
-  context: { confidence: 0.9, actingFor: "user_123" },
+  actor: "billing-agent", // an agent listed in your policy's agent_scopes
+  context: { ...(signal ? { signal } : {}), actingFor: "user_123" },
   args: { table: "invoices" },
 };
 const result = await lelu.authorize(request);
 
-if (result.allowed) {
+// Check result.decision first: a compute decision must never run the
+// original tool.
+if (result.decision === "allow") {
   console.log("Proceeding autonomously");
-} else if (result.computed) {
-  // Platform returned a safe alternative
+} else if (result.decision === "compute") {
+  // Redirected to a safe alternative: run it instead of delete_records.
+  if (!result.safeTool) throw new Error("Redirected without a safe tool");
   console.log("Safe alternative:", result.safeTool);
   console.log("With args:", result.safeArgs);
 } else if (result.decision === "human_review") {
@@ -73,8 +83,8 @@ if (result.allowed) {
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-4">Four decision outcomes</h2>
           <div className="space-y-3">
             {[
-              { decision: "allow", color: "emerald", desc: "Agent proceeds autonomously. result.allowed === true." },
-              { decision: "compute", color: "violet", desc: "Platform returns a safe alternative. Use result.safeTool and result.safeArgs." },
+              { decision: "allow", color: "emerald", desc: "Agent proceeds autonomously. result.allowed is true only for this decision." },
+              { decision: "compute", color: "violet", desc: "Redirected to a safe alternative. Run result.safeTool with result.safeArgs, never the original tool. result.allowed is false (SDK 0.2.0 and later; 0.1.x reported true, so branch on result.decision)." },
               { decision: "human_review", color: "amber", desc: "Action queued for human approval. result.decision === \"human_review\"; pass result (or result.reviewId) to waitAndRedeem()." },
               { decision: "deny", color: "red", desc: "Action blocked. Check result.reason for explanation." },
             ].map(({ decision, color, desc }) => (

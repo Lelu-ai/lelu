@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+* **`allowed` is `false` on a compute decision.** The engine sends `allowed: true` with `compute: true`, and the SDK passed it through, so code that checked `allowed` first ran the original tool when the engine had redirected it to a safe one. `allowed` is now `true` only when `decision === "allow"`, as in the Python SDK; a compute decision still has `computed: true`, `decision: "compute"`, `safeTool` and `safeArgs`. `safeTool` and `safeArgs` are set only on a compute decision.
+* **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision: "deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing.
+
+### Fixes
+
+* **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
+* The React `useAgentPermission` hook reports `decision: "compute"` (with `canExecute: false`) for a compute decision.
+
 ## [0.1.2](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.1...typescript-sdk-v0.1.2) (2026-11-28)
 
 

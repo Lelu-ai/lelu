@@ -47,7 +47,8 @@ if (decision.decision === "allow") {
   // decision.reviewId (decision.requestId is the trace ID and won't resolve).
   // See auth.api.waitAndRedeem below to resume once approved.
 } else if (decision.decision === "compute") {
-  // run decision.safeTool with decision.safeArgs instead (allowed is true here)
+  // run decision.safeTool with decision.safeArgs instead — never the original
+  // tool (allowed is false here; check decision before allowed)
 } else {
   // blocked by policy
   console.error(decision.reason);

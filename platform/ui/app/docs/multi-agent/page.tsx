@@ -140,7 +140,10 @@ export default function DocsMultiAgent() {
               <pre>
                 <code>{`import { createClient } from 'lelu-agent-auth';
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 // Agent A starts a task and delegates to Agent B
 const delegationResult = await lelu.agentAuthorize({

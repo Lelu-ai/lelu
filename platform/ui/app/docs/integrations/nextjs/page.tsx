@@ -51,33 +51,69 @@ export default function DocsIntegrationsNextjs() {
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">app/api/agent-action/route.ts</span>
             </div>
-            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient } from "lelu-agent-auth";
+            <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { createClient, LeluClient } from "lelu-agent-auth";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 
+const openai = new OpenAI();
+// The engine to call. An API key alone does not select one.
 const lelu = createClient({
-  apiKey: process.env.LELU_API_KEY!,
-  apiKey: process.env.LELU_API_KEY!,
+  baseUrl: process.env.LELU_BASE_URL,
+  apiKey: process.env.LELU_API_KEY,
 });
 
 export async function POST(request: Request) {
-  const { action, confidence } = await request.json();
+  const { prompt } = await request.json();
 
-  const decision = await lelu.authorize({ action, confidence });
-
-  if (decision.requiresHumanReview) {
-    // Return 202 and let the client poll for approval
-    return NextResponse.json(
-      { status: "pending", requestId: decision.requestId },
-      { status: 202 }
-    );
+  // Ask the model on the server, so the confidence signal comes from the
+  // model response itself and not from the browser.
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [{ role: "user", content: prompt }],
+    tools,
+    logprobs: true,
+  });
+  const call = completion.choices[0].message.tool_calls?.[0];
+  if (!call || call.type !== "function") {
+    return NextResponse.json({ status: "no_action" });
   }
 
-  if (!decision.allowed) {
-    return NextResponse.json({ error: "Denied" }, { status: 403 });
-  }
+  const signal = LeluClient.signalFrom.openai(completion);
+  const decision = await lelu.authorize({
+    tool: call.function.name, // \`tool\` is required
+    actor: "support-agent",   // an agent listed in your policy's agent_scopes
+    args: JSON.parse(call.function.arguments),
+    context: signal ? { signal } : {},
+  });
 
-  // Proceed with the action
-  return NextResponse.json({ status: "allowed" });
+  switch (decision.decision) {
+    case "allow":
+      // Proceed with the action
+      return NextResponse.json({ status: "allowed" });
+
+    case "compute":
+      // Run decision.safeTool with decision.safeArgs, never the original action.
+      if (!decision.safeTool) {
+        return NextResponse.json({ error: "Denied", reason: decision.reason }, { status: 403 });
+      }
+      return NextResponse.json({
+        status: "redirected",
+        safeTool: decision.safeTool,
+        safeArgs: decision.safeArgs,
+      });
+
+    case "human_review":
+      // 202 with the review handle. It is reviewId: requestId is only the
+      // trace ID and is not a queue key. Resume with
+      // lelu.waitAndRedeem(reviewId, sameRequest) once a reviewer decides.
+      return NextResponse.json(
+        { status: "pending", reviewId: decision.reviewId },
+        { status: 202 }
+      );
+
+    default: // "deny"
+      return NextResponse.json({ error: "Denied", reason: decision.reason }, { status: 403 });
+  }
 }`}</pre>
           </div>
         </section>
@@ -127,7 +163,7 @@ export default function ApprovalsPage() {
               <span className="text-xs text-zinc-500 font-mono">.env.local</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300 leading-loose">{`# Server-side (Engine API — keep secret)
-LELU_API_KEY=your_key_here
+LELU_BASE_URL=http://localhost:8083
 LELU_API_KEY=your_engine_api_key
 
 # Client-side (if using the approval UI widget)

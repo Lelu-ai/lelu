@@ -30,7 +30,8 @@ def client() -> LeluClient:
 def _authorize_response(decision: str = "allow", reason: str = "ok", req_id: str = "req-1") -> dict:
     """Build the engine's /v1/agent/authorize response shape from a decision string."""
     return {
-        "allowed": decision == "allow",
+        # The engine sends allowed: true with compute: true.
+        "allowed": decision in ("allow", "compute"),
         "requires_human_review": decision == "human_review",
         "compute": decision == "compute",
         "reason": reason,
@@ -95,6 +96,44 @@ async def test_authorize_compute(client: LeluClient, httpx_mock: HTTPXMock) -> N
     assert dec.requires_human_review is False
     assert dec.safe_tool == "write_file"
     assert dec.safe_args == {"path": "/tmp/sandbox/config.yaml", "sandboxed": True}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("safe_tool", [None, "", "   "])
+async def test_authorize_compute_without_safe_tool_is_deny(
+    client: LeluClient, httpx_mock: HTTPXMock, safe_tool: str | None
+) -> None:
+    response = _authorize_response(decision="compute", reason="redirect rule matched", req_id="t-nosafe")
+    if safe_tool is not None:
+        response["safe_tool"] = safe_tool
+    response["safe_args"] = {"amount": 0}
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/agent/authorize",
+        json=response,
+    )
+    dec = await client.authorize(AuthorizeRequest(tool="refund"))
+    assert dec.decision == "deny"
+    assert dec.allowed is False
+    assert dec.computed is False
+    assert "compute decision without a safe tool" in dec.reason
+    assert "redirect rule matched" in dec.reason
+    assert dec.safe_tool is None
+    assert dec.safe_args is None
+
+
+@pytest.mark.asyncio
+async def test_authorize_deny_drops_echoed_safe_tool(client: LeluClient, httpx_mock: HTTPXMock) -> None:
+    response = _authorize_response(decision="deny", reason="denied", req_id="t-deny")
+    response["safe_tool"] = "refund_sandbox"
+    httpx_mock.add_response(
+        method="POST",
+        url="http://localhost:8080/v1/agent/authorize",
+        json=response,
+    )
+    dec = await client.authorize(AuthorizeRequest(tool="refund"))
+    assert dec.decision == "deny"
+    assert dec.safe_tool is None
 
 
 @pytest.mark.asyncio

@@ -141,8 +141,8 @@ export function secureTool<TArgs = unknown, TResult = unknown>(
       }
 
       // ── Scope downgrade / compute redirect ──────────────────────────────
-      // `allowed` is also true for these — neither means "run the original
-      // tool." This wrapper has no way to re-run an arbitrary execute()
+      // Neither means "run the original tool" (`allowed` is still true for a
+      // downgrade). This wrapper has no way to re-run an arbitrary execute()
       // under a restricted scope or a different safe tool, so both must
       // never fall through to execution.
       if (decision.downgradedScope !== undefined) {

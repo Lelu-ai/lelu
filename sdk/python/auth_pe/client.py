@@ -497,8 +497,16 @@ class LeluClient:
         """
         data = await self._post("/v1/agent/authorize", self._authorize_body(req))
 
-        # Derive the decision from the engine's boolean flags.
-        if data.get("compute"):
+        # Derive the decision from the engine's boolean flags. A compute
+        # decision with no safe tool has no safe alternative to run, so it is
+        # a deny rather than a redirect to nothing.
+        raw_safe_tool = data.get("safe_tool")
+        has_safe_tool = isinstance(raw_safe_tool, str) and raw_safe_tool.strip() != ""
+        reason = data.get("reason", "")
+        if data.get("compute") and not has_safe_tool:
+            decision = "deny"
+            reason = "compute decision without a safe tool" + (f": {reason}" if reason else "")
+        elif data.get("compute"):
             decision = "compute"
         elif data.get("requires_human_review"):
             decision = "human_review"
@@ -506,20 +514,23 @@ class LeluClient:
             decision = "allow"
         else:
             decision = "deny"
+        # Only a compute decision carries a safe tool to run; the engine can
+        # echo a rule's safe_tool on a deny or a review, which is not a redirect.
+        is_compute = decision == "compute"
 
         return AuthDecision(
             request_id=data.get("trace_id", ""),
             tool=req.tool,
             decision=decision,
-            reason=data.get("reason", ""),
+            reason=reason,
             rule="",
             policy_name=None,
             latency_ms=0.0,
             mode="live",
             key_id=None,
             timestamp=datetime.now(timezone.utc).isoformat(),
-            safe_tool=data.get("safe_tool"),
-            safe_args=data.get("safe_args"),
+            safe_tool=raw_safe_tool if is_compute else None,
+            safe_args=data.get("safe_args") if is_compute else None,
             input_hash=data.get("input_hash"),
             output_hash=data.get("output_hash"),
             policy_digest=data.get("policy_digest"),

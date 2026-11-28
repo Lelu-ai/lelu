@@ -36,6 +36,19 @@ export default function DocsAnthropic() {
             Claude returns <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">tool_use</code> blocks when it wants to call a tool.
             Pass the tool name, with its input as <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">args</code>, to Lelu before dispatching.
           </p>
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            Send an <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">actor</code> listed in your policy&apos;s 
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">agent_scopes</code>; a default engine denies an unknown actor (&quot;unknown
+            agent scope&quot;). Anthropic does not expose token log-probs, so Claude responses carry no
+            verified confidence signal (<code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">LeluClient.signalFrom.anthropic()</code> always
+            returns <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">null</code>). Leave the signal out and the engine applies 
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">CONFIDENCE_MISSING_MODE</code>. Its default, <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">deny</code>,
+            refuses every call (&quot;no confidence signal detected&quot;). These examples assume the
+            engine runs with <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">CONFIDENCE_MISSING_MODE=review</code>, which is what 
+            <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">npx lelu-mcp start</code> sets: calls the policy doesn&apos;t deny go to a
+            human reviewer. Don&apos;t send a self-reported <code className="text-sm px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">confidence</code> number
+            instead; the hosted cloud and a default engine ignore it.
+          </p>
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden">
             <div className="px-4 py-2 border-b border-zinc-800 dark:border-white/10 bg-zinc-950 dark:bg-white/5">
               <span className="text-xs text-zinc-500 font-mono">agent.ts</span>
@@ -44,7 +57,13 @@ export default function DocsAnthropic() {
 import { createClient } from "lelu-agent-auth";
 
 const claude = new Anthropic();
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+// The engine to call. An API key alone does not select one: with no baseUrl
+// (and no LELU_BASE_URL) the SDK uses the engine \`npx lelu-mcp start\` runs,
+// else http://localhost:8080.
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL,
+  apiKey: process.env.LELU_API_KEY,
+});
 
 const response = await claude.messages.create({
   model: "claude-opus-4-5",
@@ -58,34 +77,44 @@ for (const block of response.content) {
 
   const request = {
     tool: block.name,
+    actor: "support-agent", // an agent listed in your policy's agent_scopes
     // Tool arguments go in args (an object), not in context.
     args: block.input as Record<string, unknown>,
+    // No context.signal: Claude exposes no log-probs (see above).
   };
   const decision = await lelu.authorize(request);
 
-  if (decision.decision === "deny") {
-    console.error(\`Blocked: \${block.name} — \${decision.reason}\`);
-    continue;
-  }
+  // Branch on decision, not on allowed.
+  switch (decision.decision) {
+    case "allow":
+      await executeTool(block.name, block.input);
+      break;
 
-  if (decision.decision === "human_review") {
-    // Waits on decision.reviewId (not requestId, the trace ID), then
-    // re-checks this exact request against what the reviewer approved.
-    const approval = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
-    if (!approval.allowed) {
-      console.error(\`Not approved: \${block.name} — \${approval.reason}\`);
-      continue;
+    case "compute":
+      // Redirected: run the safe tool Lelu chose with its safe arguments,
+      // never the original call. No safe tool means nothing safe to run.
+      if (!decision.safeTool) {
+        console.error(\`Blocked: \${block.name} was redirected without a safe tool\`);
+        break;
+      }
+      await executeTool(decision.safeTool, decision.safeArgs ?? {});
+      break;
+
+    case "human_review": {
+      // Waits on decision.reviewId (not requestId, the trace ID), then
+      // re-checks this exact request against what the reviewer approved.
+      const approval = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+      if (!approval.allowed) {
+        console.error(\`Not approved: \${block.name} — \${approval.reason}\`);
+        break;
+      }
+      await executeTool(block.name, block.input);
+      break;
     }
-  }
 
-  if (decision.decision === "compute" && decision.safeTool) {
-    // Allowed, but redirected: run the safe tool Lelu chose with its safe
-    // arguments, not the original call.
-    await executeTool(decision.safeTool, decision.safeArgs ?? {});
-    continue;
+    default: // "deny"
+      console.error(\`Blocked: \${block.name} — \${decision.reason}\`);
   }
-
-  await executeTool(block.name, block.input);
 }`}</pre>
           </div>
         </section>
@@ -104,16 +133,44 @@ for (const block of response.content) {
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { Agent } from "@anthropic-ai/agent-sdk";
 import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL,
+  apiKey: process.env.LELU_API_KEY,
+});
 
 const agent = new Agent({
   model: "claude-opus-4-5",
   tools: [searchTool, writeTool, deleteRecordsTool],
   hooks: {
+    // Returning nothing lets the original call run; only "allow" (or an
+    // approved review) reaches that.
     beforeToolCall: async ({ tool, input }) => {
-      const decision = await lelu.authorize({ tool: tool.name });
-      if (decision.decision === "deny") {
-        return { abort: true, reason: decision.reason };
+      const request = {
+        tool: tool.name,
+        actor: "records-agent", // an agent listed in your policy's agent_scopes
+        args: input as Record<string, unknown>,
+      };
+      const decision = await lelu.authorize(request);
+
+      switch (decision.decision) {
+        case "allow":
+          return;
+        case "compute":
+          // Never run the original call. Tell the model which safe tool to use.
+          return {
+            abort: true,
+            reason: decision.safeTool
+              ? \`Use \${decision.safeTool} with \${JSON.stringify(decision.safeArgs ?? {})} instead\`
+              : "Redirected without a safe tool",
+          };
+        case "human_review": {
+          // Pause until a reviewer decides, bound to this exact request.
+          const approval = await lelu.waitAndRedeem(decision, request, { timeoutMs: 5 * 60_000 });
+          if (approval.allowed) return;
+          return { abort: true, reason: \`Not approved: \${approval.reason}\` };
+        }
+        default: // "deny"
+          return { abort: true, reason: decision.reason };
       }
     },
   },
@@ -128,6 +185,7 @@ const agent = new Agent({
               <span className="text-xs text-zinc-500 font-mono">.env</span>
             </div>
             <pre className="p-4 font-mono text-sm text-zinc-300">{`ANTHROPIC_API_KEY=sk-ant-...
+LELU_BASE_URL=http://localhost:8083   # your engine; omit to use \`npx lelu-mcp start\`
 LELU_API_KEY=lelu_sk_...`}</pre>
           </div>
         </section>

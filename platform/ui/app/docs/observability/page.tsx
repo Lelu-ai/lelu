@@ -189,6 +189,7 @@ OTEL_TRACES_SAMPLER_ARG=1.0`}</code>
                 <code>{`import { createClient } from 'lelu-agent-auth';
 
 const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
   apiKey: process.env.LELU_API_KEY,
 });
 

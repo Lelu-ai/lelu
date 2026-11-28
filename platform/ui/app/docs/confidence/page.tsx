@@ -126,8 +126,12 @@ requires_human_review {
             Providing Confidence via SDK
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-            When using the Lelu SDK, your AI agent must provide its confidence score when requesting
-            authorization.
+            When using the Lelu SDK, send a verified confidence signal with each authorization
+            request: the token log-probs of the model response that proposed the action. The engine
+            computes the score from them itself. A bare <code>confidence</code> number is
+            self-reported, so the hosted cloud and a default self-hosted engine ignore it; only an
+            engine started with <code>CONFIDENCE_ALLOW_UNVERIFIED=true</code> (as{" "}
+            <code>npx lelu-mcp start</code> does) accepts one.
           </p>
 
           <div className="bg-zinc-900 dark:bg-black rounded-xl border border-zinc-800 dark:border-white/10 overflow-hidden mb-6">
@@ -136,19 +140,27 @@ requires_human_review {
             </div>
             <div className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">
               <pre>
-                <code>{`import { createClient } from 'lelu-agent-auth';
+                <code>{`import { createClient, LeluClient } from 'lelu-agent-auth';
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY });
+// The engine to call. An API key alone does not select one.
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL,
+  apiKey: process.env.LELU_API_KEY,
+});
 
-// The model's verified confidence for this action (e.g. derived from logprobs)
+// completion: the OpenAI response (requested with logprobs: true) in which
+// the model proposed this action. null when it has no log-probs.
+const signal = LeluClient.signalFrom.openai(completion);
+
 const response = await lelu.authorize({
   tool: 'delete_user',
   actor: 'agent-123',
-  context: { confidence: 0.85, actingFor: 'user:456' },
+  context: { ...(signal ? { signal } : {}), actingFor: 'user:456' },
 });
 
 if (response.decision === 'human_review') {
-  console.log('Action queued for human review. Request ID:', response.requestId);
+  // The queue handle is reviewId; requestId is only the trace ID.
+  console.log('Action queued for human review. Review ID:', response.reviewId);
 }`}</code>
               </pre>
             </div>

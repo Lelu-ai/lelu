@@ -95,10 +95,10 @@ describe("secureNode", () => {
     expect(nodeFn).not.toHaveBeenCalled();
   });
 
-  // `allowed: true` is also how the engine represents a scope downgrade or a
-  // compute redirect — neither means "run the node as requested." A wrapper
-  // that branches only on `allowed` would run the node unrestricted in both
-  // cases. This is the invariant that matters most: for every outcome other
+  // A scope downgrade still carries `allowed: true`, and a compute redirect
+  // means "run the safe tool instead" — neither means "run the node as
+  // requested." A wrapper that branches only on `allowed` would run the node
+  // unrestricted on a downgrade. This is the invariant that matters most: for every outcome other
   // than a clean allow, the wrapped function must never run.
   it("does NOT run the node when the engine downgrades the scope", async () => {
     const client = mockClient({
@@ -118,7 +118,8 @@ describe("secureNode", () => {
 
   it("does NOT run the node when the engine redirects to a compute alternative", async () => {
     const client = mockClient({
-      allowed: true,
+      allowed: false,
+      decision: "compute",
       computed: true,
       safeTool: "invoice_approve_sandbox",
       reason: "redirected to sandbox",
@@ -130,6 +131,23 @@ describe("secureNode", () => {
 
     const result = await node({ confidence: 0.75 });
     expect(wasDenied(result)).toBe(true);
+    expect(nodeFn).not.toHaveBeenCalled();
+  });
+
+  it("names the redirect, not a plain denial, when a compute decision is thrown", async () => {
+    const client = mockClient({
+      allowed: false,
+      decision: "compute",
+      computed: true,
+      safeTool: "invoice_approve_sandbox",
+      reason: "redirected to sandbox",
+    });
+    const node = secureNode<TestState>(
+      { client, actor: "invoice_bot", action: "invoice:approve", throwOnDeny: true },
+      nodeFn
+    );
+
+    await expect(node({ confidence: 0.75 })).rejects.toThrow(/redirected .*invoice_approve_sandbox/);
     expect(nodeFn).not.toHaveBeenCalled();
   });
 

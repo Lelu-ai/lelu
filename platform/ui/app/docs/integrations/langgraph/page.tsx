@@ -36,7 +36,10 @@ export default function DocsLangGraph() {
             <pre className="p-4 font-mono text-sm text-zinc-300 overflow-x-auto">{`import { StateGraph, Annotation } from "@langchain/langgraph";
 import { createClient } from "lelu-agent-auth";
 
-const lelu = createClient({ apiKey: process.env.LELU_API_KEY! });
+const lelu = createClient({
+  baseUrl: process.env.LELU_BASE_URL, // your engine; an API key alone does not select one
+  apiKey: process.env.LELU_API_KEY,
+});
 
 const State = Annotation.Root({
   tool: Annotation<string>(),

@@ -2754,8 +2754,13 @@ func (h *Handler) handleQueueWait(w http.ResponseWriter, r *http.Request) {
 
 	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
 	// The server-wide WriteTimeout (10 s) would cut a long poll off with no
-	// response. Extend the write deadline for this request only.
-	_ = http.NewResponseController(w).SetWriteDeadline(deadline.Add(5 * time.Second))
+	// response. Extend the write deadline for this request only. This needs
+	// every ResponseWriter wrapper between the server and here to implement
+	// Unwrap; if one doesn't, the call fails and the wait is cut off at 10 s,
+	// so say so in the log rather than failing silently.
+	if err := http.NewResponseController(w).SetWriteDeadline(deadline.Add(5 * time.Second)); err != nil {
+		log.Printf("queue wait %s: could not extend write deadline, response may be cut off by the server WriteTimeout: %v", id, err)
+	}
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -3078,6 +3083,15 @@ type responseRecorder struct {
 func (rec *responseRecorder) WriteHeader(statusCode int) {
 	rec.statusCode = statusCode
 	rec.ResponseWriter.WriteHeader(statusCode)
+}
+
+// Unwrap lets http.ResponseController reach the underlying ResponseWriter.
+// Without it, SetWriteDeadline and SetReadDeadline on any request passing
+// through the logging middleware (every request) return ErrNotSupported and
+// change nothing, so the long-poll wait could not extend the server's 10 s
+// timeouts and the client got an empty reply.
+func (rec *responseRecorder) Unwrap() http.ResponseWriter {
+	return rec.ResponseWriter
 }
 
 // defaultMaxBodyBytes caps the size of request bodies the engine will read.

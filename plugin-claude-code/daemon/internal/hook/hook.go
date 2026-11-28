@@ -54,6 +54,12 @@ type hookInput struct {
 		// NotebookEdit names its file notebook_path; WebFetch has a url.
 		NotebookPath string `json:"notebook_path"`
 		URL          string `json:"url"`
+		// Grep and Glob search path (a folder or file). Grep narrows the
+		// files it reads with glob; Glob's pattern is a glob. Grep's own
+		// pattern is a regular expression for the content, not a path.
+		Path    string `json:"path"`
+		Glob    string `json:"glob"`
+		Pattern string `json:"pattern"`
 	} `json:"tool_input"`
 }
 
@@ -101,6 +107,10 @@ func requestFrom(in hookInput) daemon.Request {
 	if filePath == "" {
 		filePath = in.ToolInput.NotebookPath
 	}
+	glob := in.ToolInput.Glob
+	if in.ToolName == "Glob" {
+		glob = in.ToolInput.Pattern
+	}
 	return daemon.Request{
 		SessionID:      in.SessionID,
 		Tool:           in.ToolName,
@@ -110,6 +120,8 @@ func requestFrom(in hookInput) daemon.Request {
 		OldString:      in.ToolInput.OldString,
 		Content:        in.ToolInput.Content,
 		URL:            in.ToolInput.URL,
+		Path:           in.ToolInput.Path,
+		Glob:           glob,
 		Cwd:            in.Cwd,
 		TranscriptPath: in.TranscriptPath,
 		Env:            currentEnv(),
@@ -127,22 +139,33 @@ func failClosed() bool {
 	case "0", "false":
 		return false
 	}
-	data, err := os.ReadFile(filepath.Join(dataDir(), "mode"))
-	return err == nil && strings.TrimSpace(string(data)) == "enforce"
+	return daemon.ReadMode(filepath.Join(dataDir(), "mode")).Mode == daemon.ModeEnforce
 }
 
-// unreachableMessage distinguishes "nothing has been built/installed here
-// yet" from "the daemon just isn't running right now" — a stranger's very
-// first tool call after installing the plugin via the marketplace (before
-// ever running install.sh) should get a clear next step, not a generic
-// connectivity warning that doesn't say what to do about it.
+// unreachableMessage distinguishes "the daemon binary is missing" from "the
+// daemon just isn't running right now", so a missing binary comes with a
+// recovery step that works for how the plugin was installed.
 func unreachableMessage(dialErr error) string {
 	bin := daemonBinaryPath()
 	if _, statErr := os.Stat(bin); statErr != nil {
-		installScript := filepath.Join(filepath.Dir(filepath.Dir(bin)), "install.sh")
-		return "Lelu isn't set up yet — run " + installScript + " once, then this warning goes away. This action was not checked."
+		return missingDaemonMessage(bin)
 	}
 	return "Lelu daemon unreachable (" + dialErr.Error() + ") — this action was not checked"
+}
+
+// missingDaemonMessage gives the recovery step for a missing daemon binary.
+// A plugin built in place has install.sh at its root, next to bin/, and
+// running it builds the binaries again. The checker that hooks/lelu-hook.sh
+// downloads (LELU_DAEMON_BIN) lives in the data directory, where there is no
+// install.sh; the launcher downloads it again when it finds it missing.
+func missingDaemonMessage(bin string) string {
+	if os.Getenv("LELU_DAEMON_BIN") == "" {
+		script := filepath.Join(filepath.Dir(filepath.Dir(bin)), "install.sh")
+		if _, err := os.Stat(script); err == nil {
+			return "Lelu's daemon (" + bin + ") is missing. Run " + script + " to build it again. This action was not checked."
+		}
+	}
+	return "Lelu's checker (" + bin + ") is missing. The plugin downloads it again on the next tool call or session start; if this message keeps coming back, reinstall the plugin with /plugin install lelu@lelu. This action was not checked."
 }
 
 func decisionFor(resp daemon.Response) hookOutput {

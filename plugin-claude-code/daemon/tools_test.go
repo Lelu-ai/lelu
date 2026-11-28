@@ -21,7 +21,7 @@ func TestEngine_ToolRules(t *testing.T) {
 		{"WebFetch with a non-http URL", Request{Tool: "WebFetch", URL: "file:///etc/passwd"}, OutcomeAsk},
 		{"WebFetch with no URL", Request{Tool: "WebFetch"}, OutcomeAsk},
 		{"Task is allowed (sub-agent calls are hooked too)", Request{Tool: "Task"}, OutcomeAllow},
-		{"Grep is allowed", Request{Tool: "Grep"}, OutcomeAllow},
+		{"Grep of ordinary files is allowed", Request{Tool: "Grep", Path: "src", Glob: "*.go"}, OutcomeAllow},
 		{"MCP tool keeps current behaviour", Request{Tool: "mcp__github__create_issue"}, OutcomeAllow},
 		{"unknown tool asks", Request{Tool: "SomeNewTool"}, OutcomeAsk},
 	}
@@ -47,7 +47,7 @@ func TestMerge_LocalToolAndHostAllowLists(t *testing.T) {
 	if _, ok := ps.webFetchHostAllowed("https://wiki.internal.example/page"); !ok {
 		t.Error("a host added in the local file should be allowed, with its subdomains")
 	}
-	if !ps.toolAllowed("Grep") {
+	if !ps.toolAllowed("LS") {
 		t.Error("merging must keep the default allow list")
 	}
 }

@@ -44,7 +44,10 @@
       "exact": "/"
     },
     {
-      "contains": ".env",
+      "name": ".env"
+    },
+    {
+      "name": ".env.*",
       "except": [
         ".env.example",
         ".env.sample",
@@ -53,80 +56,86 @@
       ]
     },
     {
-      "contains": ".git/"
+      "name": ".envrc"
     },
     {
-      "suffix": "/.git"
+      "name": ".git"
     },
     {
-      "contains": ".ssh"
+      "name": ".ssh"
     },
     {
-      "contains": "id_rsa"
+      "name": "id_rsa*"
     },
     {
-      "contains": "id_ed25519"
+      "name": "id_ed25519*"
     },
     {
-      "contains": ".aws/credentials"
+      "name": ".aws/credentials"
     }
   ],
   "sensitive_paths": [
     {
-      "contains": ".ssh/"
+      "name": ".ssh"
     },
     {
-      "suffix": "/.ssh"
+      "name": "id_rsa*"
     },
     {
-      "contains": "id_rsa"
+      "name": "id_ed25519*"
     },
     {
-      "contains": "id_ed25519"
+      "name": "id_ecdsa*"
     },
     {
-      "contains": "id_ecdsa"
+      "name": ".aws/credentials"
     },
     {
-      "contains": ".aws/credentials"
+      "name": ".aws/config"
     },
     {
-      "contains": ".aws/config"
+      "name": ".netrc"
     },
     {
-      "contains": ".netrc"
+      "name": ".git-credentials"
     },
     {
-      "contains": ".git-credentials"
+      "name": ".docker/config.json"
     },
     {
-      "contains": ".docker/config.json"
+      "name": ".kube/config"
     },
     {
-      "contains": ".kube/config"
+      "name": ".gnupg"
     },
     {
-      "contains": ".gnupg"
+      "name": ".env"
     },
     {
-      "contains": "/.env",
+      "name": ".env.*",
       "except": [
         ".env.example",
         ".env.sample",
         ".env.template",
         ".env.dist"
       ]
+    },
+    {
+      "name": ".envrc"
     }
   ],
   "guarded_paths": [
     {
-      "contains": ".lelu/"
+      "under": "$HOME/.lelu"
     },
     {
-      "contains": ".claude/plugins/"
+      "name": ".claude/plugins"
     },
     {
-      "contains": ".claude/settings"
+      "name": ".claude/settings.json"
+    },
+    {
+      "name": ".claude/settings.local.json"
     }
   ],
   "remote_script_pipe": {
@@ -152,8 +161,6 @@
   },
   "tools": {
     "allow": [
-      "Glob",
-      "Grep",
       "LS",
       "NotebookRead",
       "WebSearch",

@@ -2,30 +2,21 @@
 
 ## Unreleased
 
-**Requires engine 0.3.0 or later.** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
-
 ### Breaking
 
 * **`allowed` is `false` on a compute decision.** The engine sends `allowed: true` with `compute: true`, and the SDK passed it through, so code that checked `allowed` first ran the original tool when the engine had redirected it to a safe one. `allowed` is now `true` only when `decision === "allow"`, as in the Python SDK; a compute decision still has `computed: true`, `decision: "compute"`, `safeTool` and `safeArgs`. `safeTool` and `safeArgs` are set only on a compute decision.
 * **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision: "deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing.
-* **`auth.handler` requires an `authenticate` option.** It served authorize, the review queue, approve and deny to any caller, with this instance's engine credentials, and took the resolver from the request body's `resolvedBy`. Now every route except `GET /ok` answers 403 until you pass `authenticate(request)`, which returns the caller (or `null` for 401). Listing, approving and denying need `caller.reviewer`, which is recorded as the resolver; `resolvedBy` in the body is ignored. A new `reviewerKey` option sends one of the engine's `LELU_REVIEWER_KEYS` secrets when resolving. Reported in the Nauro pilot (L-2).
 
 ### Fixes
 
 * **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
 * The React `useAgentPermission` hook reports `decision: "compute"` (with `canExecute: false`) for a compute decision.
-* **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
-* **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`.
-* **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key. Reported in the Nauro pilot (L-10).
-* `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
-* `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
 
 ## [0.1.2](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.1...typescript-sdk-v0.1.2) (2026-11-28)
 
 
 ### Bug Fixes
 
-* REST accepts context.signal and actor; SDK reports real latencyMs and rule ([07886d3](https://github.com/Lelu-ai/lelu/commit/07886d3a71fda401e140fba3ac62d6cfd400fbff))
 * **sdk-typescript:** report real latencyMs and rule in authorize() ([492f235](https://github.com/Lelu-ai/lelu/commit/492f235b8a0b6c5dc94ace67bd2c48316de54e24))
 
 ## [0.1.1](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.0...typescript-sdk-v0.1.1) (2026-11-21)
@@ -33,21 +24,32 @@
 
 ### Bug Fixes
 
-* **sdk-typescript:** redeemReview returns refusal result on 403 ([ba6434c](https://github.com/Lelu-ai/lelu/commit/ba6434c408166a382a4dc3ab8c161613b9b094b8))
 * **sdk-typescript:** redeemReview returns refusal result on 403 ([8f00af5](https://github.com/Lelu-ai/lelu/commit/8f00af5ce045b250861334767eaefb57736784ac))
+* **`redeemReview()` maps the engine's `review_id` and `trace_id`** to `reviewId` and `traceId` (#106), on the allowed and the refusal path. They were returned as snake_case, so `result.reviewId` was `undefined`. ([376f081](https://github.com/Lelu-ai/lelu/commit/376f081a9b27a67bc7fe3f2307178f9a93bcf634))
 
 
 ### Documentation
 
-* fix the pages Nauro round 2 found still out of date ([ac2d57a](https://github.com/Lelu-ai/lelu/commit/ac2d57ad1c78caa3f55c13b36a6aa93a655b04f0))
 * fix the pages Nauro round 2 found still out of date ([3769938](https://github.com/Lelu-ai/lelu/commit/376993891651fcacf2e7a819461de387599113b5))
 
 ## [0.1.0](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.0.36...typescript-sdk-v0.1.0) (2026-11-12)
 
 
+**Requires engine 0.3.0 or later.** The agent registry methods map the engine's snake_case fields (#77); against engine 0.2.1, `registerAgent()` returns an object with every field `undefined`.
+
+
 ### ⚠ BREAKING CHANGES
 
-* **sdk-typescript:** auth.handler refuses every route except GET /ok until an `authenticate` option is passed, and ignores `resolvedBy` in the request body.
+* **`auth.handler` requires an `authenticate` option.** It served authorize, the review queue, approve and deny to any caller, with this instance's engine credentials, and took the resolver from the request body's `resolvedBy`. Now every route except `GET /ok` answers 403 until you pass `authenticate(request)`, which returns the caller (or `null` for 401). Listing, approving and denying need `caller.reviewer`, which is recorded as the resolver; `resolvedBy` in the body is ignored. A new `reviewerKey` option sends one of the engine's `LELU_REVIEWER_KEYS` secrets when resolving.
+
+
+### Fixes
+
+* **Agent registry responses are mapped to the camelCase types** (#77): `registerAgent()`, `getAgent()` and `listAgents()` returned `undefined` for `id`, `tenantId` and the other fields.
+* **`LELU_API_KEY` is read from the environment**, as the Python SDK does. With `LELU_BASE_URL` set and the key only in `LELU_API_KEY`, no key was sent. A discovered local engine still uses its own recorded key.
+* `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
+* `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
+
 
 ### Features
 
@@ -74,7 +76,6 @@
 
 * close 4 post-review gaps in HITL, confidence defaults, and engine errors ([e3fbaba](https://github.com/Lelu-ai/lelu/commit/e3fbaba6b0e0c351f54c14569dc5387d6aea45e0))
 * include README.md and LICENSE in npm package (v0.0.13) ([7fec473](https://github.com/Lelu-ai/lelu/commit/7fec473be50a9c6df9bb9ec0791f62ec63329354))
-* make agent registry responses match the SDKs ([a75d52e](https://github.com/Lelu-ai/lelu/commit/a75d52ec51277319b4fb206412c4c774e2718757))
 * make agent registry responses match the SDKs ([6431bec](https://github.com/Lelu-ai/lelu/commit/6431becd8b6c8036626a130a44ef258a6e60e00c))
 * **platform:** align all layers with engine compute/hash/digest features ([77b548b](https://github.com/Lelu-ai/lelu/commit/77b548b020335165f451d8675d05b44f34b56265))
 * **sdk-ts:** bin paths were silently dropped from every npm publish ([b8506e1](https://github.com/Lelu-ai/lelu/commit/b8506e13442c11c77f1a5112fddc4f93de25db50))

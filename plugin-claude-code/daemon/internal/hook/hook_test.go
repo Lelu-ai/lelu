@@ -83,16 +83,45 @@ func TestDaemonBinaryPath_FallsBackToSiblingOfExecutable(t *testing.T) {
 	}
 }
 
-func TestUnreachableMessage_BinaryMissingPointsToInstallScript(t *testing.T) {
+func TestUnreachableMessage_LocalBuildMissingPointsToInstallScript(t *testing.T) {
 	pluginRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(pluginRoot, "install.sh"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LELU_DAEMON_BIN", "")
 	t.Setenv("CLAUDE_PLUGIN_ROOT", pluginRoot) // bin/lelu-daemon deliberately not created
 
 	msg := unreachableMessage(errors.New("connect: no such file or directory"))
-	if !strings.Contains(msg, "install.sh") {
-		t.Errorf("message should point at install.sh when the daemon binary doesn't exist yet, got: %q", msg)
-	}
 	if !strings.Contains(msg, filepath.Join(pluginRoot, "install.sh")) {
 		t.Errorf("message should include the concrete install.sh path, got: %q", msg)
+	}
+}
+
+// The checker hooks/lelu-hook.sh downloads lives in the data directory,
+// which has no install.sh. The message must not name one there.
+func TestUnreachableMessage_DownloadedCheckerMissingNamesNoScript(t *testing.T) {
+	dataBin := filepath.Join(t.TempDir(), "bin", "0.3.0")
+	t.Setenv("CLAUDE_PLUGIN_ROOT", t.TempDir())
+	t.Setenv("LELU_DAEMON_BIN", filepath.Join(dataBin, "lelu-daemon"))
+
+	msg := unreachableMessage(errors.New("connect: no such file or directory"))
+	if strings.Contains(msg, "install.sh") {
+		t.Errorf("message names an install.sh that does not exist: %q", msg)
+	}
+	if !strings.Contains(msg, "/plugin install lelu@lelu") || !strings.Contains(msg, "downloads it again") {
+		t.Errorf("message should give the real recovery steps, got: %q", msg)
+	}
+}
+
+// A plugin root with no install.sh (for example a marketplace copy without a
+// local build) gets the reinstall step, not a path that does not exist.
+func TestUnreachableMessage_NoInstallScriptNamesNone(t *testing.T) {
+	t.Setenv("LELU_DAEMON_BIN", "")
+	t.Setenv("CLAUDE_PLUGIN_ROOT", t.TempDir())
+
+	msg := unreachableMessage(errors.New("connect: no such file or directory"))
+	if strings.Contains(msg, "install.sh") {
+		t.Errorf("message names an install.sh that does not exist: %q", msg)
 	}
 }
 
@@ -244,6 +273,11 @@ func TestFailClosed_FollowsModeUnlessOverridden(t *testing.T) {
 		{name: "no mode file is shadow", mode: "", env: "", want: false},
 		{name: "shadow mode", mode: "shadow", env: "", want: false},
 		{name: "enforce mode", mode: "enforce", env: "", want: true},
+		{name: "capitalized enforce", mode: "Enforce", env: "", want: true},
+		{name: "upper-case enforce", mode: "ENFORCE", env: "", want: true},
+		{name: "enforce with whitespace", mode: "  enforce \n", env: "", want: true},
+		{name: "unrecognized value is shadow", mode: "enforcing", env: "", want: false},
+		{name: "empty file is shadow", mode: "\n", env: "", want: false},
 		{name: "override on in shadow mode", mode: "shadow", env: "1", want: true},
 		{name: "override off in enforce mode", mode: "enforce", env: "0", want: false},
 	}
@@ -294,5 +328,25 @@ func TestRequestFrom_MapsNotebookPathAndURL(t *testing.T) {
 	in.ToolInput.URL = "https://example.com/x"
 	if got := requestFrom(in).URL; got != "https://example.com/x" {
 		t.Errorf("WebFetch URL = %q, want it passed through", got)
+	}
+}
+
+func TestRequestFrom_MapsGrepAndGlobPaths(t *testing.T) {
+	var grep hookInput
+	raw := `{"tool_name":"Grep","tool_input":{"pattern":"API_KEY","path":"/p","glob":"**/.env*","output_mode":"content"}}`
+	if err := json.Unmarshal([]byte(raw), &grep); err != nil {
+		t.Fatal(err)
+	}
+	if req := requestFrom(grep); req.Path != "/p" || req.Glob != "**/.env*" {
+		t.Errorf("Grep: path=%q glob=%q, want /p and its glob (not the content pattern)", req.Path, req.Glob)
+	}
+
+	var glob hookInput
+	raw = `{"tool_name":"Glob","tool_input":{"pattern":"**/.env","path":"/p"}}`
+	if err := json.Unmarshal([]byte(raw), &glob); err != nil {
+		t.Fatal(err)
+	}
+	if req := requestFrom(glob); req.Path != "/p" || req.Glob != "**/.env" {
+		t.Errorf("Glob: path=%q glob=%q, want /p and its pattern", req.Path, req.Glob)
 	}
 }

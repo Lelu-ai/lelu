@@ -100,6 +100,37 @@ When `signal` is `None` (for example, Anthropic models that expose no token
 log-probs), omit `confidence_signal` so the engine's `MissingSignalMode`
 decides rather than inventing a default score.
 
+## Mounting the approval handler (optional)
+
+`auth.handler` is an ASGI app that exposes the engine's authorize and review
+queue to your own frontend. It acts with your engine credentials, so it only
+serves a caller your app has authenticated: **without `authenticate=` it answers
+403 for everything except `GET /ok`.**
+
+```python
+import os
+from lelu import HandlerCaller, lelu
+
+async def authenticate(scope):
+    user = scope.get("user")                      # your session / JWT check
+    if user is None:
+        return None                               # -> 401
+    return HandlerCaller(reviewer=user.name if user.is_reviewer else None)
+
+auth = lelu(
+    authenticate=authenticate,
+    reviewer_key=os.environ["LELU_REVIEWER_KEY"],  # one of the engine's LELU_REVIEWER_KEYS
+)
+app.mount("/api/lelu", auth.handler)               # FastAPI / Starlette
+```
+
+- Any authenticated caller may `POST /authorize`.
+- Only a caller with a `reviewer` name may list the queue, approve or deny. That
+  name is recorded as the resolver; a `resolved_by` in the request body is ignored.
+- When the engine sets `LELU_REVIEWER_KEYS`, approvals need `reviewer_key`. To
+  approve or deny from your own code, pass it directly:
+  `await client.approve_review(review_id, "alice", reviewer_key=...)`.
+
 ## API
 
 | Method | Description |

@@ -10,7 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
+	"sync"
 
 	"github.com/lelu-ai/lelu/plugin-claude-code/daemon"
 )
@@ -160,12 +160,24 @@ func dataDir() string {
 	return filepath.Join(home, ".lelu", "claude-plugin")
 }
 
+// shadowModeReader reads the mode file on every request, so /lelu:enforce
+// and /lelu:shadow take effect without a restart. No mode file means shadow
+// mode, the default. A value other than "enforce" or "shadow" (in any case)
+// also means shadow mode; it is logged once each time it changes, and the
+// session start message and /lelu:status report it.
 func shadowModeReader(modePath string) func() bool {
+	var mu sync.Mutex
+	lastWarned := ""
 	return func() bool {
-		data, err := os.ReadFile(modePath)
-		if err != nil {
-			return true // no mode file yet => default to shadow, the safe default
+		m := daemon.ReadMode(modePath)
+		if !m.Recognized {
+			mu.Lock()
+			if m.Value != lastWarned {
+				lastWarned = m.Value
+				log.Printf("lelu-daemon: mode file %s holds %q, which is not \"enforce\" or \"shadow\"; running in shadow mode", modePath, m.Value)
+			}
+			mu.Unlock()
 		}
-		return strings.TrimSpace(string(data)) != "enforce"
+		return m.Mode != daemon.ModeEnforce
 	}
 }

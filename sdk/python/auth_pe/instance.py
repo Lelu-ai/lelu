@@ -26,26 +26,56 @@ Usage::
 
 from __future__ import annotations
 
+import inspect
 import json
-from typing import Any, Awaitable, Callable, cast
+from dataclasses import dataclass
+from typing import Any, Awaitable, Callable, Union, cast
 
 from .client import LeluClient
 from .models import AuthDecision, AuthEngineError, AuthorizeRequest, RedeemResult
 
-__all__ = ["LeluInstance", "lelu"]
+__all__ = ["HandlerCaller", "LeluInstance", "lelu"]
 
 Scope = dict[str, Any]
 Receive = Callable[[], Awaitable[dict[str, Any]]]
 Send = Callable[[dict[str, Any]], Awaitable[None]]
 
 
+@dataclass(frozen=True)
+class HandlerCaller:
+    """The caller of ``auth.handler``, as your app's own authentication sees it.
+
+    ``reviewer`` is the human this caller is, when they may review queued
+    actions. It is required to list, approve or deny, and it is recorded as the
+    resolver: the request body cannot choose it. Leave it unset for callers who
+    may only authorize.
+    """
+
+    reviewer: str | None = None
+
+
+# ``authenticate(scope)`` returns the caller, or ``None`` to refuse with 401. It
+# may be sync or async and receives the ASGI scope (headers, session, user, ...).
+Authenticate = Callable[
+    [Scope], Union[HandlerCaller, None, Awaitable[Union[HandlerCaller, None]]]
+]
+
+
 class LeluInstance:
     """App-wide Lelu instance: ``api`` is the full client, ``authorize()``
     applies the instance's default actor."""
 
-    def __init__(self, api: LeluClient, actor: str | None = None) -> None:
+    def __init__(
+        self,
+        api: LeluClient,
+        actor: str | None = None,
+        authenticate: Authenticate | None = None,
+        reviewer_key: str | None = None,
+    ) -> None:
         self.api = api
         self.actor = actor
+        self.authenticate = authenticate
+        self.reviewer_key = reviewer_key
 
     async def authorize(
         self, req: AuthorizeRequest | None = None, /, **kwargs: Any
@@ -122,12 +152,31 @@ class LeluInstance:
 
             app.mount("/api/lelu", auth.handler)
 
+        Every route except ``GET /ok`` acts with this instance's engine
+        credentials, so it is only served to a caller your app has
+        authenticated. Pass ``authenticate=`` to :func:`lelu`::
+
+            async def authenticate(scope):
+                user = scope.get("user")          # your session / JWT check
+                if user is None:
+                    return None                   # -> 401
+                return HandlerCaller(reviewer=user.name if user.is_reviewer else None)
+
+            auth = lelu(authenticate=authenticate, reviewer_key=os.environ["LELU_REVIEWER_KEY"])
+
+        Without ``authenticate`` the handler answers 403 for everything but
+        ``/ok``: mounting it publicly would otherwise let anyone authorize as
+        your agents or approve their actions.
+
         Routes:
-            POST /authorize           body: AuthorizeRequest -> AuthDecision
-            GET  /queue               -> {"items": [...], "count": N}
-            POST /queue/{id}/approve  body: {"resolved_by"?, "note"?}
-            POST /queue/{id}/deny     body: {"resolved_by"?, "note"?}
-            GET  /ok                  -> {"ok": true}
+            POST /authorize           body: AuthorizeRequest -> AuthDecision      (authenticated)
+            GET  /queue               -> {"items": [...], "count": N}             (reviewer)
+            POST /queue/{id}/approve  body: {"note"?}                             (reviewer)
+            POST /queue/{id}/deny     body: {"note"?}                             (reviewer)
+            GET  /ok                  -> {"ok": true}                             (anyone)
+
+        The resolver of an approval or denial is the authenticated reviewer. A
+        ``resolved_by`` in the request body is ignored.
         """
         if scope["type"] != "http":
             raise RuntimeError("LeluInstance.handler only supports the ASGI 'http' protocol")
@@ -136,6 +185,38 @@ class LeluInstance:
         segments = [s for s in cast(str, scope["path"]).split("/") if s]
 
         try:
+            if method == "GET" and segments == ["ok"]:
+                healthy = await self.api.is_healthy()
+                await _send_json(send, 200, {"ok": healthy})
+                return
+
+            # Everything else acts with the engine credentials, so it is only
+            # served to a caller the app has authenticated.
+            if self.authenticate is None:
+                await _send_json(
+                    send,
+                    403,
+                    {
+                        "error": "handler_not_configured",
+                        "message": "auth.handler needs an `authenticate` option before it serves anything but /ok",
+                    },
+                )
+                return
+            caller = self.authenticate(scope)
+            if inspect.isawaitable(caller):
+                caller = await caller
+            if caller is None:
+                await _send_json(send, 401, {"error": "unauthenticated"})
+                return
+            reviewer = (caller.reviewer or "").strip()
+
+            is_queue = bool(segments) and segments[0] == "queue"
+            if is_queue and not reviewer:
+                await _send_json(
+                    send, 403, {"error": "forbidden", "message": "only a reviewer may use the review queue"}
+                )
+                return
+
             if method == "POST" and segments == ["authorize"]:
                 body = await _read_json(receive)
                 decision = await self.authorize(AuthorizeRequest(**body))
@@ -159,18 +240,19 @@ class LeluInstance:
             ):
                 review_id = segments[1]
                 body = await _read_json(receive)
-                resolved_by = body.get("resolved_by") or "handler"
+                # The resolver is the authenticated reviewer; a resolved_by in
+                # the body is ignored (taking it from there let any caller name
+                # any reviewer).
                 note = body.get("note") or ""
                 if segments[2] == "approve":
-                    ok = await self.api.approve_review(review_id, resolved_by, note)
+                    ok = await self.api.approve_review(
+                        review_id, reviewer, note, reviewer_key=self.reviewer_key
+                    )
                 else:
-                    ok = await self.api.deny_review(review_id, resolved_by, note)
+                    ok = await self.api.deny_review(
+                        review_id, reviewer, note, reviewer_key=self.reviewer_key
+                    )
                 await _send_json(send, 200, {"success": ok})
-                return
-
-            if method == "GET" and segments == ["ok"]:
-                healthy = await self.api.is_healthy()
-                await _send_json(send, 200, {"ok": healthy})
                 return
 
             await _send_json(send, 404, {"error": "not_found"})
@@ -186,6 +268,8 @@ def lelu(
     api_key: str | None = None,
     actor: str | None = None,
     timeout: float = 5.0,
+    authenticate: Authenticate | None = None,
+    reviewer_key: str | None = None,
 ) -> LeluInstance:
     """Creates the app-wide Lelu instance. Call it once and import the result
     everywhere.
@@ -193,9 +277,13 @@ def lelu(
     With no arguments, connects zero-config to the engine ``lelu-mcp`` runs
     locally; pass ``base_url``/``api_key`` (or set ``LELU_BASE_URL`` /
     ``LELU_API_KEY``) to target a self-hosted or cloud engine.
+
+    ``authenticate`` guards ``auth.handler`` (see :meth:`LeluInstance.handler`);
+    ``reviewer_key`` is one of the engine's ``LELU_REVIEWER_KEYS`` secrets, sent
+    when the handler approves or denies.
     """
     api = LeluClient(base_url=base_url, timeout=timeout, api_key=api_key)
-    return LeluInstance(api, actor=actor)
+    return LeluInstance(api, actor=actor, authenticate=authenticate, reviewer_key=reviewer_key)
 
 
 async def _read_json(receive: Receive) -> dict[str, Any]:

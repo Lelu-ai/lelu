@@ -2,31 +2,29 @@
 
 ## Unreleased
 
-### Features
-
-* **Send `confidence_signal` and add `LeluClient.signal_from` builders** (#121): `AgentContext` and `SimulatorTraceItem` now accept `confidence_signal: ConfidenceSignal | None` (with `signal=` accepted as a validation alias for TypeScript parity), serialized onto `confidence_signal` for both `POST /v1/agent/authorize` and `POST /v1/queue/{id}/redeem` so approval payload fingerprints stay identical against engines in default strict mode (`CONFIDENCE_ALLOW_UNVERIFIED=false`). Added `LeluClient.signal_from` (`.openai`, `.bedrock`, `.local`, `.anthropic`) mirroring the TypeScript SDK, and marked `LeluClient.confidence_from` as deprecated in favor of `signal_from`.
-
 ### Fixes
 
 * **A compute decision without a safe tool is a deny.** When the engine answers `compute` with no (or an empty) `safe_tool`, `authorize()` returns `decision="deny"` with the reason `compute decision without a safe tool`, rather than a redirect to nothing. `safe_tool` and `safe_args` are now set only on a compute decision; the engine can echo a rule's `safe_tool` on a deny or a review, and the Strands guard read that as a redirect.
-* **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.
-* **`__version__` comes from the installed package metadata.** It was a hard-coded `0.4.3` while the package was `0.4.41`. Reported in the Nauro pilot.
 
 ## [0.4.43](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.42...python-sdk-v0.4.43) (2026-11-27)
 
 
 ### Features
 
-* **sdk-python:** send confidence_signal and add signal_from builders ([ebbdf8e](https://github.com/Lelu-ai/lelu/commit/ebbdf8e12c90e62e716535c80ece36ce2e4de541))
-* **sdk-python:** send confidence_signal and add signal_from builders ([#121](https://github.com/Lelu-ai/lelu/issues/121)) ([6876a18](https://github.com/Lelu-ai/lelu/commit/6876a1858224abbdbad83fa0014c7fe0306f5eb4))
+* **Send `confidence_signal` and add `LeluClient.signal_from` builders** (#121): `AgentContext` and `SimulatorTraceItem` now accept `confidence_signal: ConfidenceSignal | None` (with `signal=` accepted as a validation alias for TypeScript parity), serialized onto `confidence_signal` for both `POST /v1/agent/authorize` and `POST /v1/queue/{id}/redeem` so approval payload fingerprints stay identical against engines in default strict mode (`CONFIDENCE_ALLOW_UNVERIFIED=false`). Added `LeluClient.signal_from` (`.openai`, `.bedrock`, `.local`, `.anthropic`) mirroring the TypeScript SDK, and marked `LeluClient.confidence_from` as deprecated in favor of `signal_from`. ([6876a18](https://github.com/Lelu-ai/lelu/commit/6876a1858224abbdbad83fa0014c7fe0306f5eb4))
 
 ## [0.4.42](https://github.com/Lelu-ai/lelu/compare/python-sdk-v0.4.41...python-sdk-v0.4.42) (2026-11-12)
+
+
+### Fixes
+
+* **The agent registry types are exported** (#77): `from lelu import RegisterAgentRequest` raised `ImportError`. `RegisteredAgent`, `AgentWorkloadToken` and `AgentStatusResult` are exported too.
+* **`__version__` comes from the installed package metadata.** It was a hard-coded `0.4.3` while the package was `0.4.41`.
 
 
 ### Features
 
 * Add anonymous rate limiting, dashboard, and API key management ([4842938](https://github.com/Lelu-ai/lelu/commit/4842938dc95676effc4ea78a69c42f6282914c70))
-* add LangChain tool authorization wrapper ([dda6280](https://github.com/Lelu-ai/lelu/commit/dda628077235b5095428339eb484f26a7ad1735e))
 * add LangChain tool authorization wrapper ([2c3b7c9](https://github.com/Lelu-ai/lelu/commit/2c3b7c9743a135137a7b31e922962bb160e3d5a1))
 * **engine:** OAuth Token Vault — Feature 1 complete ([b73f4f8](https://github.com/Lelu-ai/lelu/commit/b73f4f8c4323d26e2506d379034bf6cecd3c3f7e))
 * fix SDK tab link and remove Go SDK from UI ([b57bbc4](https://github.com/Lelu-ai/lelu/commit/b57bbc47353b4d0111e185ee64ce54677d174f1b))
@@ -45,7 +43,6 @@
 
 ### Bug Fixes
 
-* make agent registry responses match the SDKs ([a75d52e](https://github.com/Lelu-ai/lelu/commit/a75d52ec51277319b4fb206412c4c774e2718757))
 * make agent registry responses match the SDKs ([6431bec](https://github.com/Lelu-ai/lelu/commit/6431becd8b6c8036626a130a44ef258a6e60e00c))
 * **platform:** align all layers with engine compute/hash/digest features ([77b548b](https://github.com/Lelu-ai/lelu/commit/77b548b020335165f451d8675d05b44f34b56265))
 * **python-sdk:** take the decision object for redemption, not a bare ID ([e54a24f](https://github.com/Lelu-ai/lelu/commit/e54a24f9a7272618c589e381d4c95914c865c333))

@@ -1,64 +1,60 @@
 # Changelog
 
-## Unreleased
+## [0.3.1](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.0...engine-v0.3.1) (2026-11-21)
 
-### Breaking
-
-* **Agent registry responses use snake_case field names.** `RegisteredAgent` had no JSON tags, so `POST /v1/agents`, `GET /v1/agents` and `GET /v1/agents/{id}` returned `ID`, `TenantID` and so on. The Python SDK's `register_agent`, `list_agents` and `get_agent` raised a validation error on those names, and the TypeScript SDK's `agent.id` was `undefined`. The fields are now `id`, `tenant_id`, `name`, `description`, `agent_type`, `owner_email`, `status`, `scopes`, `metadata`, `created_at` and `updated_at`. Anything reading the old names from the raw API needs to switch. Published TypeScript SDK 0.0.36 gets `id` and `status` from these responses, but `tenantId`, `agentType`, `ownerEmail`, `createdAt` and `updatedAt` stay `undefined` until an SDK release that maps them.
 
 ### Security Fixes
 
-* **The review queue is scoped to the caller's account in `PLATFORM_URL` mode.** Every queued item carried the account that triggered it, but no queue handler compared it with the caller, so any `lelu_sk_` key could list every account's pending reviews (actor, action, resource, reason), fetch or wait on any item by ID, and — without `LELU_REVIEWER_KEYS` — approve or deny another account's item, which that account's agent could then redeem. `GET /v1/queue/pending` now returns only the caller's items, with `total` counting only those; `GET /v1/queue/{id}`, `/wait`, `/approve`, `/deny` and `/redeem` answer 404 for another account's item, the same as for an unknown ID. The static `API_KEY` still sees and resolves the whole queue. Reported by Thomas.
-
 * **Rate limiting on the static `API_KEY` can no longer be bypassed by relabeling `tenant_id`** ([#113](https://github.com/Lelu-ai/lelu/issues/113)). In single-key mode the limiter used the caller-declared `tenant_id`, so changing that field on each request granted a fresh budget and let one credential saturate the audit writer. Static-key traffic now shares one fixed budget; operators relying on per-tenant buckets in single-key mode should switch those deployments to `PLATFORM_URL` account-bound keys, which still have per-account limits.
-
-### Changes
-
-* **Persisted agent reputation now records human review verdicts, not the engine's own decisions** ([#74](https://github.com/Lelu-ai/lelu/issues/74)). Every allow or review used to count as "correct" and every deny as "incorrect", so persisted reliability was `1 - deny rate`: a single denial as an agent's first decision set it to 0, and low reliability causes more denials. Now, when a reviewer resolves a `human_review` item, approve counts as correct and deny as incorrect — but only when the agent was verified by a workload token, the reviewer authenticated with `LELU_REVIEWER_KEYS`, and the review was raised by the confidence or risk gate rather than a policy rule that reviews the action every time. Persisted reliability replaces the in-memory value only once an agent has 10 verdicts (`MinDecisionsForScore`). Verdicts are stored in a new `agent_review_reputation` table; an existing `agent_reputation` table is left in place but no longer read, so `/v1/analytics/reputation` starts empty. Queued items carry `reputation_actor`, the agent ID a verdict counts toward. The in-memory reliability used without a database (and before 10 verdicts) is unchanged. Proposed by sronix.
-
-### Fixes
-
-* **The default issuer is right for an explicit listen host.** With `LISTEN_ADDR=127.0.0.1:18960` and no `LELU_ISSUER`, discovery metadata advertised `http://localhost127.0.0.1:18960`. It now uses the host given (`http://127.0.0.1:18960`), and `localhost` for `:8080`, `0.0.0.0` and `::`. Reported in the Nauro pilot.
-* **OpenTelemetry reports the engine's real version** as `service.version`, instead of a hard-coded `0.1.0`.
-* **Engine releases publish a container image again.** Images were only built on plain `v*.*.*` tags, which engine releases stopped using after `v0.0.14`, so no `engine-v*` release had one. `engine-release.yml` now pushes `ghcr.io/lelu-ai/lelu-engine:<version>` (and `latest` for non-prerelease tags) for `linux/amd64` and `linux/arm64`. The Dockerfile no longer forces `GOARCH=amd64`, which put an amd64 binary in the arm64 image, and stamps the version so `/healthz` and `--version` report it. Reported in the Nauro pilot.
-* **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
-
-## [0.3.1](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.0...engine-v0.3.1) (2026-11-21)
 
 
 ### Bug Fixes
 
-* **mcpauth:** handle redirect URI edge cases and add table tests ([948d209](https://github.com/Lelu-ai/lelu/commit/948d2090e45fc8e44084f4acd0ba57ec35fa949e))
 * **mcpauth:** handle redirect URI edge cases and add table tests ([b5406c4](https://github.com/Lelu-ai/lelu/commit/b5406c4116cb426cb1af17094d244a1b900a7aa3))
-* **mcpauth:** refuse unsafe redirect URIs at client registration ([525887a](https://github.com/Lelu-ai/lelu/commit/525887abd85c42bfc062e8fac3e13d85ae59b50b))
 * **mcpauth:** refuse unsafe redirect URIs at client registration ([96424c1](https://github.com/Lelu-ai/lelu/commit/96424c10dd7c38b2377c2320400c3a2b50ee6143))
-* **server:** rate-limit static key on credential, not claimed tenant ([ffe242e](https://github.com/Lelu-ai/lelu/commit/ffe242e08515048147a32e310fdc1116c7b29e07))
 * **server:** rate-limit static key on credential, not claimed tenant (fixes [#113](https://github.com/Lelu-ai/lelu/issues/113)) ([99b0307](https://github.com/Lelu-ai/lelu/commit/99b0307834ec46c20ac54ff19778472a5e57b3e8))
 * **server:** use one fixed rate-limit key for the static credential ([7f99b89](https://github.com/Lelu-ai/lelu/commit/7f99b89e68fd1d8e10e8e8480face160ac95657e))
 
 ## [0.3.0](https://github.com/Lelu-ai/lelu/compare/engine-v0.2.1...engine-v0.3.0) (2026-11-12)
 
 
+### Breaking
+
+* **Agent registry responses use snake_case field names.** `RegisteredAgent` had no JSON tags, so `POST /v1/agents`, `GET /v1/agents` and `GET /v1/agents/{id}` returned `ID`, `TenantID` and so on. The Python SDK's `register_agent`, `list_agents` and `get_agent` raised a validation error on those names, and the TypeScript SDK's `agent.id` was `undefined`. The fields are now `id`, `tenant_id`, `name`, `description`, `agent_type`, `owner_email`, `status`, `scopes`, `metadata`, `created_at` and `updated_at`. Anything reading the old names from the raw API needs to switch. TypeScript SDK 0.0.36 gets only `id` and `status` from these responses; TypeScript SDK 0.1.0 maps every field, and Python SDK 0.4.42 accepts them.
+
+
+### Security Fixes
+
+* **The review queue is scoped to the caller's account in `PLATFORM_URL` mode.** Every queued item carried the account that triggered it, but no queue handler compared it with the caller, so any `lelu_sk_` key could list every account's pending reviews (actor, action, resource, reason), fetch or wait on any item by ID, and — without `LELU_REVIEWER_KEYS` — approve or deny another account's item, which that account's agent could then redeem. `GET /v1/queue/pending` now returns only the caller's items, with `total` counting only those; `GET /v1/queue/{id}`, `/wait`, `/approve`, `/deny` and `/redeem` answer 404 for another account's item, the same as for an unknown ID. The static `API_KEY` still sees and resolves the whole queue. Reported by Thomas.
+
+
+### Changes
+
+* **Persisted agent reputation now records human review verdicts, not the engine's own decisions** ([#74](https://github.com/Lelu-ai/lelu/issues/74)). Every allow or review used to count as "correct" and every deny as "incorrect", so persisted reliability was `1 - deny rate`: a single denial as an agent's first decision set it to 0, and low reliability causes more denials. Now, when a reviewer resolves a `human_review` item, approve counts as correct and deny as incorrect — but only when the agent was verified by a workload token, the reviewer authenticated with `LELU_REVIEWER_KEYS`, and the review was raised by the confidence or risk gate rather than a policy rule that reviews the action every time. Persisted reliability replaces the in-memory value only once an agent has 10 verdicts (`MinDecisionsForScore`). Verdicts are stored in a new `agent_review_reputation` table; an existing `agent_reputation` table is left in place but no longer read, so `/v1/analytics/reputation` starts empty. Queued items carry `reputation_actor`, the agent ID a verdict counts toward. The in-memory reliability used without a database (and before 10 verdicts) is unchanged. Proposed by sronix.
+
+
+### Fixes
+
+* **The default issuer is right for an explicit listen host.** With `LISTEN_ADDR=127.0.0.1:18960` and no `LELU_ISSUER`, discovery metadata advertised `http://localhost127.0.0.1:18960`. It now uses the host given (`http://127.0.0.1:18960`), and `localhost` for `:8080`, `0.0.0.0` and `::`.
+* **OpenTelemetry reports the engine's real version** as `service.version`, instead of a hard-coded `0.1.0`.
+* **Engine releases publish a container image again.** Images were only built on plain `v*.*.*` tags, which engine releases stopped using after `v0.0.14`, so no `engine-v*` release had one. `engine-release.yml` now pushes `ghcr.io/lelu-ai/lelu-engine:<version>` (and `latest` for non-prerelease tags) for `linux/amd64` and `linux/arm64`. The Dockerfile no longer forces `GOARCH=amd64`, which put an amd64 binary in the arm64 image, and stamps the version so `/healthz` and `--version` report it.
+* **Redeeming an approval works for account-bound keys.** The payload fingerprint taken at enqueue includes `tenant_id` after the engine replaces it with the verified account, but redeem fingerprinted the body as sent, so an agent that didn't send its own account ID as `tenant_id` never matched its own approval. Redeem now applies the same replacement. The redeem audit event also records the item's account rather than the body's `tenant_id`.
+
+
 ### Features
 
-* **engine:** use human review verdicts as the reputation outcome signal ([b241085](https://github.com/Lelu-ai/lelu/commit/b241085737d840da607da029684cb35a969622f9))
 * **engine:** use human review verdicts as the reputation outcome signal ([c1bf0e2](https://github.com/Lelu-ai/lelu/commit/c1bf0e2cb35060ce9595609d07203e5614b8f4ff))
 
 
 ### Bug Fixes
 
-* act on round-1 security audit findings ([29b2431](https://github.com/Lelu-ai/lelu/commit/29b2431f38b461749fa6e9b92a264b29234558a9))
 * act on round-1 security audit findings ([5f680c7](https://github.com/Lelu-ai/lelu/commit/5f680c76c7407bd98f8b0abcc822c022a88529b1))
 * **engine:** correct default issuer for an explicit listen host ([a83c442](https://github.com/Lelu-ai/lelu/commit/a83c442748f77b11e4a4ec3ac1d6f8f9e02859df))
-* **engine:** key reputation on verified agent identity ([f7168e7](https://github.com/Lelu-ai/lelu/commit/f7168e754606b7a102825129174b531e00a943e7))
 * **engine:** key reputation on verified agent identity ([cd49051](https://github.com/Lelu-ai/lelu/commit/cd4905151ed2db995f5fcf830e1abbf980b026fd))
 * **engine:** publish a container image for every engine release ([c91ca22](https://github.com/Lelu-ai/lelu/commit/c91ca2238a5be1a1f78d3613a87123842654e115))
-* **engine:** scope the review queue to the caller's account ([85f95a1](https://github.com/Lelu-ai/lelu/commit/85f95a15f582757ba89f1e81c0ac5acd3aa746ce))
 * **engine:** scope the review queue to the caller's account ([e61be0e](https://github.com/Lelu-ai/lelu/commit/e61be0e0ff5e2067fcebdc06e5c042ab66697f86))
-* make agent registry responses match the SDKs ([a75d52e](https://github.com/Lelu-ai/lelu/commit/a75d52ec51277319b4fb206412c4c774e2718757))
 * make agent registry responses match the SDKs ([6431bec](https://github.com/Lelu-ai/lelu/commit/6431becd8b6c8036626a130a44ef258a6e60e00c))
 * **mcpauth:** replace a registered code/state instead of appending a second ([ffcd848](https://github.com/Lelu-ai/lelu/commit/ffcd848df5926d82b9295e1dcff09ba640d68ede))
-* **mcpauth:** URL-encode state when building the OAuth redirect ([#84](https://github.com/Lelu-ai/lelu/issues/84)) ([b7d27f9](https://github.com/Lelu-ai/lelu/commit/b7d27f9cfccf1a1ebb85ccb2f0a2fd3fb6f740f7))
 * **mcpauth:** URL-encode state when building the OAuth redirect ([#84](https://github.com/Lelu-ai/lelu/issues/84)) ([21d2db2](https://github.com/Lelu-ai/lelu/commit/21d2db243874a64bf7a035b1467cea46ead29e78))
 
 

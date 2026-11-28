@@ -3681,7 +3681,27 @@ func (h *Handler) handleGetAgent(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "agent identity registry not configured")
 		return
 	}
-	agentID := r.PathValue("agentID")
+	agent, ok := h.agentForCaller(w, r, r.PathValue("agentID"))
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, agent)
+}
+
+// agentForCaller fetches a registered agent and checks that the caller may
+// act for the account that owns it. When it returns false it has already
+// written the response.
+//
+// Fetch before checking, not the other way round: the agent's own TenantID
+// is what ownership is checked against, and there's no way to know it
+// without reading the record first. An agent owned by another account is
+// reported exactly like a missing one (404, not 403), so a caller with no
+// right to it can't confirm the ID exists. See Nate Howard's review.
+//
+// Every handler that reads or acts on one agent by ID must go through this:
+// registry methods such as SetStatus and IssueToken take an ID alone and
+// check no ownership themselves.
+func (h *Handler) agentForCaller(w http.ResponseWriter, r *http.Request, agentID string) (*identity.RegisteredAgent, bool) {
 	agent, err := h.identityReg.Get(r.Context(), agentID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -3689,18 +3709,13 @@ func (h *Handler) handleGetAgent(w http.ResponseWriter, r *http.Request) {
 		} else {
 			writeError(w, http.StatusInternalServerError, err.Error())
 		}
-		return
+		return nil, false
 	}
-	// Fetch before checking, not the other way round: the agent's own
-	// TenantID is what ownership is checked against, and there's no way to
-	// know it without reading the record first. Returning 404 rather than
-	// 403 for an out-of-tenant agent avoids confirming the ID exists at all
-	// to a caller with no right to it. See Nate Howard's review.
 	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
-		return
+		return nil, false
 	}
-	writeJSON(w, http.StatusOK, agent)
+	return agent, true
 }
 
 func (h *Handler) handleRevokeAgent(w http.ResponseWriter, r *http.Request) {
@@ -3712,17 +3727,7 @@ func (h *Handler) handleRevokeAgent(w http.ResponseWriter, r *http.Request) {
 	// Fetch first — SetStatus mutates by ID alone with no ownership check,
 	// so without reading the record first any authenticated caller could
 	// revoke any tenant's agent. See Nate Howard's review.
-	agent, err := h.identityReg.Get(r.Context(), agentID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
-		} else {
-			writeError(w, http.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+	if _, ok := h.agentForCaller(w, r, agentID); !ok {
 		return
 	}
 	if err := h.identityReg.SetStatus(r.Context(), agentID, identity.AgentStatusRevoked); err != nil {
@@ -3742,17 +3747,7 @@ func (h *Handler) handleSuspendAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentID := r.PathValue("agentID")
-	agent, err := h.identityReg.Get(r.Context(), agentID)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
-		} else {
-			writeError(w, http.StatusInternalServerError, err.Error())
-		}
-		return
-	}
-	if principal, ok := principalFromContext(r.Context()); !ok || !principalMayActAs(principal, agent.TenantID) {
-		writeError(w, http.StatusNotFound, fmt.Sprintf("agent %q not found", agentID))
+	if _, ok := h.agentForCaller(w, r, agentID); !ok {
 		return
 	}
 	if err := h.identityReg.SetStatus(r.Context(), agentID, identity.AgentStatusSuspended); err != nil {
@@ -3772,6 +3767,12 @@ func (h *Handler) handleIssueAgentToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	agentID := r.PathValue("agentID")
+	// IssueToken looks the agent up by ID alone. Without this check any
+	// authenticated caller could get a workload token for another account's
+	// agent, while reading or revoking that agent answered 404.
+	if _, ok := h.agentForCaller(w, r, agentID); !ok {
+		return
+	}
 	tok, err := h.identityReg.IssueToken(r.Context(), agentID)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {

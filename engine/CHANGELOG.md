@@ -11,6 +11,29 @@
 * **Review waits longer than 10 seconds return a response.** `GET /v1/queue/{id}/wait` accepts `timeout_ms` up to 60000 and extends its own write deadline past the server's 10 s `WriteTimeout`, but the extension never took effect, so any wait that ran past 10 s, whether approved, denied or timed out with 408, reached the client as an empty reply on a closed connection while the engine logged a response. Waits now last up to their `timeout_ms` and deliver the response.
 * **A compute rule without `safe_tool` under an agent scope is refused at policy load.** A top-level compute rule with no `safe_tool` was already refused, but the same rule under `agent_scopes.<name>.compute` loaded, and a matching action got a compute decision naming no tool. Loading now fails with an error naming the rule, such as `agent_scopes.deploy_bot.compute[1] (action "write_*_prod"): a compute rule needs safe_tool`. A blank `safe_tool` counts as missing in both styles. Should a compute decision without a safe tool ever be produced anyway, the engine denies the request instead. Fix any such policy before upgrading: the engine will refuse to load it.
 
+## [0.3.2](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.1...engine-v0.3.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* **engine:** check agent ownership before issuing an agent token ([484110d](https://github.com/Lelu-ai/lelu/commit/484110d825ce81eb4c441e73cec9743d46bac43e))
+* **engine:** let long-poll review waits outlast the 10 s write timeout ([65706ce](https://github.com/Lelu-ai/lelu/commit/65706ceee99d4163ef6f80bbdf9d185115c9ecc8))
+* **engine:** reject compute rules without safe_tool under agent scopes ([1283ed9](https://github.com/Lelu-ai/lelu/commit/1283ed9d500876b82d599a21f44a9d055b4e76e6))
+* **engine:** review waits past 10 s, agent token ownership, compute rules without a safe tool ([37676ec](https://github.com/Lelu-ai/lelu/commit/37676ec744e3f28216eb53e1589cda783f56c151))
+* install.sh finds the engine release and verifies it; changelog cleanup ([b6bf7c6](https://github.com/Lelu-ai/lelu/commit/b6bf7c6a63eb8ddea8babc13d70223f64747ccf2))
+
+
+### Documentation
+
+* **changelog:** file shipped notes under their releases and drop doubled entries ([89ce782](https://github.com/Lelu-ai/lelu/commit/89ce782c00fce3661c11c8b5a999a3764868fb2c))
+* **engine:** changelog for the wait, agent token and compute rule fixes ([fac4aff](https://github.com/Lelu-ai/lelu/commit/fac4aff9fd2ee2bbea17932d5b890df201bf0094))
+
+
+### Miscellaneous
+
+* release main ([7525ffc](https://github.com/Lelu-ai/lelu/commit/7525ffcd32533148cc80287067fb8ab069e87b6e))
+* release main ([eb34e88](https://github.com/Lelu-ai/lelu/commit/eb34e88db06535f4d6ba4ded83e87913fe928e58))
+
 ## [0.3.1](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.0...engine-v0.3.1) (2026-11-21)
 
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.10](https://github.com/Lelu-ai/lelu/compare/go-sdk-v0.1.9...go-sdk-v0.1.10) (2026-11-28)
+
+
+### Miscellaneous
+
+* release main ([7525ffc](https://github.com/Lelu-ai/lelu/commit/7525ffcd32533148cc80287067fb8ab069e87b6e))
+* release main ([eb34e88](https://github.com/Lelu-ai/lelu/commit/eb34e88db06535f4d6ba4ded83e87913fe928e58))
+
 ## [0.1.9](https://github.com/Lelu-ai/lelu/compare/go-sdk-v0.1.8...go-sdk-v0.1.9) (2026-11-12)
 
 

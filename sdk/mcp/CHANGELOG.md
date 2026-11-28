@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.38](https://github.com/Lelu-ai/lelu/compare/lelu-mcp-v0.0.37...lelu-mcp-v0.0.38) (2026-11-28)
+
+
+### Miscellaneous
+
+* **npm:** repository URLs that match npm provenance ([3334d88](https://github.com/Lelu-ai/lelu/commit/3334d88f09faf6b437b37495bdbfac61d3d19c75))
+* **npm:** repository URLs that match npm provenance ([0fd12e1](https://github.com/Lelu-ai/lelu/commit/0fd12e17127a36b1bfa537439d9089430d7d4d67))
+
 ## [0.0.37](https://github.com/Lelu-ai/lelu/compare/lelu-mcp-v0.0.36...lelu-mcp-v0.0.37) (2026-11-28)
 
 

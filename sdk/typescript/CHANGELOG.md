@@ -12,6 +12,14 @@
 * **`waitAndRedeem()` and `waitForApproval()` no longer throw when the wait times out.** The engine answers a wait that ends while the review is still pending with HTTP 408, and the client treated that as an error, so a short `timeoutMs` threw `AuthEngineError`. A timed-out wait now returns the pending item, and `waitAndRedeem()` returns `allowed: false` with `still pending after <timeoutMs>ms`, as documented and as the Python SDK does.
 * The React `useAgentPermission` hook reports `decision: "compute"` (with `canExecute: false`) for a compute decision.
 
+## [0.2.1](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.2.0...typescript-sdk-v0.2.1) (2026-11-28)
+
+
+### Miscellaneous
+
+* **npm:** repository URLs that match npm provenance ([3334d88](https://github.com/Lelu-ai/lelu/commit/3334d88f09faf6b437b37495bdbfac61d3d19c75))
+* **npm:** repository URLs that match npm provenance ([0fd12e1](https://github.com/Lelu-ai/lelu/commit/0fd12e17127a36b1bfa537439d9089430d7d4d67))
+
 ## [0.2.0](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.2...typescript-sdk-v0.2.0) (2026-11-28)
 
 

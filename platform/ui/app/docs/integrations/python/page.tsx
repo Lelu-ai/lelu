@@ -43,7 +43,8 @@ from lelu import AgentContext, AuthorizeRequest, LeluClient
 
 async def main():
     # Point at the engine you run and pass its key. Without base_url (or
-    # LELU_BASE_URL), an API key makes the client target https://lelu-ai.com.
+    # LELU_BASE_URL), the client uses the engine "npx lelu-mcp start"
+    # recorded on this machine, or else http://localhost:8080.
     async with LeluClient(
         base_url="http://localhost:8083",  # e.g. the Docker Compose engine
         api_key=os.environ["LELU_API_KEY"],

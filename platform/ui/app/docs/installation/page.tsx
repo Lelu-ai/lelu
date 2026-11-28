@@ -455,10 +455,12 @@ docker-compose up -d engine`}
               </table>
             </div>
             <p className="text-[14px] text-[#737373] leading-[1.65] mt-4">
-              The Python SDK resolves differently: it reads both{" "}
+              The Python SDK resolves the same way: it reads{" "}
               <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_BASE_URL</code> and{" "}
-              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>, and a key with no base URL
-              targets <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">https://lelu-ai.com</code>.
+              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">LELU_API_KEY</code>, and with no base URL it connects to
+              the engine <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">npx lelu-mcp start</code> recorded on this machine, or else{" "}
+              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">http://localhost:8080</code>. A key alone never sends requests to{" "}
+              <code className="font-mono text-[12px] px-1 py-0.5 bg-[#F5F5F4] dark:bg-[#0D0E13] border border-[#E7E5E4] dark:border-[#20222B] rounded">https://lelu-ai.com</code>.
               In either SDK, set the base URL and key of the engine you run explicitly.
             </p>
           </div>

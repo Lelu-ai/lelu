@@ -137,7 +137,13 @@ async function fetchGitHubProfile(accessToken: string): Promise<OAuthProfile> {
   const emailsRes = await fetch("https://api.github.com/user/emails", { headers });
   if (emailsRes.ok) {
     const emails = (await emailsRes.json()) as Array<{ email: string; primary: boolean; verified: boolean }>;
-    const best = emails.find((e) => e.primary) ?? emails.find((e) => e.verified) ?? emails[0];
+    // Prefer a verified address: sign-in refuses unverified ones
+    // (lib/oauth-link.ts), so a verified secondary beats an unverified primary.
+    const best =
+      emails.find((e) => e.primary && e.verified) ??
+      emails.find((e) => e.verified) ??
+      emails.find((e) => e.primary) ??
+      emails[0];
     if (best) {
       email = best.email;
       emailVerified = best.verified;

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCode, fetchProfile } from "@/lib/oauth";
-import { findOrCreateOAuthUser, signJWT, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
+import { findOrCreateOAuthUser, createSession, SESSION_COOKIE, cookieOptions, recordLogin } from "@/lib/auth";
+import { OAUTH_EMAIL_UNVERIFIED } from "@/lib/oauth-link";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://lelu-ai.com";
 const STATE_COOKIE = "lelu_oauth_state";
@@ -35,18 +36,16 @@ export async function GET(req: NextRequest) {
       console.error("[auth/github/callback] recordLogin failed", err);
     }
 
-    const jwt = signJWT({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      emailVerified: user.emailVerified,
-    });
+    const jwt = await createSession(user);
 
     const res = NextResponse.redirect(`${BASE_URL}${saved.next}`);
     res.cookies.set(SESSION_COOKIE, jwt, cookieOptions(60 * 60 * 24 * 7));
     res.cookies.delete(STATE_COOKIE);
     return res;
   } catch (err) {
+    if (err instanceof Error && err.message === OAUTH_EMAIL_UNVERIFIED) {
+      return fail("oauth_email_unverified");
+    }
     console.error("[auth/github/callback]", err);
     return fail("oauth_failed");
   }

@@ -13,14 +13,15 @@ repair an old SDK.
 
 | Component | Version | Where |
 |---|---|---|
-| Engine | 0.3.0 | tag `engine-v0.3.0` |
-| TypeScript SDK (`lelu-agent-auth`) | 0.1.0 | npm |
-| Python SDK (`lelu-agent-auth-sdk`) | 0.4.42 | PyPI |
-| Go SDK | 0.1.9 | tag `go-sdk-v0.1.9` |
+| Engine | 0.3.1 | tag `engine-v0.3.1` |
+| TypeScript SDK (`lelu-agent-auth`) | 0.1.1 (0.1.2 released on GitHub, npm publish pending) | npm |
+| Python SDK (`lelu-agent-auth-sdk`) | 0.4.43 | PyPI |
+| Go SDK | 0.1.9 | tag `go-sdk-v0.1.9` (the Go module proxy needs a `sdk/go/v0.1.9` tag to serve it) |
 
-These four were released together on 2026-11-12. They have **not** been run
-together as a full compatibility matrix on the published artifacts yet; the
-table below is what has been observed.
+Engine 0.3.0 and 0.3.1 were checked on 2026-11-27 with Python 0.4.42 and
+TypeScript 0.1.0 and 0.1.1 on the published release binaries: all six agent
+registry calls passed, and review, compute and queue lookup by review ID matched
+the docs. The table below is what has been observed so far.
 
 ## What has been observed
 

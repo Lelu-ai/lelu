@@ -148,6 +148,21 @@ async function applySchema(): Promise<void> {
     )
   `;
 
+  // Server-side record of each login. The session cookie carries a random
+  // session id; a session is valid only while its row exists, so logout and
+  // password reset can end it. Only the SHA-256 of the id is stored.
+  await sql`
+    CREATE TABLE IF NOT EXISTS lelu_sessions (
+      id_hash    TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES lelu_users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `;
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_lelu_sessions_user ON lelu_sessions (user_id)
+  `;
+
   await sql`
     CREATE INDEX IF NOT EXISTS idx_lelu_users_email ON lelu_users (email)
   `;

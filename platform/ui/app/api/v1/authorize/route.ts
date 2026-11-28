@@ -6,6 +6,7 @@ import { validateApiKey } from "@/lib/apikeys";
 // for now. Left in place as the natural hook for per-tenant policy sync
 // (engine/internal/sync polls a control-plane URL per tenant) once that's built.
 import { logAuditEvent } from "@/lib/audit";
+import { cleanConfidenceSignal, ENGINE_TIMEOUT_MS } from "@/lib/engine-proxy";
 import { detectInjection } from "@/lib/injection";
 import { checkQuota } from "@/lib/quota";
 
@@ -147,7 +148,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { tool, context, args, confidence } = (body as Record<string, unknown>) ?? {};
+  const { tool, context, args } = (body as Record<string, unknown>) ?? {};
 
   if (typeof tool !== "string" || !tool.trim()) {
     return NextResponse.json({ error: "'tool' is required and must be a non-empty string." }, { status: 400 });
@@ -155,8 +156,31 @@ export async function POST(req: NextRequest) {
   if (tool.length > 128) {
     return NextResponse.json({ error: "'tool' must be 128 characters or less." }, { status: 400 });
   }
-  if (confidence !== undefined && (typeof confidence !== "number" || confidence < 0 || confidence > 1)) {
+
+  // confidence and confidence_signal are read from the top level, or from a
+  // `context` object (the SDK's shape: context: { confidence: 0.85 }). Before,
+  // a context object was silently ignored, so an out-of-range value there got
+  // a 200 instead of the 400 the docs promise.
+  const raw = (body as Record<string, unknown>) ?? {};
+  const ctxObj =
+    context && typeof context === "object" && !Array.isArray(context) ? (context as Record<string, unknown>) : undefined;
+  const confidence = raw.confidence ?? ctxObj?.confidence;
+  if (
+    confidence !== undefined &&
+    confidence !== null &&
+    (typeof confidence !== "number" || !Number.isFinite(confidence) || confidence < 0 || confidence > 1)
+  ) {
     return NextResponse.json({ error: "'confidence' must be a number between 0 and 1." }, { status: 400 });
+  }
+  // A verified signal from the model provider. The engine extracts the
+  // confidence from it; a bare `confidence` number is ignored by an engine
+  // that does not accept unverified confidence.
+  const signalInput = raw.confidence_signal ?? ctxObj?.confidence_signal;
+  let confidenceSignal: Record<string, unknown> | undefined;
+  if (signalInput !== undefined && signalInput !== null) {
+    const cleaned = cleanConfidenceSignal(signalInput);
+    if (!cleaned.ok) return NextResponse.json({ error: cleaned.error }, { status: 400 });
+    confidenceSignal = cleaned.signal;
   }
 
   // --- Evaluate ---
@@ -224,10 +248,11 @@ export async function POST(req: NextRequest) {
           // the MCP zero-config path). Real deployments should eventually
           // accept a confidence_signal derived from provider logprobs instead.
           ...(typeof confidence === "number" ? { confidence } : {}),
+          ...(confidenceSignal ? { confidence_signal: confidenceSignal } : {}),
           ...(typeof context === "string" && context ? { resource: { context } } : {}),
           ...(args && typeof args === "object" ? { args } : {}),
         }),
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(ENGINE_TIMEOUT_MS),
       });
     } catch (err) {
       console.error("[v1/authorize] engine unreachable:", err);

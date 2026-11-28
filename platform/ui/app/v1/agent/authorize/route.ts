@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomBytes } from "crypto";
 import { validateApiKey } from "@/lib/apikeys";
 import { logAuditEvent } from "@/lib/audit";
-import { buildEngineAuthorizeBody, engineDecision } from "@/lib/engine-proxy";
+import { buildEngineAuthorizeBody, ENGINE_TIMEOUT_MS, engineDecision } from "@/lib/engine-proxy";
 import { checkQuota } from "@/lib/quota";
 
 // Engine-compatible authorize endpoint on the hosted cloud.
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
         ...(ENGINE_API_KEY ? { Authorization: `Bearer ${ENGINE_API_KEY}` } : {}),
       },
       body: JSON.stringify(engineBody),
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(ENGINE_TIMEOUT_MS),
     });
   } catch (err) {
     console.error("[v1/agent/authorize] engine unreachable:", err);
@@ -113,11 +113,19 @@ export async function POST(req: NextRequest) {
   const decision = engineDecision(data);
   const reason = data.reason ?? "";
   const traceId = data.trace_id || `req_${randomBytes(8).toString("hex")}`;
+  // The agent name the caller sent (e.g. "billing-agent") is shown in the
+  // audit log so customers can tell their agents apart. It is a label only:
+  // the engine evaluates every cloud call as cloud_customer, and the key that
+  // made the call is recorded separately in key_id.
+  const claimedActor =
+    typeof (input as Record<string, unknown>).actor === "string"
+      ? ((input as Record<string, unknown>).actor as string).trim().slice(0, 128)
+      : "";
   void logAuditEvent({
     traceId,
     userId,
     keyId,
-    actor: keyId,
+    actor: claimedActor || keyId,
     action: engineBody.action,
     decision:
       decision === "allow" ? "allowed" : decision === "deny" ? "denied" : decision,

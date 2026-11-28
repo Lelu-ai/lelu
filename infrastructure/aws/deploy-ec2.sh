@@ -401,7 +401,7 @@ Environment=LELU_MODE=enforce
 Environment=CONFIDENCE_MISSING_MODE=deny
 Environment=REDIS_ADDR=\${REDIS_ADDR}
 Environment=JWT_SIGNING_KEY=\${JWT_KEY}
-Environment=LELU_API_KEY=\${API_KEY}
+Environment=API_KEY=\${API_KEY}
 Restart=always
 RestartSec=3
 

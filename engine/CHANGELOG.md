@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Security Fixes
+
+* **Issuing an agent token checks that the caller owns the agent.** `POST /v1/agents/{id}/token` did no ownership check, so in `PLATFORM_URL` mode any `lelu_sk_` key could get a workload token for another account's agent, even though reading, suspending or revoking that agent answered 404. It now answers 404 for another account's agent, the same as for an unknown ID, like the other `/v1/agents/{id}` routes. The static `API_KEY` can still issue tokens for any agent.
+
+### Fixes
+
+* **Review waits longer than 10 seconds return a response.** `GET /v1/queue/{id}/wait` accepts `timeout_ms` up to 60000 and extends its own write deadline past the server's 10 s `WriteTimeout`, but the extension never took effect, so any wait that ran past 10 s, whether approved, denied or timed out with 408, reached the client as an empty reply on a closed connection while the engine logged a response. Waits now last up to their `timeout_ms` and deliver the response.
+* **A compute rule without `safe_tool` under an agent scope is refused at policy load.** A top-level compute rule with no `safe_tool` was already refused, but the same rule under `agent_scopes.<name>.compute` loaded, and a matching action got a compute decision naming no tool. Loading now fails with an error naming the rule, such as `agent_scopes.deploy_bot.compute[1] (action "write_*_prod"): a compute rule needs safe_tool`. A blank `safe_tool` counts as missing in both styles. Should a compute decision without a safe tool ever be produced anyway, the engine denies the request instead. Fix any such policy before upgrading: the engine will refuse to load it.
+
 ## [0.3.1](https://github.com/Lelu-ai/lelu/compare/engine-v0.3.0...engine-v0.3.1) (2026-11-21)
 
 

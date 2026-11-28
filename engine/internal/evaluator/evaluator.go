@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -182,11 +183,42 @@ func validatePolicy(p *Policy) error {
 		if r.Match == "" {
 			return fmt.Errorf("rules[%d] (%q): match is required", i, r.ID)
 		}
-		if r.Decision == "compute" && r.SafeTool == "" {
+		if r.Decision == "compute" && strings.TrimSpace(r.SafeTool) == "" {
 			return fmt.Errorf("rules[%d] (%q): a compute rule needs safe_tool", i, r.ID)
 		}
 	}
+	// Compute rules under an agent scope need a safe tool just as much as
+	// top-level ones. Without one, a matching action got a compute decision
+	// naming no tool to run instead. Scopes are checked in sorted order so the
+	// error names the same scope on every load.
+	names := make([]string, 0, len(p.AgentScopes))
+	for name := range p.AgentScopes {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		for i, cr := range p.AgentScopes[name].Compute {
+			if strings.TrimSpace(cr.SafeTool) == "" {
+				return fmt.Errorf("agent_scopes.%s.compute[%d] (action %q): a compute rule needs safe_tool", name, i, cr.Action)
+			}
+		}
+	}
 	return nil
+}
+
+// guardCompute turns a compute decision that names no safe tool into a deny.
+// Policy loading already rejects compute rules without safe_tool, so this
+// should never fire; it keeps a caller from ever being told to run an
+// unnamed tool if a decision like that is produced some other way.
+func guardCompute(d *Decision) *Decision {
+	if d == nil || !d.Compute || strings.TrimSpace(d.SafeTool) != "" {
+		return d
+	}
+	return &Decision{
+		Allowed:      false,
+		Reason:       "compute decision names no safe_tool; denied",
+		PolicyDigest: d.PolicyDigest,
+	}
 }
 
 // numericArg reads a numeric argument, accepting JSON numbers and numeric strings.
@@ -331,6 +363,14 @@ func (e *Evaluator) Evaluate(ctx context.Context, req AuthRequest) (*Decision, e
 
 // EvaluateAgent checks an agent auth request with confidence-aware logic.
 func (e *Evaluator) EvaluateAgent(ctx context.Context, req AgentAuthRequest) (*Decision, error) {
+	d, err := e.evaluateAgent(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return guardCompute(d), nil
+}
+
+func (e *Evaluator) evaluateAgent(ctx context.Context, req AgentAuthRequest) (*Decision, error) {
 	e.mu.RLock()
 	p := e.policy
 	rp := e.rego

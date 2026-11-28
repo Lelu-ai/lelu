@@ -16,6 +16,14 @@
 * `approveQueueItem()` and `denyQueueItem()` take an optional `{ reviewerKey }`.
 * `waitForApproval()`'s parameter is named `reviewId`, and the examples pass `decision.reviewId` — passing `requestId` (the trace id) gets a 404.
 
+## [0.1.2](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.1...typescript-sdk-v0.1.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* REST accepts context.signal and actor; SDK reports real latencyMs and rule ([07886d3](https://github.com/Lelu-ai/lelu/commit/07886d3a71fda401e140fba3ac62d6cfd400fbff))
+* **sdk-typescript:** report real latencyMs and rule in authorize() ([492f235](https://github.com/Lelu-ai/lelu/commit/492f235b8a0b6c5dc94ace67bd2c48316de54e24))
+
 ## [0.1.1](https://github.com/Lelu-ai/lelu/compare/typescript-sdk-v0.1.0...typescript-sdk-v0.1.1) (2026-11-21)
 
 
